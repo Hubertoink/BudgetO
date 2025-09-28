@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build project (quick check)",
+			"type": "shell",
+			"command": "npm run build",
+			"args": [],
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Start Dev (Electron)",
+			"type": "shell",
+			"command": "npm run dev",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Package App",
+			"type": "shell",
+			"command": "npm run package",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Rebuild Native Modules",
+			"type": "shell",
+			"command": "npm run rebuild:native",
+			"problemMatcher": []
+		}
+	]
+}

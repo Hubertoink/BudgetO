@@ -1,0 +1,22 @@
+appId: org.verein.finanzplaner
+productName: VereinO
+icon: build/Icon.ico
+files:
+  - dist/**
+  - dist-electron/**
+asar: true
+asarUnpack:
+  - '**/*.node'
+directories:
+  output: release
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/Icon.ico
+artifactName: '${productName} Setup ${version}-${arch}.${ext}'
+mac:
+  category: public.app-category.finance
+linux:
+  target: [AppImage]
+  category: Finance

@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach to Electron Main",
+            "type": "node",
+            "request": "attach",
+            "port": 5858,
+            "restart": true,
+            "timeout": 30000,
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "presentation": {
+                "group": "electron",
+                "order": 1
+            }
+        },
+        {
+            "name": "Attach to Renderer (Chrome)",
+            "type": "chrome",
+            "request": "attach",
+            "port": 9222,
+            "webRoot": "${workspaceFolder}",
+            "presentation": {
+                "group": "electron",
+                "order": 2
+            }
+        }
+    ]
+}

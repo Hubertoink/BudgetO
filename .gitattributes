@@ -1,0 +1,35 @@
+# Normalize text files and handle common binary types
+* text=auto
+
+# Scripts
+*.sh text eol=lf
+*.bash text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Source code and config (explicitly text)
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.css text
+*.scss text
+*.json text
+*.md text
+*.html text
+*.yml text
+*.yaml text
+*.toml text
+*.env text
+
+# Assets (binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.exe binary
+*.dll binary
+*.zip binary
+*.7z binary
