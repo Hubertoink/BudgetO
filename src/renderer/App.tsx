@@ -4893,14 +4893,27 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 )
             })() : ''}</td>
         ) : k === 'paymentMethod' ? (
-            <td key={k}>{r.type === 'TRANSFER'
-                ? (
+            <td key={k}>
+                {r.type === 'TRANSFER' ? (
                     (() => {
-                        const dir = r.transferFrom && r.transferTo ? `${r.transferFrom} → ${r.transferTo}` : '—'
-                        return <span className="badge">{dir}</span>
+                        const from = r.transferFrom
+                        const to = r.transferTo
+                        const title = from && to ? `${from} → ${to}` : 'Transfer'
+                        return (
+                            <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                {from === 'BAR' ? <IconCash /> : <IconBank />}
+                                <IconArrow />
+                                {to === 'BAR' ? <IconCash /> : <IconBank />}
+                            </span>
+                        )
                     })()
-                )
-                : (r.paymentMethod ? <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`}>{r.paymentMethod}</span> : '')}
+                ) : (
+                    r.paymentMethod ? (
+                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod} aria-label={`Zahlweg: ${r.paymentMethod}`} style={{ display: 'inline-grid', placeItems: 'center' }}>
+                            {r.paymentMethod === 'BAR' ? <IconCash /> : <IconBank />}
+                        </span>
+                    ) : ''
+                )}
             </td>
         ) : k === 'budget' ? (
             <td key={k} align="center">{r.budgetLabel ? (
@@ -4944,6 +4957,40 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 ))}
             </tbody>
         </table>
+    )
+}
+
+// Small inline icons used in table badges
+function IconBank({ size = 14 }: { size?: number }) {
+    const s = size
+    return (
+        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 10h18" />
+            <path d="M5 10v8M10 10v8M14 10v8M19 10v8" />
+            <path d="M2 10l10-6 10 6" />
+            <path d="M3 18h18" />
+        </svg>
+    )
+}
+
+function IconCash({ size = 14 }: { size?: number }) {
+    const s = size
+    return (
+        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M7 9h.01M17 15h.01" />
+        </svg>
+    )
+}
+
+function IconArrow({ size = 14 }: { size?: number }) {
+    const s = size
+    return (
+        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" />
+            <path d="M13 8l6 4-6 4" />
+        </svg>
     )
 }
 

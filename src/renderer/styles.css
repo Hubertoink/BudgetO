@@ -359,6 +359,16 @@ pre {
     color: #0B0E14;
 }
 
+/* Make SVG icons inside badges align nicely */
+.badge svg {
+    display: block;
+}
+.badge .icon-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
