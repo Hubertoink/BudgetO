@@ -335,6 +335,37 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_invoice_tags_invoice ON invoice_tags(invoice_id);
     `
   }
+  ,
+  {
+    version: 16,
+    up: `
+    -- Members core tables
+    CREATE TABLE IF NOT EXISTS members (
+      id INTEGER PRIMARY KEY,
+      member_no TEXT UNIQUE,
+      name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      address TEXT,
+      status TEXT CHECK(status IN ('ACTIVE','NEW','PAUSED','LEFT')) NOT NULL DEFAULT 'ACTIVE',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+
+    -- Optional tags for members using shared tags table
+    CREATE TABLE IF NOT EXISTS member_tags (
+      member_id INTEGER NOT NULL,
+      tag_id INTEGER NOT NULL,
+      PRIMARY KEY(member_id, tag_id),
+      FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE,
+      FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_members_name ON members(name);
+    CREATE INDEX IF NOT EXISTS idx_members_email ON members(email);
+    CREATE INDEX IF NOT EXISTS idx_members_status ON members(status);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

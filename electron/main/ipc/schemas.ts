@@ -620,6 +620,17 @@ export type TTagUpsertOutput = z.infer<typeof TagUpsertOutput>
 export type TTagDeleteInput = z.infer<typeof TagDeleteInput>
 export type TTagDeleteOutput = z.infer<typeof TagDeleteOutput>
 
+// Members CRUD
+export const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
+export const MembersListInput = z.object({ q: z.string().optional(), status: z.enum(['ACTIVE','NEW','PAUSED','LEFT','ALL']).optional(), limit: z.number().min(1).max(200).default(50).optional(), offset: z.number().min(0).default(0).optional() }).optional()
+export const MembersListOutput = z.object({ rows: z.array(z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional() })), total: z.number() })
+export const MemberCreateInput = z.object({ memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), tags: z.array(z.string()).optional() })
+export const MemberCreateOutput = z.object({ id: z.number() })
+export const MemberUpdateInput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string().optional(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), tags: z.array(z.string()).optional() })
+export const MemberUpdateOutput = z.object({ id: z.number() })
+export const MemberDeleteInput = z.object({ id: z.number() })
+export const MemberDeleteOutput = z.object({ id: z.number() })
+
 // Settings (simple key-value)
 export const SettingsGetInput = z.object({ key: z.string() })
 export const SettingsGetOutput = z.object({ value: z.any().optional() })

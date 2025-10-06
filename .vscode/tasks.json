@@ -30,6 +30,12 @@
 			"type": "shell",
 			"command": "npm run rebuild:native",
 			"problemMatcher": []
+		},
+		{
+			"label": "Build project (quick check)",
+			"type": "shell",
+			"command": "npm run build",
+			"group": "build"
 		}
 	]
 }

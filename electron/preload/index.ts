@@ -74,6 +74,12 @@ contextBridge.exposeInMainWorld('api', {
         addPayment: (payload: any) => ipcRenderer.invoke('invoices.addPayment', payload),
         markPaid: (payload: any) => ipcRenderer.invoke('invoices.markPaid', payload)
     },
+    members: {
+        list: (payload?: any) => ipcRenderer.invoke('members.list', payload),
+        create: (payload: any) => ipcRenderer.invoke('members.create', payload),
+        update: (payload: any) => ipcRenderer.invoke('members.update', payload),
+        delete: (payload: any) => ipcRenderer.invoke('members.delete', payload)
+    },
     invoiceFiles: {
         open: (payload: any) => ipcRenderer.invoke('invoiceFiles.open', payload),
         saveAs: (payload: any) => ipcRenderer.invoke('invoiceFiles.saveAs', payload),

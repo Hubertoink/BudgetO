@@ -99,7 +99,7 @@ export default function App() {
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
-    const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Einstellungen'>(() => {
+    const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen'>(() => {
         try { return (localStorage.getItem('activePage') as any) || 'Buchungen' } catch { return 'Buchungen' }
     })
     // When switching to Reports, bump a key to trigger chart re-measures
@@ -616,6 +616,7 @@ export default function App() {
         'Dashboard': '#7C4DFF',
         'Buchungen': '#2962FF',
         'Rechnungen': '#00B8D4',
+        'Mitglieder': '#26A69A',
         'Budgets': '#00C853',
         'Zweckbindungen': '#FFD600',
         'Belege': '#FF9100',
@@ -665,6 +666,11 @@ export default function App() {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
                                         <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
                                         <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
+                                    </svg>
+                                ) },
+                                { key: 'Mitglieder', icon: (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
+                                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
                                     </svg>
                                 ) },
                                 { key: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
@@ -736,6 +742,11 @@ export default function App() {
                                             <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
                                         </svg>
                                     ) },
+                                    { key: 'Mitglieder', label: 'Mitglieder', icon: (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
+                                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
+                                        </svg>
+                                    ) },
                                     { key: 'Budgets', label: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
                                     { key: 'Zweckbindungen', label: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
                                 ].map(({ key, label, icon }) => (
@@ -777,6 +788,9 @@ export default function App() {
                     {activePage === 'Dashboard' && <h1>Dashboard</h1>}
                     {activePage === 'Rechnungen' && (
                         <InvoicesView />
+                    )}
+                    {activePage === 'Mitglieder' && (
+                        <MembersView />
                     )}
                     {activePage === 'Buchungen' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -2301,6 +2315,156 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
 
             {/* Recent Activity: last vouchers */}
             <DashboardRecentActivity />
+        </div>
+    )
+}
+
+// Basic Members UI: list with search and add/edit modal (Phase 1)
+function MembersView() {
+    const [q, setQ] = useState('')
+    const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
+    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[] }>>([])
+    const [total, setTotal] = useState(0)
+    const [limit, setLimit] = useState(50)
+    const [offset, setOffset] = useState(0)
+    const [busy, setBusy] = useState(false)
+    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; tags?: string[] } }>(null)
+
+    async function load() {
+        setBusy(true)
+        try {
+            const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset })
+            setRows(res?.rows || []); setTotal(res?.total || 0)
+        } catch (e: any) {
+            // eslint-disable-next-line no-console
+            console.error('members.list failed', e)
+        } finally { setBusy(false) }
+    }
+    useEffect(() => { load() }, [q, status, limit, offset])
+
+    const pages = Math.max(1, Math.ceil(total / Math.max(1, limit)))
+    const page = Math.floor(offset / Math.max(1, limit)) + 1
+
+    return (
+        <div className="card" style={{ padding: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <h1 style={{ margin: 0 }}>Mitglieder</h1>
+                    <input className="input" placeholder="Suche (Name, E-Mail, Tel., Nr.)" value={q} onChange={(e) => { setOffset(0); setQ(e.target.value) }} style={{ width: 300 }} />
+                    <select className="input" value={status} onChange={(e) => { setOffset(0); setStatus(e.target.value as any) }}>
+                        <option value="ALL">Alle</option>
+                        <option value="ACTIVE">Aktiv</option>
+                        <option value="NEW">Neu</option>
+                        <option value="PAUSED">Pause</option>
+                        <option value="LEFT">Ausgetreten</option>
+                    </select>
+                    <button className="btn ghost" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}>Zurücksetzen</button>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
+                    <button className="btn" onClick={() => setForm({ mode: 'create', draft: { name: '', status: 'ACTIVE', tags: [] } })}>+ Neu</button>
+                </div>
+            </div>
+            <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
+                <thead>
+                    <tr>
+                        <th align="left">Nr.</th>
+                        <th align="left">Name</th>
+                        <th align="left">E-Mail</th>
+                        <th align="left">Telefon</th>
+                        <th align="left">Status</th>
+                        <th align="left">Tags</th>
+                        <th align="center">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map(r => (
+                        <tr key={r.id}>
+                            <td>{r.memberNo || '—'}</td>
+                            <td>{r.name}</td>
+                            <td>{r.email || '—'}</td>
+                            <td>{r.phone || '—'}</td>
+                            <td><span className="badge">{r.status}</span></td>
+                            <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.tags || []).join(', ')}</td>
+                            <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { id: r.id, memberNo: r.memberNo ?? null, name: r.name, email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, status: r.status as any, tags: r.tags || [] } })}>✎</button>
+                                <button className="btn danger" title="Löschen" onClick={async () => { if (!confirm('Mitglied wirklich löschen?')) return; try { await (window as any).api?.members?.delete?.({ id: r.id }); await load() } catch (e) { /* ignore */ } }}>🗑</button>
+                            </td>
+                        </tr>
+                    ))}
+                    {rows.length === 0 && (
+                        <tr><td colSpan={7}><div className="helper">Keine Einträge</div></td></tr>
+                    )}
+                </tbody>
+            </table>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                <div className="helper">{total} Einträge</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">⏮</button>
+                    <button className="btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
+                    <button className="btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
+                </div>
+            </div>
+
+            {form && (
+                <div className="modal-overlay" onClick={() => setForm(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
+                            <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
+                        </header>
+                        <div className="row" style={{ marginTop: 8 }}>
+                            <div className="field">
+                                <label>Mitglieds-Nr.</label>
+                                <input className="input" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Name</label>
+                                <input className="input" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} />
+                            </div>
+                            <div className="field">
+                                <label>E-Mail</label>
+                                <input className="input" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Telefon</label>
+                                <input className="input" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value || null } })} />
+                            </div>
+                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                <label>Adresse</label>
+                                <input className="input" value={form.draft.address ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, address: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Status</label>
+                                <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
+                                    <option value="ACTIVE">Aktiv</option>
+                                    <option value="NEW">Neu</option>
+                                    <option value="PAUSED">Pause</option>
+                                    <option value="LEFT">Ausgetreten</option>
+                                </select>
+                            </div>
+                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                <label>Tags (Komma-getrennt)</label>
+                                <input className="input" value={(form.draft.tags || []).join(', ')} onChange={(e) => setForm({ ...form, draft: { ...form.draft, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                            <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
+                            <button className="btn primary" onClick={async () => {
+                                try {
+                                    if (!form.draft.name || !form.draft.name.trim()) { alert('Name ist Pflichtfeld'); return }
+                                    if (form.mode === 'create') {
+                                        await (window as any).api?.members?.create?.({ ...form.draft })
+                                    } else {
+                                        await (window as any).api?.members?.update?.({ ...form.draft })
+                                    }
+                                    setForm(null); await load()
+                                } catch (e: any) { alert(e?.message || String(e)) }
+                            }}>Speichern</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
