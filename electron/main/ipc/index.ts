@@ -111,7 +111,10 @@ export function registerIpcHandlers() {
             earmarkId: (parsed.filters as any)?.earmarkId,
             budgetId: (parsed.filters as any)?.budgetId,
             q: (parsed.filters as any)?.q,
-            tag: (parsed.filters as any)?.tag
+            tag: (parsed.filters as any)?.tag,
+            // Apply sort from export payload; default to DESC if not provided
+            sort: (parsed as any).sort || 'DESC',
+            sortBy: (parsed as any).sortBy || 'date'
         })
 
         const when = new Date()
@@ -127,7 +130,7 @@ export function registerIpcHandlers() {
         const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
         const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
 
-        if (parsed.format === 'PDF') {
+    if (parsed.format === 'PDF') {
             // Phase 1 PDF: simple summary page rendered in an offscreen BrowserWindow and printed to PDF
             const when = new Date()
             const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
@@ -144,6 +147,24 @@ export function registerIpcHandlers() {
                 to: parsed.to
             } as any)
             const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, type: (parsed.filters?.type as any) || undefined })
+            // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
+            const d2 = getDb()
+            const p2: any[] = []
+            const wh2: string[] = []
+            if (parsed.from) { wh2.push('date >= ?'); p2.push(parsed.from) }
+            if (parsed.to) { wh2.push('date <= ?'); p2.push(parsed.to) }
+            if (parsed.filters?.paymentMethod) { wh2.push('payment_method = ?'); p2.push(parsed.filters.paymentMethod) }
+            if (parsed.filters?.sphere) { wh2.push('sphere = ?'); p2.push(parsed.filters.sphere) }
+            const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
+            const detailed = d2.prepare(`
+                SELECT strftime('%Y-%m', date) as month,
+                       IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END), 0) as inGross,
+                       IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END), 0) as outGross,
+                       IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount WHEN type='OUT' THEN -gross_amount ELSE 0 END), 0) as saldo
+                FROM vouchers${where2}
+                GROUP BY strftime('%Y-%m', date)
+                ORDER BY month ASC
+            `).all(...p2) as any[]
             const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
             const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
 
@@ -196,8 +217,15 @@ export function registerIpcHandlers() {
     th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
     .small { font-size: 12px; }
     .right { text-align: right; }
-    .chart { height: 140px; display: grid; grid-auto-flow: column; align-items: end; gap: 6px; }
+    .chart { height: 160px; display: grid; grid-auto-flow: column; align-items: end; gap: 8px; }
     .bar { background: #6AA6FF; }
+    .line-wrap { height: 220px; position: relative; }
+    .line-wrap svg { position: absolute; inset: 0; }
+    .stroke-in { stroke: #4CC38A; fill: none; stroke-width: 2; }
+    .stroke-out { stroke: #F06A6A; fill: none; stroke-width: 2; }
+    .stroke-net { stroke: #6AA6FF; fill: none; stroke-width: 2; stroke-dasharray: 4 4; }
+    .axis { stroke: #ccc; stroke-width: 1; }
+    .lbl { font-size: 11px; fill: #333; }
     .footer { margin-top: 24px; font-size: 11px; color: #777; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef3ff; font-size:12px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -247,12 +275,70 @@ export function registerIpcHandlers() {
         <div class="chart">
             ${(() => {
                     const max = Math.max(1, ...buckets.map((b: any) => Math.abs(b.gross)))
+                    const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
                     return buckets.map((b: any) => {
-                        const h = Math.round((Math.abs(b.gross) / max) * 120) + 8
-                        const label = String(b.month)
-                        return `<div style=display:flex;flex-direction:column;align-items:center;gap:6px><div class=bar style=width:20px;height:${h}px title="${label}: ${Number(b.gross).toFixed(2)} €"></div><div class=small>${label.slice(5)}</div></div>`
+                        const frac = Math.abs(b.gross) / max
+                        const h = Math.max(10, Math.round(frac * 120))
+                        const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
+                        const mon = m[monIdx] || String(b.month).slice(5)
+                        const val = `${Number(b.gross).toFixed(2)} €`
+                        return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+                            <div class="small" style="color:#333">${val}</div>
+                            <div class=bar style="width:22px;height:${h}px" title="${mon} ${val}"></div>
+                            <div class=small>${mon}</div>
+                        </div>`
                     }).join('')
                 })()}
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <div class="title">Verlaufslinie (IN / OUT / Saldo)</div>
+        <div class="line-wrap">
+            ${(() => {
+                // Accurate line chart from detailed series
+                const W = 760, H = 220, P = 28
+                const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
+                const maxAbs = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0, Math.abs(Number(b.saldo)||0))))
+                const ys = (v: number) => H/2 - (v / maxAbs) * (H/2 - 16)
+                const ptsIn: string[] = []
+                const ptsOut: string[] = []
+                const ptsNet: string[] = []
+                const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+                const labels: string[] = []
+                detailed.forEach((b: any, i: number) => {
+                    const x = xs(i, detailed.length)
+                    const inV = Number(b.inGross)||0
+                    const outV = Number(b.outGross)||0
+                    const netV = Number(b.saldo)||0
+                    const yIn = ys(inV)
+                    const yOut = ys(-outV)
+                    const yNet = ys(netV)
+                    ptsIn.push(`${x},${yIn}`)
+                    ptsOut.push(`${x},${yOut}`)
+                    ptsNet.push(`${x},${yNet}`)
+                    const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
+                    const mon = m[monIdx] || String(b.month).slice(5)
+                    labels.push(`
+                        <text class="lbl" x="${x}" y="${H-6}" text-anchor="middle">${mon}</text>
+                        <text class="lbl" x="${x}" y="${yIn - 6}" text-anchor="middle" fill="#4CC38A">${inV.toFixed(0)}€</text>
+                        <text class="lbl" x="${x}" y="${yOut + 12}" text-anchor="middle" fill="#F06A6A">${outV.toFixed(0)}€</text>
+                        <text class="lbl" x="${x}" y="${yNet - 6}" text-anchor="middle" fill="#6AA6FF">${netV.toFixed(0)}€</text>
+                    `)
+                })
+                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+                    <line class="axis" x1="0" y1="${H/2}" x2="${W}" y2="${H/2}"/>
+                    <polyline class="stroke-in" points="${ptsIn.join(' ')}"/>
+                    <polyline class="stroke-out" points="${ptsOut.join(' ')}"/>
+                    <polyline class="stroke-net" points="${ptsNet.join(' ')}"/>
+                    ${labels.join('')}
+                </svg>`
+            })()}
+        </div>
+        <div class="legend" style="margin-top:8px;">
+            <span class="legend-item"><span class="sw" style="background:#4CC38A"></span>IN</span>
+            <span class="legend-item"><span class="sw" style="background:#F06A6A"></span>OUT</span>
+            <span class="legend-item"><span class="sw" style="background:#6AA6FF"></span>SALDO</span>
         </div>
     </div>
 

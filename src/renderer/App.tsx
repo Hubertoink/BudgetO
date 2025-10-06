@@ -30,7 +30,6 @@ function contrastText(bg?: string | null) {
 }
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-
 function TopHeaderOrg() {
     const [org, setOrg] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
@@ -103,6 +102,11 @@ export default function App() {
     const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Einstellungen'>(() => {
         try { return (localStorage.getItem('activePage') as any) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    // When switching to Reports, bump a key to trigger chart re-measures
+    const [reportsActivateKey, setReportsActivateKey] = useState(0)
+    useEffect(() => {
+        if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
+    }, [activePage])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
     // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
@@ -113,11 +117,9 @@ export default function App() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
         try { return localStorage.getItem('sidebarCollapsed') === '1' } catch { return false }
     })
+    // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
     const [reportsTab, setReportsTab] = useState<string>(() => {
-        try {
-            const v = localStorage.getItem('reportsTab') || 'overview'
-            return v === 'compare' ? 'overview' : v
-        } catch { return 'overview' }
+        try { return 'overview' } catch { return 'overview' }
     })
 
     // UI preference: color theme palette
@@ -130,6 +132,23 @@ export default function App() {
         // apply on <html>
         try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch { }
     }, [colorTheme])
+    // UI preference: journal table row style and density (Buchungen)
+    type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
+    type JournalRowDensity = 'normal' | 'compact'
+    const [journalRowStyle, setJournalRowStyle] = useState<JournalRowStyle>(() => {
+        try { return (localStorage.getItem('ui.journalRowStyle') as JournalRowStyle) || 'both' } catch { return 'both' }
+    })
+    const [journalRowDensity, setJournalRowDensity] = useState<JournalRowDensity>(() => {
+        try { return (localStorage.getItem('ui.journalRowDensity') as JournalRowDensity) || 'normal' } catch { return 'normal' }
+    })
+    useEffect(() => {
+        try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch { }
+        try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch { }
+    }, [journalRowStyle])
+    useEffect(() => {
+        try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch { }
+        try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch { }
+    }, [journalRowDensity])
     // Period lock (year-end) status for UI controls (e.g., lock edit)
     const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
     useEffect(() => {
@@ -148,6 +167,7 @@ export default function App() {
     const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
     const [exportOrgName, setExportOrgName] = useState<string>('')
     const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
+    const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -164,9 +184,8 @@ export default function App() {
     useEffect(() => {
         try { localStorage.setItem('activePage', activePage) } catch { }
     }, [activePage])
-    useEffect(() => {
-        try { localStorage.setItem('reportsTab', reportsTab) } catch { }
-    }, [reportsTab])
+    // No-op: unified reports page; keep effect to avoid removing too many deps
+    useEffect(() => { /* unified reports */ }, [reportsTab])
     // Open Export Options when requested from nested components
     useEffect(() => {
         function onOpenExport() { setShowExportOptions(true) }
@@ -331,6 +350,24 @@ export default function App() {
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
     const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
     const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+    // Human-readable (German) labels for column keys, consistent with table headers elsewhere in the app
+    const colLabels: Record<ColKey, string> = {
+        actions: 'Aktionen',
+        date: 'Datum',
+        voucherNo: 'Nr.',
+        type: 'Typ',
+        sphere: 'Sphäre',
+        description: 'Beschreibung',
+        earmark: 'Zweckbindung',
+        budget: 'Budget',
+        paymentMethod: 'Zahlweg',
+        attachments: 'Anhänge',
+        net: 'Netto',
+        vat: 'MwSt',
+        gross: 'Brutto',
+    }
+    // Safe lookup for UI where type may be string
+    function labelForCol(k: string): string { return (colLabels as any)[k] || k }
     function sanitizeOrder(raw: any): ColKey[] {
         const arr = Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : []
         const known = new Set<ColKey>(['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross'])
@@ -745,15 +782,28 @@ export default function App() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
                             <h1 style={{ margin: 0 }}>Buchungen</h1>
                             <input ref={searchInputRef} className="input" placeholder="Suche Buchungen (Ctrl+K)" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 8, width: 340 }} />
-                            {/* Moved Zeit & Sphäre next to search */}
-                            <span style={{ color: 'var(--text-dim)' }}>Zeit:</span>
-                            <button className="btn" title="Zeitraum/Jahr wählen" onClick={() => setShowTimeFilter(true)}>
+                            {/* Quick-access: time, meta-filter, and batch icons inline */}
+                            <button className="btn" title="Zeitraum/Jahr wählen" aria-label="Zeitraum oder Jahr wählen" onClick={() => setShowTimeFilter(true)}>
                                 {/* clock icon */}
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
                             </button>
-                            <button className="btn" title="Sphäre/Zweckbindung/Budget wählen" onClick={() => setShowMetaFilter(true)}>
+                            <button className="btn" title="Sphäre/Zweckbindung/Budget wählen" aria-label="Sphäre, Zweckbindung oder Budget wählen" onClick={() => setShowMetaFilter(true)}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M3 5h18v2H3zM6 10h12v2H6zM9 15h6v2H9z"/>
+                                </svg>
+                            </button>
+                            {/* Batch assign action (earmark/tags/budget) */}
+                            <button
+                                className="btn"
+                                title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
+                                aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
+                                onClick={() => setShowBatchEarmark(true)}
+                                style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="4" rx="1" />
+                                    <rect x="3" y="10" width="18" height="4" rx="1" />
+                                    <rect x="3" y="16" width="18" height="4" rx="1" />
                                 </svg>
                             </button>
                             {/* Compact badges for key active filters: Zweckbindung, Tag, Budget */}
@@ -830,7 +880,7 @@ export default function App() {
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
                     {activePage === 'Dashboard' && (
-                        <DashboardView today={today} />
+                        <DashboardView today={today} onGoToInvoices={() => setActivePage('Rechnungen')} />
                     )}
                     {activePage === 'Buchungen' && (
                         <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
@@ -856,20 +906,7 @@ export default function App() {
                                 ))}
                             </select>
                             <button className="btn" onClick={() => loadRecent()}>Aktualisieren</button>
-                            {/* Batch assign action (earmark/tags/budget) */}
-                            <button
-                                className="btn"
-                                title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
-                                aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
-                                onClick={() => setShowBatchEarmark(true)}
-                                style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="4" rx="1" />
-                                    <rect x="3" y="10" width="18" height="4" rx="1" />
-                                    <rect x="3" y="16" width="18" height="4" rx="1" />
-                                </svg>
-                            </button>
+                            {/* Batch button moved to the top toolbar */}
                         </div>
                     )}
                     {activePage === 'Reports' && (
@@ -922,30 +959,25 @@ export default function App() {
                                         <option value="BAR">Bar</option>
                                         <option value="BANK">Bank</option>
                                     </select>
+                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }}>Filter zurücksetzen</button>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <button className="btn" onClick={() => setShowExportOptions(true)}>Exportieren…</button>
-                                    <div style={{ display: 'flex', gap: 6 }}>
-                                        <button className="btn ghost" onClick={() => setReportsTab('overview')} style={{ background: reportsTab === 'overview' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Übersicht</button>
-                                        <button className="btn ghost" onClick={() => setReportsTab('monthly')} style={{ background: reportsTab === 'monthly' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Monatsverlauf</button>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
-                    {activePage === 'Reports' && reportsTab === 'overview' && (
+                    {activePage === 'Reports' && (
                         <>
+                            {/* Unified Reports view: KPIs + donuts/bars + monthly charts */}
                             <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                 <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} />
                                 <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} />
                             </div>
-                        </>
-                    )}
-                    {activePage === 'Reports' && reportsTab === 'monthly' && (
-                        <>
-                            <ReportsMonthlyChart refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
-                            <ReportsInOutLines refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} />
+                            <div style={{ height: 12 }} />
+                            <ReportsMonthlyChart activateKey={reportsActivateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
+                            <ReportsInOutLines activateKey={reportsActivateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} />
                         </>
                     )}
 
@@ -1316,11 +1348,16 @@ export default function App() {
                             setNavIconColorMode={setNavIconColorMode}
                             colorTheme={colorTheme}
                             setColorTheme={setColorTheme}
+                            journalRowStyle={journalRowStyle}
+                            setJournalRowStyle={setJournalRowStyle}
+                            journalRowDensity={journalRowDensity}
+                            setJournalRowDensity={setJournalRowDensity}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}
                             bumpDataVersion={bumpDataVersion}
                             openTagsManager={() => setShowTagsManager(true)}
+                            labelForCol={labelForCol}
                         />
                     )}
 
@@ -1374,7 +1411,7 @@ export default function App() {
                                         ))}
                                         {bindings.length === 0 && (
                                             <tr>
-                                                <td colSpan={6} style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Keine Zweckbindungen vorhanden.</td>
+                                                <td colSpan={7} className="helper">Keine Zweckbindungen vorhanden.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -1462,6 +1499,11 @@ export default function App() {
                                             </td>
                                         </tr>
                                     ))}
+                                    {(budgets as any).length === 0 && (
+                                        <tr>
+                                            <td colSpan={8} className="helper">Keine Budgets vorhanden.</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                             {/* Tiles UI */}
@@ -1768,6 +1810,8 @@ export default function App() {
                     setOrgName={setExportOrgName}
                     amountMode={exportAmountMode}
                     setAmountMode={setExportAmountMode}
+                    sortDir={exportSortDir}
+                    setSortDir={setExportSortDir}
                     onExport={async (fmt) => {
                         try {
                             const res = await window.api?.reports.export?.({
@@ -1778,7 +1822,9 @@ export default function App() {
                                 filters: { paymentMethod: filterPM || undefined, sphere: filterSphere || undefined, type: filterType || undefined },
                                 fields: exportFields,
                                 orgName: exportOrgName || undefined,
-                                amountMode: exportAmountMode
+                                amountMode: exportAmountMode,
+                                sort: exportSortDir,
+                                sortBy: 'date'
                             } as any)
                             if (res) {
                                 const dir = res.filePath?.replace(/\\[^\\/]+$/,'').replace(/\/[^^/]+$/, '') || ''
@@ -1926,7 +1972,7 @@ function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
 }
 
 // Export Options Modal for Reports
-function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, onExport }: {
+function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport }: {
     open: boolean
     onClose: () => void
     fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -1935,6 +1981,8 @@ function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgN
     setOrgName: (v: string) => void
     amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
     setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
+    sortDir: 'ASC' | 'DESC'
+    setSortDir: (v: 'ASC' | 'DESC') => void
     onExport: (fmt: 'CSV' | 'XLSX' | 'PDF') => Promise<void>
 }) {
     const all: Array<{ key: any; label: string }> = [
@@ -1973,6 +2021,7 @@ function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgN
                                 </label>
                             ))}
                         </div>
+                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags“ gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
                     </div>
                     <div className="field" style={{ gridColumn: '1 / span 2' }}>
                         <label>Organisationsname (optional)</label>
@@ -1985,6 +2034,13 @@ function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgN
                             <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
                         </div>
                     </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Sortierung (Datum)</label>
+                        <div className="btn-group" role="group">
+                            <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
+                            <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
+                        </div>
+                    </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                     <button className="btn" onClick={() => onExport('CSV')}>CSV</button>
@@ -1995,7 +2051,7 @@ function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgN
         </div>, document.body
     ) : null
 }
-function DashboardView({ today }: { today: string }) {
+function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
     const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
     const [loading, setLoading] = useState(false)
     const [cashier, setCashier] = useState<string>('')
@@ -2067,6 +2123,72 @@ function DashboardView({ today }: { today: string }) {
     }, [period, refreshKey])
     const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
+    // Offene Rechnungen: Kachel mit Fälligkeiten (Due Soon / Überfällig)
+    const [invOpenCount, setInvOpenCount] = useState<number>(0)
+    const [invOpenRemaining, setInvOpenRemaining] = useState<number>(0)
+    const [invDueSoonCount, setInvDueSoonCount] = useState<number>(0)
+    const [invDueSoonRemaining, setInvDueSoonRemaining] = useState<number>(0)
+    const [invOverdueCount, setInvOverdueCount] = useState<number>(0)
+    const [invOverdueRemaining, setInvOverdueRemaining] = useState<number>(0)
+    const [invTopDue, setInvTopDue] = useState<Array<{ id: number; party: string; dueDate?: string | null; remaining: number }>>([])
+
+    const loadInvoiceTiles = useCallback(async () => {
+        try {
+            // Helpers for ISO dates (UTC semantics)
+            const now = new Date()
+            const isoToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10)
+            const plus5 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 5)).toISOString().slice(0, 10)
+            const yday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)).toISOString().slice(0, 10)
+
+            // Helper to sum two summaries (OPEN + PARTIAL)
+            const sumTwo = (a: any, b: any) => ({ count: (a?.count || 0) + (b?.count || 0), remaining: (a?.remaining || 0) + (b?.remaining || 0) })
+
+            // Overall open (OPEN + PARTIAL)
+            const sOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN' })
+            const sPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL' })
+            const openTot = sumTwo(sOpen, sPart)
+            setInvOpenCount(openTot.count)
+            setInvOpenRemaining(openTot.remaining)
+
+            // Due soon: between today and +5 days
+            const sSoonOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
+            const sSoonPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
+            const soonTot = sumTwo(sSoonOpen, sSoonPart)
+            setInvDueSoonCount(soonTot.count)
+            setInvDueSoonRemaining(soonTot.remaining)
+
+            // Overdue: due date before today (<= yesterday)
+            const sOverOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueTo: yday })
+            const sOverPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueTo: yday })
+            const overTot = sumTwo(sOverOpen, sOverPart)
+            setInvOverdueCount(overTot.count)
+            setInvOverdueRemaining(overTot.remaining)
+
+            // Top due (next 5 days) preview list (merge OPEN + PARTIAL, sort ascending by due, take 3)
+            const listOpen = await (window as any).api?.invoices?.list?.({ limit: 5, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
+            const listPart = await (window as any).api?.invoices?.list?.({ limit: 5, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
+            const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
+                .filter((r: any) => !!r && !!r.dueDate)
+                .sort((a: any, b: any) => String(a.dueDate).localeCompare(String(b.dueDate)))
+            // Deduplicate by id and take top 5
+            const uniq: Map<number, any> = new Map()
+            for (const r of mergedRaw) { if (r && typeof r.id === 'number' && !uniq.has(r.id)) uniq.set(r.id, r) }
+            const merged = Array.from(uniq.values()).slice(0, 5)
+                .map((r: any) => ({ id: r.id, party: r.party, dueDate: r.dueDate, remaining: Math.max(0, Math.round(((Number(r.grossAmount || 0) - Number(r.paidSum || 0)) || 0) * 100) / 100) }))
+            setInvTopDue(merged)
+        } catch {
+            // Non-fatal; keep tile hidden or zeros
+        }
+    }, [])
+
+    useEffect(() => {
+        let alive = true
+        ;(async () => { if (alive) await loadInvoiceTiles() })()
+        const onChanged = () => loadInvoiceTiles()
+        window.addEventListener('data-changed', onChanged)
+        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    }, [loadInvoiceTiles])
+
     return (
         <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -2108,6 +2230,53 @@ function DashboardView({ today }: { today: string }) {
                     <div style={{ fontWeight: 600, color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
                 </div>
             </div>
+            {/* Offene Rechnungen */}
+            <div className="card" style={{ padding: 12, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong>Offene Rechnungen</strong>
+                        <span className="chip" title="Summen berücksichtigen offene (OPEN+PARTIAL) Rechnungen. 'Fällig in ≤ 5 Tagen' bezieht sich auf heute bis +5 Tage, 'Überfällig' ist vor heute.">ⓘ</span>
+                    </div>
+                    <button className="btn ghost" onClick={onGoToInvoices}>Zu Rechnungen</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 8, overflow: 'hidden' }}>
+                    <div className="card" style={{ padding: 10, minWidth: 0 }}>
+                        <div className="helper">Offen gesamt</div>
+                        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
+                    </div>
+                    <div className="card" style={{ padding: 10, minWidth: 0 }}>
+                        <div className="helper">Fällig in ≤ 5 Tagen</div>
+                        <div style={{ fontWeight: 600, color: '#f9a825', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
+                    </div>
+                    <div className="card" style={{ padding: 10, borderLeft: '4px solid var(--danger)', minWidth: 0 }}>
+                        <div className="helper">Überfällig</div>
+                        <div style={{ fontWeight: 600, color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
+                    </div>
+                </div>
+                <div style={{ marginTop: 10, overflow: 'hidden' }}>
+                    <div className="helper">Nächste Fälligkeiten</div>
+                    {invTopDue.length > 0 ? (
+                        <div style={{ marginTop: 6, maxHeight: 180, overflowY: 'auto', display: 'grid', gap: 4 }}>
+                            {invTopDue.map((r) => {
+                                const onOpen = () => {
+                                    try { onGoToInvoices() } catch {}
+                                    window.setTimeout(() => { window.dispatchEvent(new CustomEvent('open-invoice-details', { detail: { id: r.id } })) }, 0)
+                                }
+                                return (
+                                    <div key={r.id} onClick={onOpen} title="Details öffnen" style={{ cursor: 'pointer', display: 'grid', gridTemplateColumns: '120px 1fr auto', alignItems: 'center', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                                        <div style={{ color: 'var(--text-dim)' }}>{r.dueDate || '—'}</div>
+                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party || '—'}</div>
+                                        <div style={{ textAlign: 'right', fontWeight: 600 }}>{eur.format(r.remaining || 0)}</div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="helper" style={{ marginTop: 6 }}>—</div>
+                    )}
+                </div>
+            </div>
+
             {/* Charts preview */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {(() => {
@@ -2755,6 +2924,16 @@ function InvoicesView() {
         return () => { cancelled = true }
     }, [detailId])
 
+    // Allow external components (e.g., Dashboard tile) to open an invoice detail by id
+    useEffect(() => {
+        function onOpen(e: any) {
+            const id = Number(e?.detail?.id)
+            if (isFinite(id) && id > 0) openDetails(id)
+        }
+        window.addEventListener('open-invoice-details', onOpen as any)
+        return () => window.removeEventListener('open-invoice-details', onOpen as any)
+    }, [])
+
     async function addPayment() {
         if (!showPayModal) return
         const amt = Number(payAmount.replace(',', '.'))
@@ -3106,7 +3285,22 @@ function InvoicesView() {
                                             </span>
                                         </td>
                                         <td>{fmtDateLocal(r.date)}</td>
-                                        <td>{fmtDateLocal(r.dueDate || '')}</td>
+                                        {(() => {
+                                            const due = r.dueDate || ''
+                                            let style: React.CSSProperties | undefined
+                                            let title = 'Fälligkeit'
+                                            if (due) {
+                                                try {
+                                                    const today = new Date()
+                                                    const d = new Date(due)
+                                                    const diffMs = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).getTime() - new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).getTime()
+                                                    const days = Math.round(diffMs / (1000 * 60 * 60 * 24))
+                                                    if (days < 0) { style = { color: 'var(--danger)', fontWeight: 600 }; title = 'Überfällig' }
+                                                    else if (days <= 5) { style = { color: '#f9a825', fontWeight: 600 }; title = 'Fällig in ≤ 5 Tagen' }
+                                                } catch { }
+                                            }
+                                            return (<td style={style} title={title}>{fmtDateLocal(due)}</td>)
+                                        })()}
                                         <td>{r.invoiceNo || '—'}</td>
                                         <td>{r.party}</td>
                                         <td>
@@ -3987,7 +4181,6 @@ function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string
                     <strong>Summen</strong>
                     <div className="helper">Für den gewählten Zeitraum und die Filter.</div>
                 </div>
-                <button className="btn ghost" onClick={() => { const ev = new Event('open-export-options'); window.dispatchEvent(ev) }}>Exportieren</button>
             </div>
             {loading && <div>Lade …</div>}
             {data && (
@@ -4069,45 +4262,9 @@ function ReportsTabs() {
     )
 }
 
-// Utility: export an SVG node as a PNG download
-function exportSvgToPng(svg: SVGSVGElement, filename: string) {
-    try {
-        const serializer = new XMLSerializer()
-        const src = serializer.serializeToString(svg)
-        const svgBlob = new Blob([src], { type: 'image/svg+xml;charset=utf-8' })
-        const url = URL.createObjectURL(svgBlob)
-        const img = new Image()
-        const width = svg.viewBox?.baseVal?.width || svg.width?.baseVal?.value || 800
-        const height = svg.viewBox?.baseVal?.height || svg.height?.baseVal?.value || 400
-        img.onload = () => {
-            const canvas = document.createElement('canvas')
-            canvas.width = Math.ceil(width)
-            canvas.height = Math.ceil(height)
-            const ctx = canvas.getContext('2d')
-            if (!ctx) return
-            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#fff'
-            ctx.fillRect(0, 0, canvas.width, canvas.height)
-        ctx.drawImage(img, 0, 0)
-            URL.revokeObjectURL(url)
-            canvas.toBlob((blob) => {
-                if (!blob) return
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(blob)
-                a.download = filename
-                document.body.appendChild(a)
-                a.click()
-                setTimeout(() => {
-                    URL.revokeObjectURL(a.href)
-                    document.body.removeChild(a)
-                }, 0)
-            }, 'image/png')
-        }
-        img.onerror = () => URL.revokeObjectURL(url)
-        img.src = url
-    } catch { /* noop */ }
-}
+// Removed export-as-image helper (PDF export is sufficient)
 
-function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' }) {
+function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' }) {
     const [loading, setLoading] = useState(false)
     const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
     const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
@@ -4123,13 +4280,43 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
     useEffect(() => {
         const el = containerRef.current
         if (!el) return
-        setContainerW(el.clientWidth)
-        const ro = new ResizeObserver((entries) => {
-            if (entries[0]) setContainerW(entries[0].contentRect.width)
-        })
+        const measure = () => {
+            const rectW = el.getBoundingClientRect().width
+            const parentW = el.parentElement?.clientWidth || 0
+            const w = Math.max(rectW, parentW, 0)
+            if (w && Math.abs(w - containerW) > 1) setContainerW(w)
+        }
+        measure()
+        const ro = new ResizeObserver(() => measure())
         ro.observe(el)
-        return () => ro.disconnect()
+        const onResize = () => measure()
+        const onVisibility = () => { if (document.visibilityState === 'visible') { setTimeout(measure, 0); setTimeout(measure, 120) } }
+        window.addEventListener('resize', onResize)
+        document.addEventListener('visibilitychange', onVisibility)
+        // catch late layout after tab switches
+        const t0 = setTimeout(measure, 0)
+        const t1 = setTimeout(measure, 120)
+        const t2 = setTimeout(measure, 360)
+        return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVisibility); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
     }, [])
+    // Re-measure when Reports page becomes active (activateKey bump)
+    useEffect(() => {
+        const el = containerRef.current
+        if (!el) return
+        const measure = () => {
+            const rectW = el.getBoundingClientRect().width
+            const parentW = el.parentElement?.clientWidth || 0
+            const w = Math.max(rectW, parentW, 0)
+            if (w && Math.abs(w - containerW) > 1) setContainerW(w)
+        }
+        requestAnimationFrame(() => {
+            measure()
+            setTimeout(measure, 0)
+            setTimeout(measure, 120)
+            setTimeout(measure, 360)
+        })
+        // no cleanup needed for timeouts started here
+    }, [props.activateKey])
     useEffect(() => {
         let cancelled = false
         setLoading(true)
@@ -4206,12 +4393,28 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
                         <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
                         <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--accent)' }}></span>Saldo</span>
                     </div>
-                    <button className="btn ghost" onClick={() => { const svg = svgRef.current; if (svg) exportSvgToPng(svg, 'monatsverlauf.png') }}>Als Bild speichern</button>
                 </div>
             </div>
             {loading && <div>Lade …</div>}
             {!loading && (
-                <div ref={containerRef} style={{ overflowX: 'auto' }}>
+                <div ref={containerRef} style={{ overflowX: 'auto', position: 'relative' }}>
+                    {/* Focus details overlay (hover or click to pin; double-click to drilldown) */}
+                    {(() => {
+                        const focusIdx = (typeof hoverIdx === 'number' ? hoverIdx : null)
+                        // selected pin handled on click below via title; keep hover only for now to avoid clutter
+                        const idx = focusIdx
+                        if (idx == null || !series[idx]) return null
+                        const s = series[idx]
+                        const net = s.inGross + s.outGross
+                        return (
+                            <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <strong style={{ fontSize: 12 }}>{monthLabel(s.month, true)}</strong>
+                                <span className="chip" style={{ background: '#2e7d32', color: '#fff' }}>IN {eurFmt.format(s.inGross)}</span>
+                                <span className="chip" style={{ background: '#c62828', color: '#fff' }}>OUT {eurFmt.format(Math.abs(s.outGross))}</span>
+                                <span className="chip" style={{ background: net >= 0 ? '#2e7d32' : '#c62828', color: '#fff' }}>Netto {eurFmt.format(net)}</span>
+                            </div>
+                        )
+                    })()}
                     <svg ref={svgRef} width={width} height={height} role="img" aria-label="Monatsverlauf">
                         {/* grid lines */}
                         {Array.from({ length: 4 }).map((_, i) => {
@@ -4227,14 +4430,18 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
                             const yOut = yBase + (innerH - hOut)
                             const saldoMonth = s.inGross + s.outGross
                             return (
-                                <g key={s.month} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => {
-                                    // Drilldown to Buchungen for this month
+                                <g key={s.month}>
+                                    {/* Large invisible hit area per month to ease hover/click */}
+                                    <rect x={gx - Math.floor(gap/2)} y={yBase} width={groupW + gap} height={innerH} fill="transparent" onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => setHoverIdx(i)} onDoubleClick={() => {
+                                    // Drilldown to Buchungen for this month (double-click)
                                     const [yy, mm] = s.month.split('-').map(Number)
                                     const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
                                     const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
                                     const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
                                     window.dispatchEvent(ev)
-                                }} style={{ cursor: 'pointer' }}>
+                                    }} style={{ cursor: 'pointer' }} />
+                                    {/* Actual bars */}
+                                    <g>
                                     <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
                                     <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
                                     {/* Monthly net overlay (thin bar) */}
@@ -4253,6 +4460,7 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
                                     )}
                                     <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
                                     <title>{`${monthLabel(s.month, true)}\nIN: ${eurFmt.format(s.inGross)}\nOUT: ${eurFmt.format(Math.abs(s.outGross))}\nNetto: ${eurFmt.format(saldoMonth)}\nKlick für Drilldown`}</title>
+                                    </g>
                                 </g>
                             )
                         })}
@@ -4416,7 +4624,6 @@ function ReportsSphereDonut(props: { refreshKey?: number; from?: string; to?: st
                             <span key={r.key} className="legend-item"><span className="legend-swatch" style={{ background: colors[r.key] }}></span>{r.key}</span>
                         ))}
                     </div>
-                    <button className="btn ghost" onClick={() => { const svg = svgRef.current; if (svg) exportSvgToPng(svg, 'sphaeren.png') }}>Als Bild speichern</button>
                 </div>
             </div>
             {loading && <div>Lade …</div>}
@@ -4471,6 +4678,7 @@ function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; t
     const [data, setData] = useState<Array<{ key: 'BAR' | 'BANK' | null; inGross: number; outGross: number }>>([])
     const svgRef = useRef<SVGSVGElement | null>(null)
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+    const [hoverIdx, setHoverIdx] = useState<number | null>(null)
     useEffect(() => {
         let cancelled = false
         setLoading(true)
@@ -4504,7 +4712,6 @@ function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; t
                         <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
                         <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
                     </div>
-                    <button className="btn ghost" onClick={() => { const svg = svgRef.current; if (svg) exportSvgToPng(svg, 'zahlwege.png') }}>Als Bild speichern</button>
                 </div>
             </div>
             {loading && <div>Lade …</div>}
@@ -4517,10 +4724,20 @@ function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; t
                         const yBar = y + 8
                         const label = r.key ?? '—'
                         return (
-                            <g key={(r.key ?? 'NULL') + i}>
+                            <g key={(r.key ?? 'NULL') + i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
                                 <text x={margin.left - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle" fontSize="12">{label}</text>
                                 <rect x={margin.left} y={yBar} width={Math.max(0, inX - margin.left)} height={10} fill="#2e7d32" rx={3} />
                                 <rect x={margin.left} y={yBar + 12} width={Math.max(0, outX - margin.left)} height={10} fill="#c62828" rx={3} />
+                                {hoverIdx === i && (
+                                    <g>
+                                        <text x={Math.max(margin.left + 4, inX - 6)} y={yBar - 4} textAnchor="end" fontSize="11" fill="#fff">
+                                            {eurFmt.format(r.inGross)}
+                                        </text>
+                                        <text x={Math.max(margin.left + 4, outX - 6)} y={yBar + 12 + 22} textAnchor="end" fontSize="11" fill="#fff">
+                                            {eurFmt.format(r.outGross)}
+                                        </text>
+                                    </g>
+                                )}
                                 <title>{`${label}\nIN: ${eurFmt.format(r.inGross)}\nOUT: ${eurFmt.format(r.outGross)}`}</title>
                             </g>
                         )
@@ -4618,25 +4835,49 @@ function ReportsCashBars(props: { refreshKey?: number; from?: string; to?: strin
     )
 }
 
-function ReportsInOutLines(props: { refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
+function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
     const [loading, setLoading] = useState(false)
     const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
     const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-    // Responsive: measure container width to expand chart
+    // Responsive: measure container width to expand chart (robust across tab switches)
     const containerRef = useRef<HTMLDivElement | null>(null)
     const [containerW, setContainerW] = useState<number>(0)
     useEffect(() => {
         const el = containerRef.current
         if (!el) return
-        setContainerW(el.clientWidth)
-        const ro = new ResizeObserver((entries) => {
-            if (entries[0]) setContainerW(entries[0].contentRect.width)
-        })
+        const measure = () => {
+            const w = Math.max(el.getBoundingClientRect().width, el.parentElement?.clientWidth || 0)
+            if (w && Math.abs(w - containerW) > 1) setContainerW(w)
+        }
+        measure()
+        const ro = new ResizeObserver(() => measure())
         ro.observe(el)
-        return () => ro.disconnect()
+        const onResize = () => measure()
+        const onVis = () => { if (document.visibilityState === 'visible') { setTimeout(measure, 0); setTimeout(measure, 120) } }
+        window.addEventListener('resize', onResize)
+        document.addEventListener('visibilitychange', onVis)
+        const t0 = setTimeout(measure, 0)
+        const t1 = setTimeout(measure, 120)
+        const t2 = setTimeout(measure, 360)
+        return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVis); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
     }, [])
+    // Re-measure on reports activation (tab/page switch)
+    useEffect(() => {
+        const el = containerRef.current
+        if (!el) return
+        const measure = () => {
+            const w = Math.max(el.getBoundingClientRect().width, el.parentElement?.clientWidth || 0)
+            if (w && Math.abs(w - containerW) > 1) setContainerW(w)
+        }
+        requestAnimationFrame(() => {
+            measure()
+            setTimeout(measure, 0)
+            setTimeout(measure, 120)
+            setTimeout(measure, 360)
+        })
+    }, [props.activateKey])
     useEffect(() => {
         let cancelled = false
         setLoading(true)
@@ -4685,7 +4926,22 @@ function ReportsInOutLines(props: { refreshKey?: number; from?: string; to?: str
             </div>
             {loading && <div>Lade …</div>}
             {!loading && (
-                <div ref={containerRef} style={{ overflowX: 'auto' }}>
+                <div ref={containerRef} style={{ overflowX: 'auto', position: 'relative' }}>
+                    {/* Focus details overlay */}
+                    {(() => {
+                        const idx = (typeof hoverIdx === 'number' ? hoverIdx : null)
+                        if (idx == null) return null
+                        const m = months[idx]
+                        const inn = inBuckets.find(b => b.month === m)?.gross || 0
+                        const out = outBuckets.find(b => b.month === m)?.gross || 0
+                        return (
+                            <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <strong style={{ fontSize: 12 }}>{monthLabel(m, true)}</strong>
+                                <span className="chip" style={{ background: '#2e7d32', color: '#fff' }}>IN {eurFmt.format(inn)}</span>
+                                <span className="chip" style={{ background: '#c62828', color: '#fff' }}>OUT {eurFmt.format(out)}</span>
+                            </div>
+                        )
+                    })()}
                     <svg width={width} height={height} role="img" aria-label="IN vs OUT">
                         {/* grid lines */}
                         {Array.from({ length: 4 }).map((_, i) => {
@@ -4695,13 +4951,25 @@ function ReportsInOutLines(props: { refreshKey?: number; from?: string; to?: str
                         <polyline fill="none" stroke="#2e7d32" strokeWidth="2" points={points(inBuckets)} />
                         <polyline fill="none" stroke="#c62828" strokeWidth="2" points={points(outBuckets)} />
                         {months.map((m, i) => (
-                            <g key={m} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => {
-                                const [yy, mm] = m.split('-').map(Number)
-                                const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
-                                const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
-                                const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
-                                window.dispatchEvent(ev)
-                            }} style={{ cursor: 'pointer' }}>
+                            <g key={m} style={{ cursor: 'pointer' }}>
+                                {(() => {
+                                    // Wide invisible hit-area that spans the month interval
+                                    const left = (i === 0 ? margin.left : Math.round((xFor(i - 1) + xFor(i)) / 2))
+                                    const right = (i === months.length - 1 ? (width - margin.right) : Math.round((xFor(i) + xFor(i + 1)) / 2))
+                                    const hitX = Math.max(margin.left, left)
+                                    const hitW = Math.max(8, right - left)
+                                    return (
+                                        <rect x={hitX} y={margin.top} width={hitW} height={innerH} fill="transparent"
+                                            onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => setHoverIdx(i)}
+                                            onDoubleClick={() => {
+                                                const [yy, mm] = m.split('-').map(Number)
+                                                const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
+                                                const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
+                                                const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
+                                                window.dispatchEvent(ev)
+                                            }} />
+                                    )
+                                })()}
                                 {/* interactive points */}
                                 <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="#2e7d32">
                                     <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(inBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
@@ -4709,58 +4977,7 @@ function ReportsInOutLines(props: { refreshKey?: number; from?: string; to?: str
                                 <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="#c62828">
                                     <title>{`OUT ${monthLabel(m, true)}: ${eurFmt.format(outBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
                                 </circle>
-                                {/* decluttered labels: threshold-based visibility, staggered positions, separation, clamped bounds */}
-                                {(() => {
-                                    const inVal = inBuckets.find(b => b.month === m)?.gross || 0
-                                    const outVal = outBuckets.find(b => b.month === m)?.gross || 0
-                                    const SHOW_THRESHOLD = 150 // €
-                                    const showIn = Math.abs(inVal) >= SHOW_THRESHOLD || hoverIdx === i
-                                    const showOut = Math.abs(outVal) >= SHOW_THRESHOLD || hoverIdx === i
-                                    if (!showIn && !showOut) return null
-
-                                    const x = xFor(i)
-                                    const padX = 6
-                                    const padY = 3
-                                    const fs = 11
-                                    const inText = eurFmt.format(inVal)
-                                    const outText = eurFmt.format(outVal)
-                                    const estW = (t: string) => Math.max(20, Math.round(t.length * 6.2) + padX * 2)
-                                    const inW = estW(inText)
-                                    const outW = estW(outText)
-                                    const inBaseY = yFor(inVal)
-                                    const outBaseY = yFor(outVal)
-                                    let inLabelY = Math.max(margin.top + 10, inBaseY - 14)
-                                    let outLabelY = Math.min(margin.top + innerH - 6, outBaseY + 18)
-                                    // Ensure minimum vertical separation between IN and OUT labels
-                                    if (showIn && showOut && Math.abs(inLabelY - outLabelY) < 16) {
-                                        inLabelY = Math.max(margin.top + 10, inLabelY - 10)
-                                        outLabelY = Math.min(margin.top + innerH - 6, outLabelY + 10)
-                                    }
-                                    // Horizontal staggering to reduce overlap across adjacent months
-                                    const dxIn = (i % 2 === 0 ? -10 : 10)
-                                    const dxOut = (i % 2 === 0 ? 10 : -10)
-                                    // Clamp to chart inner width
-                                    const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
-                                    const inTx = clamp((x + dxIn) - inW / 2, margin.left, (width - margin.right) - inW)
-                                    const outTx = clamp((x + dxOut) - outW / 2, margin.left, (width - margin.right) - outW)
-
-                                    return (
-                                        <g>
-                                            {showIn && (
-                                                <g transform={`translate(${inTx}, ${inLabelY - (fs + padY * 2) + 4})`}>
-                                                    <rect width={inW} height={fs + padY * 2} rx={6} fill="rgba(0,0,0,0.35)" stroke="#2e7d32" />
-                                                    <text x={inW / 2} y={fs + padY - 4} textAnchor="middle" fontSize={fs} fill="#ffffff">{inText}</text>
-                                                </g>
-                                            )}
-                                            {showOut && (
-                                                <g transform={`translate(${outTx}, ${outLabelY - (fs + padY * 2) + 4})`}>
-                                                    <rect width={outW} height={fs + padY * 2} rx={6} fill="rgba(0,0,0,0.35)" stroke="#c62828" />
-                                                    <text x={outW / 2} y={fs + padY - 4} textAnchor="middle" fontSize={fs} fill="#ffffff">{outText}</text>
-                                                </g>
-                                            )}
-                                        </g>
-                                    )
-                                })()}
+                                {/* Wertbeschriftungen entfernt – Hover overlay zeigt Details */}
                                 <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, false)}</text>
                             </g>
                         ))}
@@ -5039,6 +5256,11 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                         {visibleOrder.map((k) => tdFor(k, r))}
                     </tr>
                 ))}
+                {rows.length === 0 && (
+                    <tr>
+                        <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                    </tr>
+                )}
             </tbody>
         </table>
     )
@@ -5098,11 +5320,16 @@ function SettingsView({
     setNavIconColorMode,
     colorTheme,
     setColorTheme,
+    journalRowStyle,
+    setJournalRowStyle,
+    journalRowDensity,
+    setJournalRowDensity,
     tagDefs,
     setTagDefs,
     notify,
     bumpDataVersion,
     openTagsManager,
+    labelForCol,
 }: {
     defaultCols: Record<string, boolean>
     defaultOrder: string[]
@@ -5122,11 +5349,16 @@ function SettingsView({
     setNavIconColorMode: (v: 'color' | 'mono') => void
     colorTheme: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones'
     setColorTheme: (v: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones') => void
+    journalRowStyle: 'both' | 'lines' | 'zebra' | 'none'
+    setJournalRowStyle: (v: 'both' | 'lines' | 'zebra' | 'none') => void
+    journalRowDensity: 'normal' | 'compact'
+    setJournalRowDensity: (v: 'normal' | 'compact') => void
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
     setTagDefs: React.Dispatch<React.SetStateAction<Array<{ id: number; name: string; color?: string | null; usage?: number }>>>
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
     bumpDataVersion: () => void
     openTagsManager?: () => void
+    labelForCol: (k: string) => string
 }) {
     type TileKey = 'general' | 'table' | 'import' | 'storage' | 'org' | 'tags' | 'yearEnd' | 'tutorial' | 'about'
     const [active, setActive] = useState<TileKey>('general')
@@ -5161,6 +5393,24 @@ function SettingsView({
                             <option value="PRETTY">Lesbar (z.B. {pretty})</option>
                         </select>
                         <div className="helper">Wirkt u.a. in Buchungen (Datumsspalte) und Filter-Chips.</div>
+                    </div>
+                    <div className="field">
+                        <label>Buchungen: Zeilenlayout</label>
+                        <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
+                            <option value="both">Linien + Zebra</option>
+                            <option value="lines">Nur Linien</option>
+                            <option value="zebra">Nur Zebra</option>
+                            <option value="none">Ohne Linien/Zebra</option>
+                        </select>
+                        <div className="helper">„Nur Linien“ entspricht der Rechnungen-Tabelle. „Zebra“ hebt jede zweite Zeile leicht hervor.</div>
+                    </div>
+                    <div className="field">
+                        <label>Buchungen: Zeilenhöhe</label>
+                        <select className="input" value={journalRowDensity} onChange={(e) => setJournalRowDensity(e.target.value as any)}>
+                            <option value="normal">Normal</option>
+                            <option value="compact">Kompakt</option>
+                        </select>
+                        <div className="helper">„Kompakt“ reduziert die vertikale Polsterung der Tabellenzellen.</div>
                     </div>
                     <div className="field">
                         <label>Menü-Layout</label>
@@ -5313,7 +5563,7 @@ function SettingsView({
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     {Object.keys(defaultCols).map(k => (
                         <label key={k} title={k === 'actions' ? 'Empfohlen aktiviert' : ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <input type="checkbox" checked={!!cols[k]} onChange={(e) => setCols({ ...cols, [k]: e.target.checked })} /> {k}
+                            <input type="checkbox" checked={!!cols[k]} onChange={(e) => setCols({ ...cols, [k]: e.target.checked })} /> {labelForCol(k)}
                         </label>
                     ))}
                 </div>
@@ -5322,12 +5572,12 @@ function SettingsView({
                 )}
                 <div>
                     <div className="helper">Reihenfolge:</div>
-                    <DnDOrder order={order as any} cols={cols as any} onChange={(o) => setOrder(o as any)} />
+                    <DnDOrder order={order as any} cols={cols as any} onChange={(o) => setOrder(o as any)} labelFor={labelForCol} />
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn" onClick={() => { setCols(defaultCols); setOrder(defaultOrder) }}>Preset: Standard</button>
-                    <button className="btn" onClick={() => { setCols({ actions: true, date: true, voucherNo: false, type: false, sphere: false, description: true, earmark: false, paymentMethod: false, attachments: false, net: false, vat: false, gross: true } as any); setOrder(['actions', 'date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'paymentMethod', 'attachments', 'net', 'vat']) }}>Preset: Minimal</button>
-                    <button className="btn" onClick={() => { setCols({ ...defaultCols }); setOrder(['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']) }}>Preset: Details</button>
+                    <button className="btn" onClick={() => { setCols(defaultCols); setOrder(defaultOrder) }}>Voreinstellung: Standard</button>
+                    <button className="btn" onClick={() => { setCols({ actions: true, date: true, voucherNo: false, type: false, sphere: false, description: true, earmark: false, paymentMethod: false, attachments: false, net: false, vat: false, gross: true } as any); setOrder(['actions', 'date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'paymentMethod', 'attachments', 'net', 'vat']) }}>Voreinstellung: Minimal</button>
+                    <button className="btn" onClick={() => { setCols({ ...defaultCols }); setOrder(['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']) }}>Voreinstellung: Details</button>
                     <button className="btn" onClick={() => { setCols(defaultCols); setOrder(defaultOrder); setJournalLimit(20) }}>Zurücksetzen</button>
                 </div>
             </div>
@@ -6500,7 +6750,7 @@ function ImportXlsxCard({ notify }: { notify?: (type: 'success' | 'error' | 'inf
     )
 }
 // Simple drag-and-drop order list for columns
-function DnDOrder({ order, cols, onChange }: { order: string[]; cols: Record<string, boolean>; onChange: (o: string[]) => void }) {
+function DnDOrder({ order, cols, onChange, labelFor }: { order: string[]; cols: Record<string, boolean>; onChange: (o: string[]) => void; labelFor: (k: string) => string }) {
     const dragIndex = useRef<number | null>(null)
     function onDragStart(e: React.DragEvent<HTMLDivElement>, idx: number) {
         dragIndex.current = idx
@@ -6546,7 +6796,7 @@ function DnDOrder({ order, cols, onChange }: { order: string[]; cols: Record<str
                         }}
                     >
                         <span aria-hidden>☰</span>
-                        <span>{k}</span>
+                        <span>{labelFor(k)}</span>
                     </div>
                 )
             })}

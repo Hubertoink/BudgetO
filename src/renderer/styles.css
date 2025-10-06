@@ -305,6 +305,16 @@ pre {
     padding: 16px;
 }
 
+/* Prevent nested cards or long lists inside tiles from visually "growing" the tile without bounds */
+.card .card {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+}
+
+/* Constrain dashboard mini-tables inside tiles */
+.card table {
+    width: 100%;
+}
+
 .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -350,13 +360,19 @@ pre {
 }
 
 .badge.pm-bar {
-    background: color-mix(in oklab, var(--pm-bar) 28%, transparent);
+    background: color-mix(in oklab, var(--pm-bar) 36%, transparent);
     color: #0f2a14;
 }
 
 .badge.pm-bank {
-    background: color-mix(in oklab, var(--pm-bank) 28%, transparent);
+    background: color-mix(in oklab, var(--pm-bank) 36%, transparent);
     color: #0B0E14;
+}
+
+/* Force SVG icons inside payment badges to use a lighter stroke for better contrast */
+.badge.pm-bar svg,
+.badge.pm-bank svg {
+    stroke: color-mix(in oklab, var(--text) 36%, var(--surface) 0%);
 }
 
 /* Make SVG icons inside badges align nicely */
@@ -392,6 +408,34 @@ td {
 tbody tr:hover {
     background: color-mix(in oklab, var(--muted) 20%, transparent);
 }
+
+/* Row layout toggles for Buchungen (journal) via root data attributes */
+/* Default (no attribute or 'both'): keep lines and zebra as defined above */
+/* Only lines: remove zebra background */
+:root[data-journal-row-style="lines"] .journal-table tbody tr:nth-child(even) { background: transparent; }
+/* Make lines more pronounced in 'lines' mode */
+:root[data-journal-row-style="lines"] .journal-table th,
+:root[data-journal-row-style="lines"] .journal-table td {
+    border-bottom-color: color-mix(in oklab, var(--border) 220%, transparent);
+    border-bottom-width: 1.25px;
+}
+/* Only zebra: remove row separators */
+:root[data-journal-row-style="zebra"] .journal-table th,
+:root[data-journal-row-style="zebra"] .journal-table td { border-bottom: 0; }
+/* None: no zebra and no separators */
+:root[data-journal-row-style="none"] .journal-table th,
+:root[data-journal-row-style="none"] .journal-table td { border-bottom: 0; }
+:root[data-journal-row-style="none"] .journal-table tbody tr:nth-child(even) { background: transparent; }
+
+/* Slightly strengthen lines when both zebra + lines are active */
+:root[data-journal-row-style="both"] .journal-table th,
+:root[data-journal-row-style="both"] .journal-table td {
+    border-bottom-color: color-mix(in oklab, var(--border) 170%, transparent);
+}
+
+/* Density control: compact reduces cell padding */
+:root[data-journal-row-density="compact"] .journal-table th,
+:root[data-journal-row-density="compact"] .journal-table td { padding-top: 2px; padding-bottom: 2px; }
 
 /* Brutto colorization in journal table */
 td.gross-in {

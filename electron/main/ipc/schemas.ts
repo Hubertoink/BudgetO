@@ -72,7 +72,10 @@ export const ReportsExportInput = z.object({
     // Optional UI-driven options
     fields: z.array(z.enum(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount', 'tags'])).optional(),
     orgName: z.string().optional(),
-    amountMode: z.enum(['POSITIVE_BOTH', 'OUT_NEGATIVE']).optional()
+    amountMode: z.enum(['POSITIVE_BOTH', 'OUT_NEGATIVE']).optional(),
+    // Sorting controls (applies to table/list output across formats)
+    sort: z.enum(['ASC', 'DESC']).optional(),
+    sortBy: z.enum(['date', 'gross', 'net']).optional()
 })
 
 export const ReportsExportOutput = z.object({ filePath: z.string() })
