@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld('api', {
     db: {
         export: () => ipcRenderer.invoke('db.export'),
         import: () => ipcRenderer.invoke('db.import'),
+        openInfo: () => ipcRenderer.invoke('db.openInfo'),
         location: {
             get: () => ipcRenderer.invoke('db.location.get'),
             pick: () => ipcRenderer.invoke('db.location.pick'),

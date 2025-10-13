@@ -108,6 +108,18 @@ export default function App() {
         if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
     }, [activePage])
 
+    // Shared DB mode info (rw/ro): show a small read-only indicator in the header when DB is opened read-only
+    const [dbOpenInfo, setDbOpenInfo] = useState<{ mode: 'rw' | 'ro'; owner?: string | undefined } | null>(null)
+    useEffect(() => {
+        let cancelled = false
+        async function load() {
+            try { const info = await (window as any).api?.db?.openInfo?.(); if (!cancelled) setDbOpenInfo(info || null) } catch { }
+        }
+        load()
+        const id = window.setInterval(load, 60000)
+        return () => { cancelled = true; window.clearInterval(id) }
+    }, [])
+
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
     // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
     type NavLayout = 'left' | 'top'
@@ -687,6 +699,13 @@ export default function App() {
                         </button>
                     )}
                     <TopHeaderOrg />
+                    {/* Read-only badge for side layout */}
+                    {!isTopNav && dbOpenInfo?.mode === 'ro' && (
+                        <span title={`Nur Lesen – gesperrt durch ${dbOpenInfo?.owner || 'anderen Benutzer'}`}
+                              style={{ marginLeft: 8, fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'color-mix(in oklab, #FFC107 40%, transparent)', color: '#7A5D00', border: '1px solid #E0B400' }}>
+                            Nur Lesen
+                        </span>
+                    )}
                 </div>
                 {isTopNav ? (
                     <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
@@ -741,7 +760,16 @@ export default function App() {
                         ))}
                     </nav>
                 ) : null}
-                {isTopNav && <div />}
+                {isTopNav && (
+                    <div style={{ justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
+                        {dbOpenInfo?.mode === 'ro' && (
+                            <span title={`Nur Lesen – gesperrt durch ${dbOpenInfo?.owner || 'anderen Benutzer'}`}
+                                  style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'color-mix(in oklab, #FFC107 40%, transparent)', color: '#7A5D00', border: '1px solid #E0B400' }}>
+                                Nur Lesen
+                            </span>
+                        )}
+                    </div>
+                )}
                 {/* Window controls */}
                 <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
                     <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
