@@ -13,6 +13,7 @@ export type MemberRow = {
   phone?: string | null
   address?: string | null
   status: MemberStatus
+  boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null
   createdAt: string
   updatedAt?: string | null
   tags?: string[]
@@ -35,15 +36,15 @@ function setMemberTags(d: DB, memberId: number, tags?: string[]) {
   const clean = (tags || []).map(t => String(t).trim()).filter(Boolean)
   if (!clean.length) return
   for (const name of clean) {
-    d.prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)').run(name)
-    const t = d.prepare('SELECT id FROM tags WHERE name = ?').get(name) as any
+    d.prepare("INSERT OR IGNORE INTO tags(name, scope) VALUES (?, 'MEMBER')").run(name)
+    const t = d.prepare("SELECT id FROM tags WHERE name = ? AND scope = 'MEMBER'").get(name) as any
     if (t?.id) d.prepare('INSERT OR IGNORE INTO member_tags(member_id, tag_id) VALUES (?,?)').run(memberId, t.id)
   }
 }
 
-export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL'; limit?: number; offset?: number }): { rows: MemberRow[]; total: number } {
+export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL'; limit?: number; offset?: number; sortBy?: 'memberNo'|'name'|'email'|'status'; sort?: 'ASC'|'DESC' }): { rows: MemberRow[]; total: number } {
   const d = getDb()
-  const { q, status, limit = 50, offset = 0 } = params || {}
+  const { q, status, limit = 50, offset = 0, sortBy = 'name', sort = 'ASC' } = params || {} as any
   const wh: string[] = []
   const args: any[] = []
   if (q && q.trim()) {
@@ -55,8 +56,22 @@ export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL';
   const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
   const base = `FROM members m${whereSql}`
   const total = (d.prepare(`SELECT COUNT(1) as c ${base}`).get(...args) as any)?.c || 0
+  const dir = String(sort).toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
+  // Custom ORDER BY to ensure numeric sorting for member numbers
+  const orderClause = (() => {
+    if (sortBy === 'memberNo') {
+      // Group numeric values first (ASC), then sort numerics by integer value, then fallback to text and id for stability
+      // Using GLOB to detect non-numeric: any character outside 0-9
+      const isNonNumeric = "CASE WHEN m.member_no IS NULL OR TRIM(m.member_no) = '' OR m.member_no GLOB '*[^0-9]*' THEN 1 ELSE 0 END"
+      return `${isNonNumeric} ASC, CAST(m.member_no AS INTEGER) ${dir}, m.member_no COLLATE NOCASE ${dir}, m.id ${dir}`
+    }
+    const col = sortBy === 'email' ? 'm.email' : sortBy === 'status' ? 'm.status' : 'm.name'
+    const collate = col === 'm.name' ? ' COLLATE NOCASE' : ''
+    return `${col}${collate} ${dir}, m.id ${dir}`
+  })()
   const rows = d.prepare(`
     SELECT m.id, m.member_no as memberNo, m.name, m.email, m.phone, m.address, m.status, m.created_at as createdAt, m.updated_at as updatedAt,
+           m.board_role as boardRole,
            m.iban as iban, m.bic as bic, m.contribution_amount as contribution_amount, m.contribution_interval as contribution_interval,
            m.mandate_ref as mandate_ref, m.mandate_date as mandate_date, m.join_date as join_date, m.leave_date as leave_date,
            m.notes as notes, m.next_due_date as next_due_date,
@@ -66,22 +81,42 @@ export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL';
              WHERE mt.member_id = m.id
            ) as tagsConcat
     ${base}
-    ORDER BY m.name COLLATE NOCASE ASC, m.id ASC
+    ORDER BY ${orderClause}
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset) as any[]
   const mapped: MemberRow[] = rows.map(r => ({ ...r, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] }))
   return { rows: mapped, total }
 }
 
-export function createMember(input: { memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[] }) {
+export function createMember(input: { memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[];
+  iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
+  mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; }) {
   return withTransaction((d: DB) => {
-    const info = d.prepare(`INSERT INTO members(member_no, name, email, phone, address, status) VALUES (?,?,?,?,?,?)`).run(
+    // Defensive check: required fields (must match schema expectations)
+    if (!input.memberNo || !String(input.memberNo).trim()) throw new Error('Mitgliedsnummer ist erforderlich')
+    if (!input.join_date || !String(input.join_date).trim()) throw new Error('Eintrittsdatum ist erforderlich')
+    const info = d.prepare(`INSERT INTO members(
+      member_no, name, email, phone, address, status, board_role,
+      iban, bic, contribution_amount, contribution_interval,
+      mandate_ref, mandate_date, join_date, leave_date, notes, next_due_date
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       input.memberNo ?? null,
       input.name,
       input.email ?? null,
       input.phone ?? null,
       input.address ?? null,
-      input.status ?? 'ACTIVE'
+      input.status ?? 'ACTIVE',
+      input.boardRole ?? null,
+      input.iban ?? null,
+      input.bic ?? null,
+      input.contribution_amount ?? null,
+      input.contribution_interval ?? null,
+      input.mandate_ref ?? null,
+      input.mandate_date ?? null,
+      input.join_date,
+      input.leave_date ?? null,
+      input.notes ?? null,
+      input.next_due_date ?? null
     )
     const id = Number(info.lastInsertRowid)
     setMemberTags(d, id, input.tags)
@@ -91,7 +126,7 @@ export function createMember(input: { memberNo?: string | null; name: string; em
 
 export function updateMember(input: { id: number; memberNo?: string | null; name?: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[];
   iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
-  mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; }) {
+  mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; }) {
   return withTransaction((d: DB) => {
     const cur = d.prepare('SELECT id FROM members WHERE id=?').get(input.id)
     if (!cur) throw new Error('Mitglied nicht gefunden')
@@ -103,6 +138,7 @@ export function updateMember(input: { id: number; memberNo?: string | null; name
     if (input.phone !== undefined) { fields.push('phone = ?'); args.push(input.phone) }
     if (input.address !== undefined) { fields.push('address = ?'); args.push(input.address) }
     if (input.status !== undefined) { fields.push('status = ?'); args.push(input.status) }
+  if (input.boardRole !== undefined) { fields.push('board_role = ?'); args.push(input.boardRole) }
     if (input.iban !== undefined) { fields.push('iban = ?'); args.push(input.iban) }
     if (input.bic !== undefined) { fields.push('bic = ?'); args.push(input.bic) }
     if (input.contribution_amount !== undefined) { fields.push('contribution_amount = ?'); args.push(input.contribution_amount) }
@@ -134,6 +170,7 @@ export function getMemberById(id: number): MemberRow | null {
   const d = getDb()
   const r = d.prepare(`
     SELECT m.id, m.member_no as memberNo, m.name, m.email, m.phone, m.address, m.status, m.created_at as createdAt, m.updated_at as updatedAt,
+           m.board_role as boardRole,
            m.iban as iban, m.bic as bic, m.contribution_amount as contribution_amount, m.contribution_interval as contribution_interval,
            m.mandate_ref as mandate_ref, m.mandate_date as mandate_date, m.join_date as join_date, m.leave_date as leave_date,
            m.notes as notes, m.next_due_date as next_due_date,

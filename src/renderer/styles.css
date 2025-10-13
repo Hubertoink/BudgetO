@@ -2,6 +2,69 @@
     --radius: 12px;
 }
 
+/* Settings: Cards and previews */
+.settings-card { border: 1px solid var(--panel-border, color-mix(in oklab, var(--text)/10%, transparent)); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 0 color-mix(in oklab, var(--text)/7%, transparent) inset; }
+.settings-title { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 2px; }
+.settings-sub { color: color-mix(in oklab, var(--text)/68%, transparent); font-size: 12px; margin-bottom: 10px; }
+.muted-sep { height: 1px; background: color-mix(in oklab, var(--text)/10%, transparent); margin: 12px 0; }
+
+/* Tiny table preview */
+/* Inline label + control */
+.label-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+
+/* Accent Toggle (checkbox[role=switch]) - robust rendering */
+input[type="checkbox"].toggle {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    position: relative;
+    display: inline-block !important;
+    vertical-align: middle;
+    width: 44px !important;
+    height: 24px !important;
+    min-width: 44px;
+    min-height: 24px;
+    border-radius: 999px !important;
+    /* Use accent tint even in OFF state for visibility */
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 30%, var(--surface)), color-mix(in oklab, var(--accent) 22%, var(--surface))) !important;
+    border: 1px solid color-mix(in oklab, var(--accent) 55%, var(--surface)) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--bg)/50%, transparent) !important;
+    background-clip: padding-box;
+    cursor: pointer !important;
+    transition: background .15s ease, border-color .15s ease;
+    flex-shrink: 0;
+    padding: 0 !important;
+    margin: 0;
+}
+/* Hover/active affordances */
+input[type="checkbox"].toggle:hover { border-color: var(--accent) !important; }
+input[type="checkbox"].toggle:active::after { transform: translateX(0) scale(0.96); }
+input[type="checkbox"].toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, color-mix(in oklab, #ffffff 88%, var(--bg) 5%), color-mix(in oklab, #f6f8fb 82%, var(--bg) 8%));
+    box-shadow: 0 1px 2px rgba(0,0,0,.35);
+    transition: transform .15s ease;
+}
+input[type="checkbox"].toggle:checked {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 92%, var(--surface)), color-mix(in oklab, var(--accent) 80%, var(--surface))) !important;
+    border-color: var(--accent) !important;
+}
+input[type="checkbox"].toggle:checked::after { transform: translateX(20px); }
+input[type="checkbox"].toggle:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent)/60%, transparent) !important;
+}
+input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !important; }
+
+/* Theme swatches */
+.swatches { display: inline-flex; gap: 6px; margin-top: 6px; }
+.swatch { width: 18px; height: 12px; border-radius: 3px; border: 1px solid color-mix(in oklab, var(--text)/15%, transparent); box-shadow: 0 1px 0 color-mix(in oklab, var(--text)/10%, transparent) inset; }
+
 :root[data-theme="dark"] {
     --bg: #0F1115;
     --surface: #151821;
@@ -14,6 +77,8 @@
     --success: #4CC38A;
     --warning: #F5C451;
     --danger: #F06A6A;
+    /* Ensure native form controls (date picker, selects, scrollbars) use dark palette */
+    color-scheme: dark;
     /* Badge and semantic intensities */
     --badge-text: #E7EAF0;
     --badge-in: #4CC38A;
@@ -47,6 +112,7 @@
     --success: #4CC38A;
     --warning: #F5C451;
     --danger: #F06A6A;
+    color-scheme: light;
     /* Badge and semantic intensities */
     --badge-text: #0B0E14;
     --badge-in: #4CC38A;
@@ -191,6 +257,64 @@
     --pm-bank: #EDAFB8; /* accent */
 }
 
+/* Monochrome Harmony */
+:root[data-color-theme="monochrome-harmony"] {
+    /* Provided palette:
+       --platinum: #cfdbd5ff;
+    --alabaster: #e8eddfff;
+    --saffron: #f5cb5cff;
+    --eerie-black: #242423ff;
+    --jet: #333533ff; */
+    --bg: #242423;         /* eerie black */
+    --surface: #333533;    /* jet */
+    --muted: #2B2D2B;      /* slightly darker blend for controls */
+    --border: #3E423E;     /* subtle edge */
+    --text: #E8EDDF;       /* alabaster */
+    --text-dim: #CFDBD5;   /* platinum */
+    --accent: #F5CB5C;     /* saffron */
+    --accent-hover: #ffd987; /* lighter saffron */
+    --success: #8BC34A;    /* harmonious green accent */
+    --warning: #F5CB5C;    /* saffron */
+    --danger: #E57373;     /* soft red */
+    --badge-in: #8BC34A;
+    --badge-out: #E57373;
+    --sphere-ideell: #F5CB5C; /* accent */
+    --sphere-zweck: #CFDBD5;  /* platinum */
+    --sphere-vermoegen: #E8EDDF; /* alabaster */
+    --sphere-wgb: #333533;  /* jet */
+    --pm-bar: #CFDBD5;      /* soft neutral */
+    --pm-bank: #F5CB5C;     /* accent */
+}
+
+/* Vintage Charm */
+:root[data-color-theme="vintage-charm"] {
+    /* Provided palette:
+       --rich-black: #04151f;
+       --dark-slate-gray: #183a37;
+       --wheat: #efd6ac;
+       --mahogany: #c44900;
+       --dark-purple: #432534; */
+    --bg: #04151F;           /* rich black */
+    --surface: #183A37;      /* dark slate gray */
+    --muted: #0E2426;        /* deeper surface for controls */
+    --border: #22514D;       /* slightly brighter edge */
+    --text: #EFD6AC;         /* wheat */
+    --text-dim: color-mix(in oklab, #EFD6AC 70%, #183A37); /* muted wheat */
+    --accent: #C44900;       /* mahogany */
+    --accent-hover: #D85A12; /* lighter mahogany */
+    --success: #73C088;      /* soft green that fits vintage */
+    --warning: #EFC46E;      /* warm gold */
+    --danger: #C86C86;       /* vintage rose */
+    --badge-in: #73C088;
+    --badge-out: #C86C86;
+    --sphere-ideell: #C44900;  /* accent */
+    --sphere-zweck: #EFD6AC;   /* wheat */
+    --sphere-vermoegen: #432534;/* dark purple */
+    --sphere-wgb: #183A37;     /* dark slate */
+    --pm-bar: #EFD6AC;        /* wheat */
+    --pm-bank: #C44900;       /* accent */
+}
+
 html,
 body,
 #root {
@@ -322,7 +446,24 @@ pre {
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.3px;
+    border: 0; /* keep badges flat */
 }
+
+/* Ensure clickable badges (rendered as <button class="badge">) stay flat and accessible */
+button.badge {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    background: transparent; /* background is set via inline style or variant classes */
+    cursor: pointer;
+}
+button.badge::-moz-focus-inner { border: 0; }
+button.badge:focus { outline: none; }
+button.badge:focus-visible {
+    /* subtle focus ring that matches theme without 3D look */
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
+}
+button.badge:hover { filter: brightness(1.03); }
 
 .badge.in {
     background: color-mix(in oklab, var(--badge-in) 25%, transparent);
@@ -508,6 +649,12 @@ svg text {
     max-height: 90vh;
 }
 
+/* Wider Members modal similar to booking */
+.member-modal {
+    width: min(1100px, 96vw);
+    max-height: 90vh;
+}
+
 /* Two-column layout for Basis + Finanzen blocks */
 .booking-modal .block-grid {
     display: grid;
@@ -577,6 +724,16 @@ textarea {
 /* Ensure date inputs use same UI font */
 input[type="date"] {
     font-family: inherit;
+}
+
+/* Chromium: tune calendar icon for dark backgrounds */
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.1) contrast(0.9);
+}
+
+/* Improve focus ring visibility against dark surfaces */
+:root[data-theme="dark"] input[type="date"]:focus {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
 }
 
 /* Input adornments (prefix/suffix like €) */

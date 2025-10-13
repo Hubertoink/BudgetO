@@ -254,7 +254,7 @@ export function listVouchersAdvanced(filters: {
 }) {
     const d = getDb()
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
-    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description,
+    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,
@@ -286,8 +286,8 @@ export function listVouchersAdvanced(filters: {
     if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
     if (q && q.trim()) {
         const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like)
+        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+        params.push(like, like, like, like)
     }
     if (tag) {
         sql += ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
@@ -332,8 +332,8 @@ export function listVouchersAdvancedPaged(filters: {
     if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
     if (q && q.trim()) {
         const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like)
+        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+        params.push(like, like, like, like)
     }
     let joinSql = ''
     if (tag) {
@@ -344,7 +344,7 @@ export function listVouchersAdvancedPaged(filters: {
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v${joinSql}${whereSql}`).get(...params) as any)?.c || 0
     const rows = d.prepare(
-        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description,
+    `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
@@ -393,8 +393,8 @@ export function batchAssignEarmark(params: {
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
     if (params.q && params.q.trim()) {
         const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR date LIKE ?)')
-        args.push(like, like, like)
+        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+        args.push(like, like, like, like)
     }
     if (params.onlyWithout) wh.push('earmark_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -429,8 +429,8 @@ export function batchAssignBudget(params: {
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
     if (params.q && params.q.trim()) {
         const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR date LIKE ?)')
-        args.push(like, like, like)
+        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+        args.push(like, like, like, like)
     }
     if (params.onlyWithout) wh.push('budget_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -462,15 +462,15 @@ export function batchAssignTags(params: {
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
     if (params.q && params.q.trim()) {
         const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR date LIKE ?)')
-        args.push(like, like, like)
+        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+        args.push(like, like, like, like)
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     // Collect voucher ids
     const ids = (d.prepare(`SELECT id FROM vouchers${whereSql}`).all(...args) as any[]).map(r => r.id)
     if (!ids.length) return { updated: 0 }
     // Ensure tags exist (upsert by name)
-    const exist = d.prepare('SELECT id, name FROM tags').all() as any[]
+    const exist = d.prepare("SELECT id, name FROM tags WHERE scope = 'FINANCE'").all() as any[]
     const byName = new Map<string, number>(exist.map(r => [String(r.name).toLowerCase(), r.id]))
     const tagIds: number[] = []
     for (const nameRaw of params.tags) {
@@ -479,7 +479,7 @@ export function batchAssignTags(params: {
         const key = name.toLowerCase()
         let id = byName.get(key)
         if (!id) {
-            const info = d.prepare('INSERT INTO tags(name) VALUES (?)').run(name)
+            const info = d.prepare("INSERT INTO tags(name, scope) VALUES (?, 'FINANCE')").run(name)
             id = Number(info.lastInsertRowid)
             byName.set(key, id)
         }
@@ -522,8 +522,8 @@ export function summarizeVouchers(filters: {
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
     if (q && q.trim()) {
         const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.date LIKE ? )')
-        paramsBase.push(like, like, like)
+        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
+        paramsBase.push(like, like, like, like)
     }
     if (tag) {
         joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
@@ -614,10 +614,18 @@ export function updateVoucher(input: {
     earmarkId?: number | null
     budgetId?: number | null
     tags?: string[]
+    netAmount?: number
+    vatRate?: number
+    grossAmount?: number
 }) {
     const d = getDb()
     const warnings: string[] = []
-    const current = d.prepare('SELECT id, date, type, sphere, gross_amount as grossAmount, earmark_id as earmarkId, budget_id as budgetId FROM vouchers WHERE id=?').get(input.id) as any
+    const current = d.prepare(`
+        SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
+               net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount,
+               earmark_id as earmarkId, budget_id as budgetId
+        FROM vouchers WHERE id=?
+    `).get(input.id) as any
     if (!current) throw new Error('Beleg nicht gefunden')
     // Enforce period lock for the voucher's existing date (block edits in closed year)
     ensurePeriodOpen(current.date, d)
@@ -666,7 +674,68 @@ export function updateVoucher(input: {
     if (input.transferFrom !== undefined) { fields.push('transfer_from = ?'); params.push(input.transferFrom) }
     if (input.transferTo !== undefined) { fields.push('transfer_to = ?'); params.push(input.transferTo) }
     if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
-    if (!fields.length && !input.tags) return { id: input.id, warnings }
+    // If sphere or year changes, re-number voucher (year, seq_no, voucher_no)
+    const targetSphere = input.sphere ?? current.sphere
+    const targetYear = Number(newDate?.slice(0, 4) || String(current.year))
+    const sphereChanged = input.sphere != null && input.sphere !== current.sphere
+    const yearChanged = Number(targetYear) !== Number(current.year)
+    if (sphereChanged || yearChanged) {
+        const seq = nextVoucherSequence(d as any, targetYear, targetSphere)
+        const newNo = makeVoucherNo(targetYear, newDate, targetSphere, seq)
+        fields.push('year = ?')
+        params.push(targetYear)
+        fields.push('seq_no = ?')
+        params.push(seq)
+        fields.push('voucher_no = ?')
+        params.push(newNo)
+        if (current.voucherNo && current.voucherNo !== newNo) warnings.push(`Belegnummer neu vergeben: ${current.voucherNo} → ${newNo}`)
+    }
+
+    // Amount updates (optional)
+    let setAmounts = false
+    if (input.grossAmount != null) {
+        fields.push('gross_amount = ?')
+        params.push(input.grossAmount)
+        // If gross is provided, we don't infer net/vat unless vatRate also provided
+        if (input.vatRate != null) {
+            fields.push('vat_rate = ?')
+            params.push(input.vatRate)
+            fields.push('net_amount = ?')
+            const net = Math.round((Number(input.grossAmount) / (1 + Number(input.vatRate)/100)) * 100) / 100
+            params.push(net)
+            fields.push('vat_amount = ?')
+            const vat = Math.round((Number(input.grossAmount) - net) * 100) / 100
+            params.push(vat)
+        }
+        setAmounts = true
+    } else if (input.netAmount != null) {
+        fields.push('net_amount = ?')
+        params.push(input.netAmount)
+        const rate = input.vatRate != null ? Number(input.vatRate) : (current.vatRate ?? 0)
+        fields.push('vat_rate = ?')
+        params.push(rate)
+        const vat = Math.round((Number(input.netAmount) * rate / 100) * 100) / 100
+        fields.push('vat_amount = ?')
+        params.push(vat)
+        const gross = Math.round(((Number(input.netAmount) + vat) * 100)) / 100
+        fields.push('gross_amount = ?')
+        params.push(gross)
+        setAmounts = true
+    } else if (input.vatRate != null) {
+        // Update vatRate with recompute from existing net if available
+        const rate = Number(input.vatRate)
+        const curNet = current?.netAmount ?? 0
+        fields.push('vat_rate = ?')
+        params.push(rate)
+        const vat = Math.round((curNet * rate / 100) * 100) / 100
+        fields.push('vat_amount = ?')
+        params.push(vat)
+        const gross = Math.round(((curNet + vat) * 100)) / 100
+        fields.push('gross_amount = ?')
+        params.push(gross)
+        setAmounts = true
+    }
+    if (!fields.length && !input.tags && !setAmounts) return { id: input.id, warnings }
     params.push(input.id)
     d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
     try {

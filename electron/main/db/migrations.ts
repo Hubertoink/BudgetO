@@ -383,6 +383,50 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE members ADD COLUMN next_due_date TEXT;
     `
   }
+  ,
+  {
+    version: 18,
+    up: `
+    -- Membership payments tracking (manual assignment by Kassier)
+    CREATE TABLE IF NOT EXISTS membership_payments (
+      id INTEGER PRIMARY KEY,
+      member_id INTEGER NOT NULL,
+      period_key TEXT NOT NULL, -- 'YYYY-MM' | 'YYYY-Q1..Q4' | 'YYYY'
+      interval TEXT CHECK(interval IN ('MONTHLY','QUARTERLY','YEARLY')) NOT NULL,
+      amount NUMERIC NOT NULL,
+      date_paid TEXT NOT NULL DEFAULT (date('now')),
+      voucher_id INTEGER,
+      verified INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+      UNIQUE(member_id, period_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_mp_member_period ON membership_payments(member_id, period_key);
+    CREATE INDEX IF NOT EXISTS idx_mp_voucher ON membership_payments(voucher_id);
+    `
+  }
+  ,
+  {
+    version: 19,
+    up: `
+    -- Board function for members (optional)
+    ALTER TABLE members ADD COLUMN board_role TEXT CHECK(board_role IN ('V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'));
+    `
+  }
+  ,
+  {
+    version: 20,
+    up: `
+    -- Scope tags by domain (FINANCE vs MEMBER)
+    ALTER TABLE tags ADD COLUMN scope TEXT; -- null for existing rows
+    UPDATE tags SET scope = 'FINANCE' WHERE scope IS NULL;
+    -- Drop old unique index on name, if any, and create a scoped unique index
+    DROP INDEX IF EXISTS idx_tags_name;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_unique ON tags(name, scope);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

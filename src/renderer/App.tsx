@@ -123,7 +123,7 @@ export default function App() {
     })
 
     // UI preference: color theme palette
-    type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones'
+    type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
     const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
         try { return (localStorage.getItem('ui.colorTheme') as ColorTheme) || 'default' } catch { return 'default' }
     })
@@ -544,6 +544,27 @@ export default function App() {
         return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
     }, [])
 
+    // Lightweight lookup for budget names (for chips), decoupled from budgets state order
+    const [budgetNames, setBudgetNames] = useState<Record<number, string>>({})
+    useEffect(() => {
+        let alive = true
+        async function loadNames() {
+            try {
+                const res = await window.api?.budgets?.list?.({})
+                const map: Record<number, string> = {}
+                for (const b of (res?.rows || []) as any[]) {
+                    const nm = (b.name && String(b.name).trim()) || b.categoryName || b.projectName || String(b.year)
+                    map[b.id] = nm
+                }
+                if (alive) setBudgetNames(map)
+            } catch { /* ignore */ }
+        }
+        loadNames()
+        const onChanged = () => loadNames()
+        window.addEventListener('data-changed', onChanged)
+        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+
     const activeChips = useMemo(() => {
         const chips: Array<{ key: string; label: string; clear: () => void }> = []
         if (from) chips.push({ key: 'from', label: `von ${fmtDate(from)}`, clear: () => setFrom('') })
@@ -556,10 +577,13 @@ export default function App() {
             chips.push({ key: 'earmark', label: `Zweckbindung: ${em?.code ?? '#' + filterEarmark}`, clear: () => setFilterEarmark(null) })
         }
         if (filterTag) chips.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-        if (filterBudgetId) chips.push({ key: 'budget', label: `Budget: #${filterBudgetId}`, clear: () => setFilterBudgetId(null) })
+        if (filterBudgetId) {
+            const label = budgetNames[filterBudgetId] || `#${filterBudgetId}`
+            chips.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
+        }
         if (q) chips.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
         return chips
-    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, q, fmtDate])
+    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, fmtDate])
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
@@ -628,7 +652,7 @@ export default function App() {
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : `${sidebarCollapsed ? '64px' : '240px'} 1fr`, gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header
-                style={{ gridArea: 'top', position: 'sticky', top: 0, zIndex: 1000, display: 'grid', gridTemplateColumns: isTopNav ? '1fr auto 1fr 104px' : '1fr 104px', alignItems: 'center', gap: 12, padding: '4px 8px', borderBottom: '1px solid var(--border)', backdropFilter: 'var(--blur)', background: 'color-mix(in oklab, var(--surface) 80%, transparent)', ['-webkit-app-region' as any]: 'drag' }}
+                style={{ gridArea: 'top', position: 'sticky', top: 0, zIndex: 1000, display: 'grid', gridTemplateColumns: isTopNav ? '1fr auto 1fr 104px' : '1fr 104px', alignItems: 'center', gap: 12, padding: '4px 8px', borderBottom: '1px solid var(--border)', backdropFilter: 'var(--blur)', background: 'color-mix(in oklab, var(--surface) 80%, transparent)', WebkitAppRegion: 'drag' } as any}
                 onDoubleClick={(e) => {
                     const target = e.target as HTMLElement
                     // Ignore double-clicks on interactive elements
@@ -636,7 +660,7 @@ export default function App() {
                     window.api?.window?.toggleMaximize?.()
                 }}
             >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, ['-webkit-app-region' as any]: 'no-drag' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
                     {!isTopNav && (
                         <button
                             className="btn ghost"
@@ -654,7 +678,7 @@ export default function App() {
                     <TopHeaderOrg />
                 </div>
                 {isTopNav ? (
-                    <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', ['-webkit-app-region' as any]: 'no-drag' }}>
+                    <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
                         {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
                         {[
                             [
@@ -708,7 +732,7 @@ export default function App() {
                 ) : null}
                 {isTopNav && <div />}
                 {/* Window controls */}
-                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', ['-webkit-app-region' as any]: 'no-drag' }}>
+                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
                     <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
                     </button>
@@ -784,59 +808,7 @@ export default function App() {
 
             {/* Main content */}
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
-                <div className="container">
-                    {activePage === 'Dashboard' && <h1>Dashboard</h1>}
-                    {activePage === 'Rechnungen' && (
-                        <InvoicesView />
-                    )}
-                    {activePage === 'Mitglieder' && (
-                        <MembersView />
-                    )}
-                    {activePage === 'Buchungen' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                            <h1 style={{ margin: 0 }}>Buchungen</h1>
-                            <input ref={searchInputRef} className="input" placeholder="Suche Buchungen (Ctrl+K)" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 8, width: 340 }} />
-                            {/* Quick-access: time, meta-filter, and batch icons inline */}
-                            <button className="btn" title="Zeitraum/Jahr wählen" aria-label="Zeitraum oder Jahr wählen" onClick={() => setShowTimeFilter(true)}>
-                                {/* clock icon */}
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
-                            </button>
-                            <button className="btn" title="Sphäre/Zweckbindung/Budget wählen" aria-label="Sphäre, Zweckbindung oder Budget wählen" onClick={() => setShowMetaFilter(true)}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M3 5h18v2H3zM6 10h12v2H6zM9 15h6v2H9z"/>
-                                </svg>
-                            </button>
-                            {/* Batch assign action (earmark/tags/budget) */}
-                            <button
-                                className="btn"
-                                title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
-                                aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
-                                onClick={() => setShowBatchEarmark(true)}
-                                style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="4" rx="1" />
-                                    <rect x="3" y="10" width="18" height="4" rx="1" />
-                                    <rect x="3" y="16" width="18" height="4" rx="1" />
-                                </svg>
-                            </button>
-                            {/* Compact badges for key active filters: Zweckbindung, Tag, Budget */}
-                            {filterEarmark != null && (() => {
-                                const em = earmarks.find(e => e.id === filterEarmark)
-                                const bg = em?.color || undefined
-                                const fg = contrastText(bg)
-                                return (
-                                    <span
-                                        key="badge-earmark"
-                                        className="badge"
-                                        title={`Zweckbindung: ${em?.code || ('#' + filterEarmark)}`}
-                                        onClick={async () => { setFilterEarmark(null); setPage(1); await loadRecent() }}
-                                        style={{ cursor: 'pointer', background: bg, color: bg ? fg : undefined }}
-                                    >
-                                        🎯 {em?.code || ('#' + filterEarmark)}
-                                    </span>
-                                )
-                            })()}
+                            {/* Compact badge kept only for Tag (earmark/budget badges removed to avoid redundancy) */}
                             {filterTag && (() => {
                                 const td = (tagDefs || []).find(t => (t.name || '').toLowerCase() === (filterTag || '').toLowerCase())
                                 const bg = td?.color || undefined
@@ -853,43 +825,22 @@ export default function App() {
                                     </span>
                                 )
                             })()}
-                            {filterBudgetId != null && (() => {
-                                const b = budgets.find(bb => bb.id === filterBudgetId)
-                                const bg = (b as any)?.color || undefined
-                                const fg = contrastText(bg)
-                                const label = (() => {
-                                    if (!b) return `Budget #${filterBudgetId}`
-                                    const nm = (b.name && b.name.trim()) || b.categoryName || b.projectName || String(b.year)
-                                    return nm
-                                })()
-                                return (
-                                    <span
-                                        key="badge-budget"
-                                        className="badge"
-                                        title={`Budget: ${label}`}
-                                        onClick={async () => { setFilterBudgetId(null); setPage(1); await loadRecent() }}
-                                        style={{ cursor: 'pointer', background: bg, color: bg ? fg : undefined }}
-                                    >
-                                        💰 {label}
-                                    </span>
-                                )
-                            })()}
                             {/* Active filter indicator: clears all filters on click */}
                             {activeChips.length > 0 && (
                                 <button
                                     className="btn"
-                                    title="Filter aktiv – Klick zum Zurücksetzen"
+                                    title="Filter zurücksetzen"
                                     onClick={async () => {
                                         setFrom(''); setTo(''); setFilterSphere(null); setFilterType(null); setFilterPM(null); setFilterEarmark(null); setFilterBudgetId(null); setFilterTag(null); setQ(''); setPage(1);
                                         await loadRecent()
                                     }}
-                                    style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', borderColor: 'var(--accent)' }}
+                                    style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', borderColor: 'var(--accent)', padding: '6px 10px' }}
                                 >
-                                    Filter aktiv • Zurücksetzen
+                                    Filter zurücksetzen
                                 </button>
                             )}
-                        </div>
-                    )}
+                        
+                    
                     {activePage === 'Reports' && <h1>Reports</h1>}
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
@@ -897,7 +848,7 @@ export default function App() {
                         <DashboardView today={today} onGoToInvoices={() => setActivePage('Rechnungen')} />
                     )}
                     {activePage === 'Buchungen' && (
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                             {/* Sphäre/Zweckbindung/Budget via Modal; keep rest inline */}
                             <span style={{ color: 'var(--text-dim)' }}>Art:</span>
                             <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as any) || null)}>
@@ -919,7 +870,57 @@ export default function App() {
                                     <option key={t.id} value={t.name}>{t.name}</option>
                                 ))}
                             </select>
+
+                            {/* Textsuche */}
+                            <input
+                                className="input"
+                                placeholder="Suche (#ID, Text, Betrag …)"
+                                value={q}
+                                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                                style={{ minWidth: 200, flex: '1 1 260px' }}
+                                aria-label="Suche"
+                            />
+
+                            {/* Icons: Zeitraum & Meta-Filter */}
+                            <button
+                                className="btn ghost"
+                                title="Zeitraum wählen"
+                                aria-label="Zeitraum wählen"
+                                onClick={() => setShowTimeFilter(true)}
+                                style={{ display: 'grid', placeItems: 'center' }}
+                            >
+                                {/* Calendar icon */}
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm-1 6v12h12V8H6zm2 2h3v3H8v-3z" />
+                                </svg>
+                            </button>
+                            <button
+                                className="btn ghost"
+                                title="Sphäre / Zweckbindung / Budget filtern"
+                                aria-label="Sphäre / Zweckbindung / Budget filtern"
+                                onClick={() => setShowMetaFilter(true)}
+                                style={{ display: 'grid', placeItems: 'center' }}
+                            >
+                                {/* Funnel/Filter icon */}
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
+                                </svg>
+                            </button>
+
                             <button className="btn" onClick={() => loadRecent()}>Aktualisieren</button>
+                            <button
+                                className="btn ghost"
+                                title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
+                                aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
+                                onClick={() => setShowBatchEarmark(true)}
+                                style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="4" rx="1" />
+                                    <rect x="3" y="10" width="18" height="4" rx="1" />
+                                    <rect x="3" y="16" width="18" height="4" rx="1" />
+                                </svg>
+                            </button>
                             {/* Batch button moved to the top toolbar */}
                         </div>
                     )}
@@ -1034,7 +1035,14 @@ export default function App() {
                                     tagDefs={tagDefs}
                                     eurFmt={eurFmt}
                                     fmtDate={fmtDate}
-                                    onEdit={(r) => setEditRow(r)}
+                                    onEdit={(r) => setEditRow({
+                                        ...r,
+                                        // defaults for amount editor
+                                        mode: (r as any).grossAmount != null ? 'GROSS' : 'NET',
+                                        netAmount: (r as any).netAmount ?? null,
+                                        grossAmount: (r as any).grossAmount ?? null,
+                                        vatRate: (r as any).vatRate ?? 0
+                                    } as any)}
                                     onDelete={(r) => setDeleteRow(r)}
                                     onToggleSort={(col: 'date' | 'net' | 'gross') => {
                                         setPage(1)
@@ -1092,93 +1100,239 @@ export default function App() {
                             {/* Edit Modal */}
                             {editRow && (
                                 <div className="modal-overlay" onClick={() => setEditRow(null)}>
-                                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
                                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <h2 style={{ margin: 0 }}>Buchung bearbeiten</h2>
+                                            <h2 style={{ margin: 0 }}>
+                                                {(() => {
+                                                    const desc = (editRow.description || '').trim()
+                                                    const label = desc ? `+ Buchung (${desc.length > 60 ? desc.slice(0,60) + '…' : desc}) bearbeiten` : `+ Buchung bearbeiten`
+                                                    return label
+                                                })()}
+                                            </h2>
                                             <button className="btn danger" onClick={() => setEditRow(null)}>Schließen</button>
                                         </header>
-                                        <div className="row">
-                                            <div className="field">
-                                                <label>Datum</label>
-                                                <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
-                                            </div>
-                                            <div className="field">
-                                                <label>Art</label>
-                                                <select className="input" value={editRow.type ?? ''} onChange={(e) => setEditRow({ ...editRow, type: (e.target.value as any) || undefined })}>
-                                                    <option value="">—</option>
-                                                    <option value="IN">IN</option>
-                                                    <option value="OUT">OUT</option>
-                                                    <option value="TRANSFER">TRANSFER</option>
-                                                </select>
-                                            </div>
-                                            <div className="field">
-                                                <label>Sphäre</label>
-                                                <select className="input" value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
-                                                    <option value="">—</option>
-                                                    <option value="IDEELL">IDEELL</option>
-                                                    <option value="ZWECK">ZWECK</option>
-                                                    <option value="VERMOEGEN">VERMOEGEN</option>
-                                                    <option value="WGB">WGB</option>
-                                                </select>
-                                            </div>
-                                            {editRow.type === 'TRANSFER' ? (
-                                                <div className="field">
-                                                    <label>Richtung</label>
-                                                    <select className="input" value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
-                                                        onChange={(e) => {
-                                                            const v = e.target.value
-                                                            if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
-                                                            else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
-                                                            else setEditRow({ ...editRow, transferFrom: null, transferTo: null })
-                                                        }}>
-                                                        <option value="->">—</option>
-                                                        <option value="BAR->BANK">BAR → BANK</option>
-                                                        <option value="BANK->BAR">BANK → BAR</option>
-                                                    </select>
+
+                                        <form onSubmit={async (e) => {
+                                            e.preventDefault()
+                                            try {
+                                                const payload: any = { id: editRow.id, date: editRow.date, description: editRow.description ?? null, type: editRow.type, sphere: editRow.sphere, earmarkId: editRow.earmarkId, budgetId: editRow.budgetId, tags: editRow.tags || [] }
+                                                if (editRow.type === 'TRANSFER') {
+                                                    delete payload.paymentMethod
+                                                    payload.transferFrom = editRow.transferFrom ?? null
+                                                    payload.transferTo = editRow.transferTo ?? null
+                                                } else {
+                                                    payload.paymentMethod = editRow.paymentMethod ?? null
+                                                    payload.transferFrom = null
+                                                    payload.transferTo = null
+                                                }
+                                                if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
+                                                    payload.grossAmount = Number((editRow as any).grossAmount)
+                                                    if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
+                                                } else if ((editRow as any).mode === 'NET' && (editRow as any).netAmount != null && (editRow as any).netAmount !== '') {
+                                                    payload.netAmount = Number((editRow as any).netAmount)
+                                                    if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
+                                                }
+                                                const res = await window.api?.vouchers.update?.(payload)
+                                                notify('success', 'Buchung gespeichert')
+                                                const w = (res as any)?.warnings as string[] | undefined
+                                                if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
+                                                setFlashId(editRow.id); window.setTimeout(() => setFlashId((cur) => (cur === editRow.id ? null : cur)), 3000)
+                                                setEditRow(null); await loadRecent(); bumpDataVersion()
+                                            } catch (e: any) {
+                                                notify('error', friendlyError(e))
+                                            }
+                                        }}>
+                                            {/* Live Summary */}
+                                            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+                                                <div className="helper">Zusammenfassung</div>
+                                                <div style={{ fontWeight: 600 }}>
+                                                    {(() => {
+                                                        const date = fmtDate(editRow.date)
+                                                        const type = editRow.type
+                                                        const pm = editRow.type === 'TRANSFER' ? (((editRow as any).transferFrom || '—') + ' → ' + ((editRow as any).transferTo || '—')) : ((editRow as any).paymentMethod || '—')
+                                                        const amount = (() => {
+                                                            if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
+                                                            if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
+                                                            const n = Number((editRow as any).netAmount || 0); const v = Number((editRow as any).vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
+                                                            return eurFmt.format(g)
+                                                        })()
+                                                        const sphere = editRow.sphere
+                                                        return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
+                                                    })()}
                                                 </div>
-                                            ) : (
-                                                <div className="field">
-                                                    <label>Zahlweg</label>
-                                                    <select className="input" value={editRow.paymentMethod ?? ''} onChange={(e) => setEditRow({ ...editRow, paymentMethod: (e.target.value as any) || null })}>
-                                                        <option value="">—</option>
-                                                        <option value="BAR">Bar</option>
-                                                        <option value="BANK">Bank</option>
-                                                    </select>
+                                            </div>
+
+                                            {/* Blocks A+B in a side-by-side grid on wide screens */}
+                                            <div className="block-grid" style={{ marginBottom: 8 }}>
+                                                {/* Block A – Basisinfos */}
+                                                <div className="card" style={{ padding: 12 }}>
+                                                    <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                                                    <div className="row">
+                                                        <div className="field">
+                                                            <label>Datum</label>
+                                                            <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
+                                                        </div>
+                                                        <div className="field">
+                                                            <label>Art</label>
+                                                            <div className="btn-group" role="group" aria-label="Art wählen">
+                                                                {(['IN','OUT','TRANSFER'] as const).map(t => (
+                                                                    <button key={t} type="button" className="btn" onClick={() => setEditRow({ ...editRow, type: t })} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div className="field">
+                                                            <label>Sphäre</label>
+                                                            <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
+                                                                <option value="">—</option>
+                                                                <option value="IDEELL">IDEELL</option>
+                                                                <option value="ZWECK">ZWECK</option>
+                                                                <option value="VERMOEGEN">VERMOEGEN</option>
+                                                                <option value="WGB">WGB</option>
+                                                            </select>
+                                                        </div>
+                                                        {editRow.type === 'TRANSFER' ? (
+                                                            <div className="field">
+                                                                <label>Richtung</label>
+                                                                <select value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
+                                                                    onChange={(e) => {
+                                                                        const v = e.target.value
+                                                                        if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
+                                                                        else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
+                                                                        else setEditRow({ ...editRow, transferFrom: null, transferTo: null })
+                                                                    }}>
+                                                                    <option value="->">—</option>
+                                                                    <option value="BAR->BANK">BAR → BANK</option>
+                                                                    <option value="BANK->BAR">BANK → BAR</option>
+                                                                </select>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="field">
+                                                                <label>Zahlweg</label>
+                                                                <div className="btn-group" role="group" aria-label="Zahlweg wählen">
+                                                                    {(['BAR','BANK'] as const).map(pm => (
+                                                                        <button key={pm} type="button" className="btn" onClick={() => setEditRow({ ...editRow, paymentMethod: pm })} style={{ background: (editRow as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
-                                            <div className="field">
-                                                <label>Zweckbindung</label>
-                                                <select className="input" value={(editRow.earmarkId ?? '') as any} onChange={(e) => setEditRow({ ...editRow, earmarkId: e.target.value ? Number(e.target.value) : null })}>
-                                                    <option value="">—</option>
-                                                    {earmarks.map(em => (
-                                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                                    ))}
-                                                </select>
+
+                                                {/* Block B – Finanzdetails */}
+                                                <div className="card" style={{ padding: 12 }}>
+                                                    <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
+                                                    <div className="row">
+                                                        {editRow.type === 'TRANSFER' ? (
+                                                            <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                                <label>Betrag (Transfer)</label>
+                                                                <span className="adorn-wrap">
+                                                                    <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
+                                                                        onChange={(e) => {
+                                                                            const v = Number(e.target.value)
+                                                                            setEditRow({ ...(editRow as any), grossAmount: v } as any)
+                                                                        }} />
+                                                                    <span className="adorn-suffix">€</span>
+                                                                </span>
+                                                                <div className="helper">Transfers sind umsatzsteuerneutral.</div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="field">
+                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
+                                                                    <div style={{ display: 'flex', gap: 8 }}>
+                                                                        <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
+                                                                            <option value="NET">Netto</option>
+                                                                            <option value="GROSS">Brutto</option>
+                                                                        </select>
+                                                                        <span className="adorn-wrap" style={{ flex: 1 }}>
+                                                                            <input className="input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
+                                                                                onChange={(e) => {
+                                                                                    const v = Number(e.target.value)
+                                                                                    if ((editRow as any).mode === 'GROSS') setEditRow({ ...(editRow as any), grossAmount: v } as any)
+                                                                                    else setEditRow({ ...(editRow as any), netAmount: v } as any)
+                                                                                }} />
+                                                                            <span className="adorn-suffix">€</span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="helper">{(editRow as any).mode === 'GROSS' ? 'Bei Brutto wird USt/Netto nicht berechnet' : 'USt wird automatisch berechnet'}</div>
+                                                                </div>
+                                                                {(editRow as any).mode === 'NET' && (
+                                                                    <div className="field">
+                                                                        <label>USt %</label>
+                                                                        <input className="input" type="number" step="0.1" value={(editRow as any).vatRate ?? 0} onChange={(e) => setEditRow({ ...(editRow as any), vatRate: Number(e.target.value) } as any)} />
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="row">
+                                                        <div className="field">
+                                                            <label>Budget</label>
+                                                            <select value={(editRow as any).budgetId ?? ''} onChange={(e) => setEditRow({ ...editRow, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                                                <option value="">—</option>
+                                                                {budgetsForEdit.map(b => (
+                                                                    <option key={b.id} value={b.id}>{b.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div className="field">
+                                                            <label>Zweckbindung</label>
+                                                            <select value={(editRow as any).earmarkId ?? ''} onChange={(e) => setEditRow({ ...editRow, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                                                <option value="">—</option>
+                                                                {earmarks.map(em => (
+                                                                    <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="field">
-                                                <label>Budget</label>
-                                                <select className="input" value={(editRow.budgetId ?? '') as any} onChange={(e) => setEditRow({ ...editRow, budgetId: e.target.value ? Number(e.target.value) : null })}>
-                                                    <option value="">—</option>
-                                                    {budgetsForEdit.map(b => (
-                                                        <option key={b.id} value={b.id}>{b.label}</option>
-                                                    ))}
-                                                </select>
+
+                                            {/* Block C – Beschreibung & Tags */}
+                                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
+                                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                                                <div className="row">
+                                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                        <label>Beschreibung</label>
+                                                        <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                                    </div>
+                                                    <TagsEditor
+                                                        label="Tags"
+                                                        value={editRow.tags || []}
+                                                        onChange={(tags) => setEditRow({ ...editRow, tags })}
+                                                        tagDefs={tagDefs}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                <label>Beschreibung</label>
-                                                <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} />
-                                            </div>
-                                            <TagsEditor
-                                                label="Tags"
-                                                value={editRow.tags || []}
-                                                onChange={(tags) => setEditRow({ ...editRow, tags })}
-                                                tagDefs={tagDefs}
-                                            />
-                                            {/* Attachments management */}
-                                            <div className="card" style={{ gridColumn: '1 / span 2', padding: 10 }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <strong>Anhänge</strong>
-                                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+                                            {/* Block D – Anhänge */}
+                                            <div
+                                                className="card"
+                                                style={{ marginTop: 0, padding: 12 }}
+                                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                                                onDrop={async (e) => {
+                                                    e.preventDefault(); e.stopPropagation();
+                                                    if (!editRow) return
+                                                    try {
+                                                        const list = Array.from(e.dataTransfer?.files || [])
+                                                        for (const f of list) {
+                                                            const buf = await f.arrayBuffer()
+                                                            const dataBase64 = bufferToBase64Safe(buf)
+                                                            await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: f.name, dataBase64, mimeType: f.type || undefined })
+                                                        }
+                                                        const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
+                                                        setEditRowFiles(res?.files || [])
+                                                    } catch (err: any) {
+                                                        notify('error', 'Upload fehlgeschlagen: ' + (err?.message || String(err)))
+                                                    }
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                                        <strong>Anhänge</strong>
+                                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 8 }}>
                                                         <input ref={editFileInputRef} type="file" multiple hidden onChange={async (e) => {
                                                             const list = e.target.files
                                                             if (!list || !list.length || !editRow) return
@@ -1194,7 +1348,7 @@ export default function App() {
                                                                 notify('error', 'Upload fehlgeschlagen: ' + (e?.message || String(e)))
                                                             } finally { if (editFileInputRef.current) editFileInputRef.current.value = '' }
                                                         }} />
-                                                        <button className="btn" onClick={() => editFileInputRef.current?.click?.()}>+ Datei(en)</button>
+                                                        <button type="button" className="btn" onClick={() => editFileInputRef.current?.click?.()}>+ Datei(en)</button>
                                                     </div>
                                                 </div>
                                                 {editRowFilesLoading && <div className="helper">Lade …</div>}
@@ -1263,40 +1417,17 @@ export default function App() {
                                                     </div>
                                                 </div>
                                             )}
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                                            <div>
-                                                <button className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>
-                                                    🗑 Löschen
-                                                </button>
+
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                                                <div>
+                                                    <button type="button" className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑 Löschen</button>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                    <button type="button" className="btn" onClick={() => setEditRow(null)}>Abbrechen</button>
+                                                    <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <button className="btn" onClick={() => setEditRow(null)}>Abbrechen</button>
-                                                <button className="btn primary" onClick={async () => {
-                                                try {
-                                                    const payload: any = { id: editRow.id, date: editRow.date, description: editRow.description ?? null, type: editRow.type, sphere: editRow.sphere, earmarkId: editRow.earmarkId, budgetId: editRow.budgetId, tags: editRow.tags || [] }
-                                                    if (editRow.type === 'TRANSFER') {
-                                                        delete payload.paymentMethod
-                                                        payload.transferFrom = editRow.transferFrom ?? null
-                                                        payload.transferTo = editRow.transferTo ?? null
-                                                    } else {
-                                                        payload.paymentMethod = editRow.paymentMethod ?? null
-                                                        payload.transferFrom = null
-                                                        payload.transferTo = null
-                                                    }
-                                                    const res = await window.api?.vouchers.update?.(payload)
-                                                    notify('success', 'Buchung gespeichert')
-                                                    const w = (res as any)?.warnings as string[] | undefined
-                                                    if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
-                                                    // Flash the updated row
-                                                    setFlashId(editRow.id); window.setTimeout(() => setFlashId((cur) => (cur === editRow.id ? null : cur)), 3000)
-                                                    setEditRow(null); await loadRecent(); bumpDataVersion()
-                                                } catch (e: any) {
-                                                    notify('error', friendlyError(e))
-                                                }
-                                            }}>Speichern</button>
-                                            </div>
-                                        </div>
+                                        </form>
                                     </div>
                                 </div>
                             )}
@@ -1419,7 +1550,6 @@ export default function App() {
                                                 </td>
                                                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                                     <button className="btn" onClick={() => setEditBinding({ id: b.id, code: b.code, name: b.name, description: b.description ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, isActive: !!b.isActive, color: b.color ?? null, budget: (b as any).budget ?? null })}>✎</button>
-                                                    <button className="btn danger" onClick={() => setDeleteBinding({ id: b.id, code: b.code, name: b.name })}>🗑</button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1437,32 +1567,7 @@ export default function App() {
                                         onSaved={async () => { notify('success', 'Zweckbindung gespeichert'); await loadBindings(); await loadEarmarks() }}
                                     />
                                 )}
-                                {deleteBinding && (
-                                    <div className="modal-overlay" onClick={() => setDeleteBinding(null)}>
-                                        <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                <h2 style={{ margin: 0 }}>Zweckbindung löschen</h2>
-                                                <button className="btn danger" onClick={() => setDeleteBinding(null)}>Schließen</button>
-                                            </header>
-                                            <p>Möchtest du die Zweckbindung <strong>{deleteBinding.code}</strong> – {deleteBinding.name} wirklich löschen?</p>
-                                            <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt unverändert, es wird nur die Zweckbindung entfernt.</div>
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                                                <button className="btn" onClick={() => setDeleteBinding(null)}>Abbrechen</button>
-                                                <button className="btn danger" onClick={async () => {
-                                                    try {
-                                                        await window.api?.bindings.delete?.({ id: deleteBinding.id })
-                                                        notify('success', 'Zweckbindung gelöscht')
-                                                        setDeleteBinding(null)
-                                                        await loadBindings()
-                                                        await loadEarmarks()
-                                                    } catch (e: any) {
-                                                        notify('error', e?.message || String(e))
-                                                    }
-                                                }}>Ja, löschen</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Delete-Dialog für Zweckbindungen wird nun im Bearbeiten-Modal gehandhabt */}
                             </div>
 
                             <EarmarkUsageCards
@@ -1509,7 +1614,6 @@ export default function App() {
                                             <td align="right">{eurFmt.format(b.amountPlanned)}</td>
                                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                                 <button className="btn" onClick={() => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)}>✎</button>
-                                                <button className="btn danger" onClick={() => setDeleteBudget({ id: b.id, name: b.name ?? null })}>🗑</button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1529,24 +1633,17 @@ export default function App() {
                                     onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
                                 />
                             )}
-                            {deleteBudget && (
-                                <div className="modal-overlay" onClick={() => setDeleteBudget(null)}>
-                                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <h2 style={{ margin: 0 }}>Budget löschen</h2>
-                                            <button className="btn danger" onClick={() => setDeleteBudget(null)}>Schließen</button>
-                                        </header>
-                                        <p>Möchtest du das Budget {deleteBudget.name ? (<strong>"{deleteBudget.name}"</strong>) : (<strong>#{deleteBudget.id}</strong>)} wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                                            <button className="btn" onClick={() => setDeleteBudget(null)}>Abbrechen</button>
-                                            <button className="btn danger" onClick={async () => { await window.api?.budgets.delete?.({ id: deleteBudget.id }); setDeleteBudget(null); notify('success', 'Budget gelöscht'); await loadBudgets() }}>Ja, löschen</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Delete-Dialog für Budgets wird nun im Bearbeiten-Modal gehandhabt */}
                         </div>
                     )}
-                </div>
+
+                    {activePage === 'Mitglieder' && (
+                        <MembersView />
+                    )}
+
+                    {activePage === 'Rechnungen' && (
+                        <InvoicesView />
+                    )}
             </main>
 
             {/* Quick-Add Modal */}
@@ -1778,8 +1875,8 @@ export default function App() {
                     </div>
                 ))}
             </div>
-            {/* Global Floating Action Button: + Buchung (hidden in Einstellungen) */}
-            {activePage !== 'Einstellungen' && (
+            {/* Global Floating Action Button: + Buchung (hidden in Einstellungen und Mitglieder) */}
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
             )}
             {/* Time Filter Modal for Buchungen */}
@@ -2323,26 +2420,177 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
 function MembersView() {
     const [q, setQ] = useState('')
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
-    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[]; iban?: string | null; contribution_amount?: number | null }>>([])
+    const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })
+    const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
+    useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
+    useEffect(() => { try { localStorage.setItem('members.sort', sort) } catch { } }, [sort])
+    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[]; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
     const [total, setTotal] = useState(0)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
     const [busy, setBusy] = useState(false)
-    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; tags?: string[];
+    const [showPayments, setShowPayments] = useState(false)
+    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; tags?: string[];
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
         mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
+    const [formTab, setFormTab] = useState<'PERSON'|'FINANCE'|'MANDATE'|'MEMBERSHIP'|'MISC'>('PERSON')
+    // Members delete confirm (app-styled modal)
+    const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
+    const [deleteBusy, setDeleteBusy] = useState(false)
+    // Invite modal state
+    const [showInvite, setShowInvite] = useState(false)
+    const [inviteBusy, setInviteBusy] = useState(false)
+    const [inviteEmails, setInviteEmails] = useState<string[]>([])
+    const [inviteSubject, setInviteSubject] = useState<string>(() => { try { return localStorage.getItem('invite.subject') || 'Einladung zur Sitzung' } catch { return 'Einladung zur Sitzung' } })
+    const [inviteBody, setInviteBody] = useState<string>(() => { try { return localStorage.getItem('invite.body') || 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } catch { return 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } })
+    const [inviteActiveOnly, setInviteActiveOnly] = useState<boolean>(() => { try { return localStorage.getItem('invite.activeOnly') === '1' } catch { return false } })
+    useEffect(() => { try { localStorage.setItem('invite.subject', inviteSubject) } catch {} }, [inviteSubject])
+    useEffect(() => { try { localStorage.setItem('invite.body', inviteBody) } catch {} }, [inviteBody])
+    useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
+
+    // Column preferences for members table
+    const [showColumnsModal, setShowColumnsModal] = useState(false)
+    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showBoardTable: boolean }>(() => {
+        try {
+            const raw = localStorage.getItem('members.columns')
+            if (raw) {
+                const parsed = JSON.parse(raw)
+                return {
+                    showIBAN: parsed.showIBAN ?? true,
+                    showContribution: parsed.showContribution ?? true,
+                    showAddress: parsed.showAddress ?? false,
+                    showBoardTable: parsed.showBoardTable ?? false
+                }
+            }
+        } catch {}
+        return { showIBAN: true, showContribution: true, showAddress: false, showBoardTable: false }
+    })
+    useEffect(() => { try { localStorage.setItem('members.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
+    // Optional separate board table
+    const [boardRows, setBoardRows] = useState<any[]>([])
+    useEffect(() => {
+        let alive = true
+        if (!colPrefs.showBoardTable) { setBoardRows([]); return }
+        ;(async () => {
+            try {
+                const pageSize = 200
+                let ofs = 0
+                let total = 0
+                const acc: any[] = []
+                do {
+                    const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit: pageSize, offset: ofs, sortBy: 'memberNo', sort: 'ASC' })
+                    const rows = (res?.rows || []) as any[]
+                    total = res?.total ?? rows.length
+                    acc.push(...rows)
+                    ofs += pageSize
+                } while (ofs < total)
+                const onlyBoard = acc.filter(r => !!r.boardRole)
+                const roleOrder: Record<string, number> = { V1: 1, V2: 2, KASSIER: 3, SCHRIFT: 4, KASSENPR1: 5, KASSENPR2: 6 }
+                onlyBoard.sort((a, b) => {
+                    const ra = roleOrder[String(a.boardRole) as string] || 999
+                    const rb = roleOrder[String(b.boardRole) as string] || 999
+                    if (ra !== rb) return ra - rb
+                    return String(a.name || '').localeCompare(String(b.name || ''), 'de', { sensitivity: 'base' })
+                })
+                if (alive) setBoardRows(onlyBoard)
+            } catch {
+                if (alive) setBoardRows([])
+            }
+        })()
+        return () => { alive = false }
+    }, [colPrefs.showBoardTable, q, status])
+
+    // Helpers
+    const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+    function validateIBAN(iban?: string | null): { ok: boolean; msg?: string } {
+        if (!iban) return { ok: true }
+        const s = iban.replace(/\s+/g, '').toUpperCase()
+        if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/.test(s)) return { ok: false, msg: 'Format ungültig' }
+        const rearr = s.slice(4) + s.slice(0, 4)
+        const nums = rearr.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55))
+        let mod = 0
+        for (let i = 0; i < nums.length; i += 7) {
+            const part = String(mod) + nums.slice(i, i + 7)
+            mod = Number(BigInt(part) % 97n)
+        }
+        return { ok: mod === 1, msg: mod === 1 ? undefined : 'Prüfziffer ungültig' }
+    }
+    function validateBIC(bic?: string | null): { ok: boolean; msg?: string } {
+        if (!bic) return { ok: true }
+        const s = bic.replace(/\s+/g, '').toUpperCase()
+        if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s)) return { ok: false, msg: 'Format ungültig' }
+        return { ok: true }
+    }
+    function nextDuePreview(amount?: number | null, interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null, anchor?: string | null): string | null {
+        if (!amount || !interval) return null
+        let d = anchor ? new Date(anchor) : new Date()
+        if (isNaN(d.getTime())) d = new Date()
+        const add = interval === 'MONTHLY' ? 1 : interval === 'QUARTERLY' ? 3 : 12
+        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + add, 1))
+        const iso = d.toISOString().slice(0, 10)
+    return `${interval === 'MONTHLY' ? 'Monatlich' : interval === 'QUARTERLY' ? 'Quartal' : 'Jährlich'}: ${eurFmt.format(amount)} → Initiale Fälligkeit ca. ${iso}`
+    }
+
+    // Required fields UX: highlight and modal
+    const [requiredTouched, setRequiredTouched] = useState(false)
+    const [missingRequired, setMissingRequired] = useState<string[]>([])
+
+    // Address split helpers for future letter feature (kept local; combined into address on save)
+    const [addrStreet, setAddrStreet] = useState<string>('')
+    const [addrZip, setAddrZip] = useState<string>('')
+    const [addrCity, setAddrCity] = useState<string>('')
+    useEffect(() => {
+        if (!form) return
+        const a = (form.draft.address || '').trim()
+        const m = /^(.*?)(?:,\s*)?(\d{4,5})?\s*([^,]*)$/.exec(a)
+        if (m) { setAddrStreet(m[1]?.trim() || ''); setAddrZip(m[2]?.trim() || ''); setAddrCity(m[3]?.trim() || '') }
+        else { setAddrStreet(a); setAddrZip(''); setAddrCity('') }
+    }, [form?.draft.address])
 
     async function load() {
         setBusy(true)
         try {
-            const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset })
+            const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset, sortBy, sort })
             setRows(res?.rows || []); setTotal(res?.total || 0)
         } catch (e: any) {
             // eslint-disable-next-line no-console
             console.error('members.list failed', e)
         } finally { setBusy(false) }
     }
-    useEffect(() => { load() }, [q, status, limit, offset])
+    useEffect(() => { load() }, [q, status, limit, offset, sortBy, sort])
+    // Load invite recipients when invite modal opens
+    useEffect(() => {
+        if (!showInvite) return
+        let alive = true
+        ;(async () => {
+            setInviteBusy(true)
+            try {
+                const pageSize = 200
+                let ofs = 0
+                let emails: string[] = []
+                let totalCount = 0
+                do {
+                    const effectiveStatus = inviteActiveOnly ? 'ACTIVE' : status
+                    const res = await (window as any).api?.members?.list?.({ q: q || undefined, status: effectiveStatus, limit: pageSize, offset: ofs })
+                    const rows = res?.rows || []
+                    totalCount = res?.total || rows.length
+                    emails = emails.concat(rows.map((r: any) => String(r.email || '').trim()).filter((e: string) => !!e && /@/.test(e)))
+                    ofs += pageSize
+                } while (ofs < totalCount)
+                const seen = new Set<string>()
+                const unique = emails.filter(e => { const k = e.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+                if (alive) setInviteEmails(unique)
+            } catch { if (alive) setInviteEmails([]) }
+            finally { if (alive) setInviteBusy(false) }
+        })()
+        return () => { alive = false }
+    }, [showInvite, q, status, inviteActiveOnly])
+
+    // When opening create modal, reset validation and address fields
+    useEffect(() => {
+        if (!form) return
+        if (form.mode === 'create') { setRequiredTouched(false); setMissingRequired([]); setFormTab('PERSON'); setAddrStreet(''); setAddrZip(''); setAddrCity('') }
+    }, [form?.mode])
 
     const pages = Math.max(1, Math.ceil(total / Math.max(1, limit)))
     const page = Math.floor(offset / Math.max(1, limit)) + 1
@@ -2360,23 +2608,95 @@ function MembersView() {
                         <option value="PAUSED">Pause</option>
                         <option value="LEFT">Ausgetreten</option>
                     </select>
-                    <button className="btn ghost" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}>Zurücksetzen</button>
+                    <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>Spalten</button>
+                    {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
+                        <button className="btn ghost" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}>Zurücksetzen</button>
+                    ) : null })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn" onClick={() => setForm({ mode: 'create', draft: { name: '', status: 'ACTIVE', tags: [] } })}>+ Neu</button>
+                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
+                        style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
+                    <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                        name: '', status: 'ACTIVE', boardRole: null, tags: [], memberNo: null, email: null, phone: null, address: null,
+                        iban: null, bic: null, contribution_amount: null, contribution_interval: null,
+                        mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
+                    } }) }}>+ Neu</button>
                 </div>
             </div>
+            {colPrefs.showBoardTable && boardRows.length > 0 && (
+                <div className="card" style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 8px 0 8px' }}>
+                        <h2 style={{ margin: 0 }}>Vorstand</h2>
+                        <div className="helper">{boardRows.length} Personen</div>
+                    </div>
+                    <table cellPadding={6} style={{ marginTop: 4, width: '100%' }}>
+                        <thead>
+                            <tr>
+                                <th align="left">Funktion</th>
+                                <th align="left">Name</th>
+                                <th align="left">Nr.</th>
+                                <th align="left">E-Mail</th>
+                                <th align="left">Telefon</th>
+                                <th align="center">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {boardRows.map((r: any) => (
+                                <tr key={`board-${r.id}`}>
+                                    <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ background: def.color, color: '#fff' }}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
+                                    <td>{r.name}</td>
+                                    <td>{r.memberNo || '—'}</td>
+                                    <td>{r.email ? (<a href={`mailto:${String(r.email).trim()}`} title="E-Mail senden">{String(r.email).trim()}</a>) : '—'}</td>
+                                    <td>{r.phone || '—'}</td>
+                                    <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                                        <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
+                                            id: r.id,
+                                            memberNo: r.memberNo ?? null,
+                                            name: r.name,
+                                            email: r.email ?? null,
+                                            phone: r.phone ?? null,
+                                            address: r.address ?? null,
+                                            status: r.status as any,
+                                            boardRole: (r as any).boardRole ?? null,
+                                            tags: r.tags || [],
+                                            iban: (r as any).iban ?? null,
+                                            bic: (r as any).bic ?? null,
+                                            contribution_amount: (r as any).contribution_amount ?? null,
+                                            contribution_interval: (r as any).contribution_interval ?? null,
+                                            mandate_ref: (r as any).mandate_ref ?? null,
+                                            mandate_date: (r as any).mandate_date ?? null,
+                                            join_date: (r as any).join_date ?? null,
+                                            leave_date: (r as any).leave_date ?? null,
+                                            notes: (r as any).notes ?? null,
+                                            next_due_date: (r as any).next_due_date ?? null
+                                        } })}>✎</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
             <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
                 <thead>
                     <tr>
-                        <th align="left">Nr.</th>
-                        <th align="left">Name</th>
-                        <th align="left">E-Mail</th>
+                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                            Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                        </th>
+                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                            Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                        </th>
+                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                            E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                        </th>
                         <th align="left">Telefon</th>
-                        <th align="left">IBAN</th>
-                        <th align="right">Beitrag</th>
-                        <th align="left">Status</th>
+                        {colPrefs.showAddress && (<th align="left">Adresse</th>)}
+                        {colPrefs.showIBAN && (<th align="left">IBAN</th>)}
+                        {colPrefs.showContribution && (<th align="right">Beitrag</th>)}
+                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                            Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                        </th>
                         <th align="left">Tags</th>
                         <th align="center">Aktionen</th>
                     </tr>
@@ -2385,22 +2705,50 @@ function MembersView() {
                     {rows.map(r => (
                         <tr key={r.id}>
                             <td>{r.memberNo || '—'}</td>
-                            <td>{r.name}</td>
-                            <td>{r.email || '—'}</td>
+                            <td>
+                                <span>{r.name}</span>
+                                {r.boardRole && (() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ marginLeft: 8, background: def.color, color: '#fff' }}>{def.label}</span>) : null })()}
+                                {((r as any).contribution_amount != null && (r as any).contribution_amount > 0 && !!(r as any).contribution_interval) ? (
+                                    <MemberStatusButton memberId={r.id} name={r.name} memberNo={r.memberNo || undefined} />
+                                ) : null}
+                            </td>
+                            <td>{r.email ? (<a href={`mailto:${String(r.email).trim()}`} title="E-Mail senden">{String(r.email).trim()}</a>) : '—'}</td>
                             <td>{r.phone || '—'}</td>
-                            <td>{r.iban || '—'}</td>
-                            <td align="right">{r.contribution_amount != null ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.contribution_amount) : '—'}</td>
-                            <td><span className="badge">{r.status}</span></td>
+                            {colPrefs.showAddress && (<td>{r.address || '—'}</td>)}
+                            {colPrefs.showIBAN && (<td>{r.iban || '—'}</td>)}
+                            {colPrefs.showContribution && (<td align="right">{r.contribution_amount != null ? eurFmt.format(r.contribution_amount) : '—'}</td>)}
+                            <td>{(() => { const s = String(r.status || '').toUpperCase(); const c = (s === 'ACTIVE') ? '#00C853' : (s === 'LEFT') ? 'var(--danger)' : '#FFD600'; return (
+                                <span title={s} aria-label={`Status: ${s}`} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c }} />
+                            ) })()}</td>
                             <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.tags || []).join(', ')}</td>
                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { id: r.id, memberNo: r.memberNo ?? null, name: r.name, email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, status: r.status as any, tags: r.tags || [], iban: (r as any).iban ?? null, bic: (r as any).bic ?? null, contribution_amount: (r as any).contribution_amount ?? null } })}>✎</button>
-                                <button className="btn danger" title="Löschen" onClick={async () => { if (!confirm('Mitglied wirklich löschen?')) return; try { await (window as any).api?.members?.delete?.({ id: r.id }); await load() } catch (e) { /* ignore */ } }}>🗑</button>
+                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
+                                    id: r.id,
+                                    memberNo: r.memberNo ?? null,
+                                    name: r.name,
+                                    email: r.email ?? null,
+                                    phone: r.phone ?? null,
+                                    address: r.address ?? null,
+                                    status: r.status as any,
+                                    boardRole: (r as any).boardRole ?? null,
+                                    tags: r.tags || [],
+                                    iban: (r as any).iban ?? null,
+                                    bic: (r as any).bic ?? null,
+                                    contribution_amount: (r as any).contribution_amount ?? null,
+                                    contribution_interval: (r as any).contribution_interval ?? null,
+                                    mandate_ref: (r as any).mandate_ref ?? null,
+                                    mandate_date: (r as any).mandate_date ?? null,
+                                    join_date: (r as any).join_date ?? null,
+                                    leave_date: (r as any).leave_date ?? null,
+                                    notes: (r as any).notes ?? null,
+                                    next_due_date: (r as any).next_due_date ?? null
+                                } })}>✎</button>
                             </td>
                         </tr>
                     ))}
-                    {rows.length === 0 && (
-                        <tr><td colSpan={9}><div className="helper">Keine Einträge</div></td></tr>
-                    )}
+                    {rows.length === 0 && (() => { const colSpan = 9 - (colPrefs.showIBAN ? 0 : 1) - (colPrefs.showContribution ? 0 : 1) + (colPrefs.showAddress ? 1 : 0); return (
+                        <tr><td colSpan={colSpan}><div className="helper">Keine Einträge</div></td></tr>
+                    )})()}
                 </tbody>
             </table>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
@@ -2414,106 +2762,940 @@ function MembersView() {
 
             {form && (
                 <div className="modal-overlay" onClick={() => setForm(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
-                            <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                {/* Info tooltip instead of right-side column */}
+                                <button className="btn ghost" title={'IBAN/BIC werden live geprüft.\nBeitragsvorschau zeigt die initiale Fälligkeit.\nMit Tab lassen sich Felder schnell durchlaufen.'}>ℹ️</button>
+                                <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
+                                <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
+                            </div>
                         </header>
-                        <div className="row" style={{ marginTop: 8 }}>
-                            <div className="field">
-                                <label>Mitglieds-Nr.</label>
-                                <input className="input" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Name</label>
-                                <input className="input" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} />
-                            </div>
-                            <div className="field">
-                                <label>E-Mail</label>
-                                <input className="input" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Telefon</label>
-                                <input className="input" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value || null } })} />
-                            </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Adresse</label>
-                                <input className="input" value={form.draft.address ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, address: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>IBAN</label>
-                                <input className="input" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>BIC</label>
-                                <input className="input" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Beitrag (EUR)</label>
-                                <input className="input" type="number" step="0.01" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Intervall</label>
-                                <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
-                                    <option value="">—</option>
-                                    <option value="MONTHLY">Monatlich</option>
-                                    <option value="QUARTERLY">Quartal</option>
-                                    <option value="YEARLY">Jährlich</option>
-                                </select>
-                            </div>
-                            <div className="field">
-                                <label>Mandats-Ref.</label>
-                                <input className="input" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Mandats-Datum</label>
-                                <input className="input" type="date" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Eintritt</label>
-                                <input className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Austritt</label>
-                                <input className="input" type="date" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} />
-                            </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Notizen</label>
-                                <input className="input" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} />
-                            </div>
-                            <div className="field">
-                                <label>Status</label>
-                                <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
-                                    <option value="ACTIVE">Aktiv</option>
-                                    <option value="NEW">Neu</option>
-                                    <option value="PAUSED">Pause</option>
-                                    <option value="LEFT">Ausgetreten</option>
-                                </select>
-                            </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Tags (Komma-getrennt)</label>
-                                <input className="input" value={(form.draft.tags || []).join(', ')} onChange={(e) => setForm({ ...form, draft: { ...form.draft, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} />
-                            </div>
+                        {/* Tabs */}
+                        <div role="tablist" aria-label="Mitglied bearbeiten" style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', padding: '4px 0' }}>
+                            {([
+                                { k: 'PERSON', label: 'Persönliches', color: '#2962FF' },
+                                { k: 'FINANCE', label: 'Finanzdaten', color: '#00C853' },
+                                { k: 'MANDATE', label: 'Mandat', color: '#FFD600' },
+                                { k: 'MEMBERSHIP', label: 'Mitgliedschaft', color: '#7C4DFF' },
+                                { k: 'MISC', label: 'Sonstiges', color: '#FF9100' }
+                            ] as Array<{k: any; label: string; color: string}>).map(t => {
+                                const active = formTab === t.k
+                                const bg = active ? 'color-mix(in oklab, ' + t.color + ' 25%, transparent)' : undefined
+                                const br = active ? t.color : 'transparent'
+                                return (
+                                    <button key={t.k} role="tab" aria-selected={active} className="btn" onClick={() => setFormTab(t.k)}
+                                        style={{ borderColor: br, background: bg, color: active ? contrastText(t.color) : undefined }}>
+                                        {t.label}
+                                    </button>
+                                )
+                            })}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                            <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                            <button className="btn primary" onClick={async () => {
+                        <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                            <div style={{ display: 'grid', gap: 12 }}>
+                                {formTab === 'PERSON' && (
+                                    <div className="card" style={{ padding: 10 }}>
+                                        <div className="helper" title="Name, Kontakt und Anschrift">Persönliche Daten</div>
+                                        <div className="row" style={{ marginTop: 6 }}>
+                                            <div className="field">
+                                                <label>Mitglieds-Nr. <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                                <input className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                                {requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Mitgliedsnummer angeben</div>)}
+                                            </div>
+                                            <div className="field">
+                                                <label>Name <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                                <input className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                                {requiredTouched && (!form.draft.name || !form.draft.name.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Name angeben</div>)}
+                                            </div>
+                                            <div className="field"><label>E-Mail</label><input className="input" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
+                                            <div className="field"><label>Telefon</label><input className="input" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value || null } })} /></div>
+                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                                <label>Adresse</label>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 1fr', gap: 6 }}>
+                                                    <input className="input" placeholder="Straße und Nr." value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} />
+                                                    <input className="input" placeholder="PLZ" value={addrZip} onChange={(e) => setAddrZip(e.target.value)} />
+                                                    <input className="input" placeholder="Ort" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <div className="field"><label>Status</label>
+                                                <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
+                                                    <option value="ACTIVE">Aktiv</option>
+                                                    <option value="NEW">Neu</option>
+                                                    <option value="PAUSED">Pause</option>
+                                                    <option value="LEFT">Ausgetreten</option>
+                                                </select>
+                                            </div>
+                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                                <label>Tags (Komma-getrennt)</label>
+                                                <input className="input" placeholder="z.B. Jugend, Vorstand" value={(form.draft.tags || []).join(', ')} onChange={(e) => setForm({ ...form, draft: { ...form.draft, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {formTab === 'FINANCE' && (
+                                    <div className="card" style={{ padding: 10 }}>
+                                        <div className="helper" title="Bankdaten und Beitrag">Finanzdaten</div>
+                                        <div className="row" style={{ marginTop: 6 }}>
+                                            {(() => { const v = validateIBAN(form.draft.iban); return (
+                                                <div className="field"><label title="IBAN mit Prüfziffer, Leerzeichen optional">IBAN</label>
+                                                    <input className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                                    {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
+                                                </div>
+                                            ) })()}
+                                            {(() => { const v = validateBIC(form.draft.bic); return (
+                                                <div className="field"><label title="8 oder 11 Zeichen">BIC</label>
+                                                    <input className="input" placeholder="BANKDEFFXXX" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                                    {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
+                                                </div>
+                                            ) })()}
+                                            <div className="field"><label title="Regelmäßiger Beitrag in Euro">Beitrag (EUR)</label>
+                                                <input className="input" type="number" step="0.01" placeholder="z.B. 12,00" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
+                                            </div>
+                                            <div className="field"><label title="Abbuchungsintervall">Intervall</label>
+                                                <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
+                                                    <option value="">—</option>
+                                                    <option value="MONTHLY">Monatlich</option>
+                                                    <option value="QUARTERLY">Quartal</option>
+                                                    <option value="YEARLY">Jährlich</option>
+                                                </select>
+                                            </div>
+                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                                <div className="helper" aria-live="polite">{nextDuePreview(form.draft.contribution_amount ?? null, form.draft.contribution_interval ?? null, form.draft.next_due_date ?? form.draft.mandate_date ?? form.draft.join_date ?? null) || '—'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {formTab === 'MANDATE' && (
+                                    <div className="card" style={{ padding: 10 }}>
+                                        <div className="helper" title="SEPA-Lastschrift Mandat">Mandatsinfos</div>
+                                        <div className="row" style={{ marginTop: 6 }}>
+                                            <div className="field"><label title="Referenz auf SEPA-Mandat">Mandats-Ref.</label><input className="input" placeholder="M-2025-001" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} /></div>
+                                            <div className="field"><label>Mandats-Datum</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} /></div>
+                                        </div>
+                                    </div>
+                                )}
+                                {formTab === 'MEMBERSHIP' && (
+                                    <div className="card" style={{ padding: 10 }}>
+                                        <div className="helper" title="Mitgliedschaftsdaten">Mitgliedschaft</div>
+                                        <div className="row" style={{ marginTop: 6 }}>
+                                            <div className="field"><label>Eintritt <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />{requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Eintrittsdatum angeben</div>)}</div>
+                                            <div className="field"><label>Austritt</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /></div>
+                                            <div className="field"><label>Initiale Fälligkeit</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} /></div>
+                                            <div className="field"><label>Funktion (Vorstand)</label>
+                                                <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } })}>
+                                                    <option value="">—</option>
+                                                    <option value="V1">1. Vorsitz</option>
+                                                    <option value="V2">2. Vorsitz</option>
+                                                    <option value="KASSIER">Kassier</option>
+                                                    <option value="KASSENPR1">1. Kassenprüfer</option>
+                                                    <option value="KASSENPR2">2. Kassenprüfer</option>
+                                                    <option value="SCHRIFT">Schriftführer</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {formTab === 'MISC' && (
+                                    <div className="card" style={{ padding: 10 }}>
+                                        <div className="helper" title="Freitext-Notizen (einfacher Text)">Sonstiges</div>
+                                        <div className="row" style={{ marginTop: 6 }}>
+                                            <div className="field" style={{ gridColumn: '1 / span 2' }}><label>Notizen</label><input className="input" placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} /></div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Right-side info column removed to maximize space */}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                            {form.mode === 'edit' ? (
+                                <button className="btn danger" onClick={() => {
+                                    if (!form?.draft?.id) return
+                                    const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
+                                    setDeleteConfirm({ id: form.draft.id, label })
+                                }}>🗑 Löschen</button>
+                            ) : <span />}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
+                                <button className="btn primary" onClick={async () => {
                                 try {
-                                    if (!form.draft.name || !form.draft.name.trim()) { alert('Name ist Pflichtfeld'); return }
+                                    setRequiredTouched(true)
+                                    const missing: string[] = []
+                                    if (!form.draft.name || !form.draft.name.trim()) missing.push('Name')
                                     if (form.mode === 'create') {
-                                        await (window as any).api?.members?.create?.({ ...form.draft })
-                                    } else {
-                                        await (window as any).api?.members?.update?.({ ...form.draft })
+                                        if (!form.draft.memberNo || !String(form.draft.memberNo).trim()) missing.push('Mitglieds-Nr.')
+                                        if (!form.draft.join_date || !String(form.draft.join_date).trim()) missing.push('Eintritt')
                                     }
-                                    setForm(null); await load()
+                                    if (missing.length) { setMissingRequired(missing); return }
+                                    const addrCombined = [addrStreet, [addrZip, addrCity].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+                                    const payload = { ...form.draft, address: addrCombined || form.draft.address || null }
+                                    if (form.mode === 'create') {
+                                        await (window as any).api?.members?.create?.(payload)
+                                    } else {
+                                        await (window as any).api?.members?.update?.(payload)
+                                    }
+                                    setForm(null); setRequiredTouched(false); setMissingRequired([]); await load()
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Speichern</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showColumnsModal && (
+                <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
+                            <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
+                        </header>
+                        <div className="card" style={{ padding: 10 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <input type="checkbox" checked={colPrefs.showIBAN} onChange={(e)=>setColPrefs(p=>({ ...p, showIBAN: e.target.checked }))} />
+                                IBAN anzeigen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                                <input type="checkbox" checked={colPrefs.showContribution} onChange={(e)=>setColPrefs(p=>({ ...p, showContribution: e.target.checked }))} />
+                                Beitrag anzeigen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                                <input type="checkbox" checked={colPrefs.showAddress} onChange={(e)=>setColPrefs(p=>({ ...p, showAddress: e.target.checked }))} />
+                                Adresse anzeigen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                                <input type="checkbox" checked={colPrefs.showBoardTable} onChange={(e)=>setColPrefs(p=>({ ...p, showBoardTable: e.target.checked }))} />
+                                Vorstand oben als eigene Tabelle
+                            </label>
+                            <div className="helper" style={{ marginTop: 8 }}>Tipp: Du kannst IBAN/Beitrag ausblenden und stattdessen die Adresse anzeigen.</div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn" onClick={() => setShowColumnsModal(false)}>Schließen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showInvite && (
+                <div className="modal-overlay" onClick={() => setShowInvite(false)}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 900px)', maxWidth: 900, display: 'grid', gap: 10 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Einladung per E-Mail</h3>
+                            <button className="btn" onClick={()=>setShowInvite(false)}>×</button>
+                        </header>
+                        <div className="card" style={{ padding: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <div className="helper">Aktuelle Filter: Status = {status}, Suche = {q ? `"${q}"` : '—'}</div>
+                                <label className="helper" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <input type="checkbox" checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
+                                    Nur aktive einladen
+                                </label>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                                <div className="field">
+                                    <label>Betreff</label>
+                                    <input className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
+                                </div>
+                                <div className="field">
+                                    <label>Anzahl Empfänger (BCC)</label>
+                                    <input className="input" value={inviteEmails.length || 0} readOnly />
+                                </div>
+                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                    <label>Nachricht</label>
+                                    <textarea className="input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} style={{ resize: 'vertical' }} />
+                                </div>
+                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                    <label>Empfänger (BCC)</label>
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input className="input" readOnly value={inviteEmails.join('; ')} style={{ flex: 1 }} />
+                                        <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert('E-Mail-Adressen kopiert') } catch { alert('Kopieren nicht möglich') } }}>Kopieren</button>
+                                    </div>
+                                    <div className="helper">Die Liste basiert auf der aktuellen Ansicht (Filter & Suche) und enthält nur Kontakte mit E-Mail.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="helper">{inviteBusy ? 'Sammle E-Mail-Adressen…' : `${inviteEmails.length} Empfänger gefunden`}</div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn" onClick={()=>setShowInvite(false)}>Abbrechen</button>
+                                <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen kopiert (BCC).`) } catch { alert('Kopieren nicht möglich') } }}>Nur BCC kopieren</button>
+                                <button className="btn primary" disabled={!inviteEmails.length} onClick={() => {
+                                    const subject = encodeURIComponent(inviteSubject || '')
+                                    const body = encodeURIComponent(inviteBody || '')
+                                    const bccRaw = inviteEmails.join(';')
+                                    const mailto = `mailto:?bcc=${encodeURIComponent(bccRaw)}&subject=${subject}&body=${body}`
+                                    if (mailto.length <= 1800 && inviteEmails.length <= 50) {
+                                        try { window.location.href = mailto } catch { /* ignore */ }
+                                    } else {
+                                        (async () => { try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen in die Zwischenablage kopiert. Füge sie als BCC in dein E-Mail-Programm ein.`) } catch { alert('Link zu lang – E-Mail-Adressen konnten nicht automatisch kopiert werden.') } })()
+                                    }
+                                }}>Im Mail-Programm öffnen</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showPayments && (
+                <PaymentsAssignModal onClose={() => setShowPayments(false)} />
+            )}
+            {missingRequired.length > 0 && (
+                <div className="modal-overlay" onClick={() => setMissingRequired([])}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
+                            <button className="btn" onClick={() => setMissingRequired([])}>×</button>
+                        </header>
+                        <div className="card" style={{ padding: 10 }}>
+                            <div>Bitte ergänze die folgenden Felder:</div>
+                            <ul className="helper" style={{ marginTop: 6 }}>
+                                {missingRequired.map((f) => (<li key={f}>{f}</li>))}
+                            </ul>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn primary" onClick={() => setMissingRequired([])}>OK</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {deleteConfirm && (
+                <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Mitglied löschen</h3>
+                            <button className="btn" onClick={() => setDeleteConfirm(null)}>×</button>
+                        </header>
+                        <div className="card" style={{ padding: 10 }}>
+                            <div style={{ marginBottom: 6 }}>Soll das folgende Mitglied wirklich gelöscht werden?</div>
+                            <div className="helper" style={{ fontWeight: 600 }}>{deleteConfirm.label}</div>
+                            <div className="helper" style={{ color: 'var(--danger)', marginTop: 8 }}>Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn" onClick={() => setDeleteConfirm(null)} disabled={deleteBusy}>Abbrechen</button>
+                            <button className="btn danger" disabled={deleteBusy} onClick={async () => {
+                                setDeleteBusy(true)
+                                try {
+                                    await (window as any).api?.members?.delete?.({ id: deleteConfirm.id })
+                                    setDeleteConfirm(null)
+                                    setForm(null)
+                                    await load()
+                                } catch (e: any) { alert(e?.message || String(e)) }
+                                finally { setDeleteBusy(false) }
+                            }}>Endgültig löschen</button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
     )
+}
+
+function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; name: string; memberNo?: string }) {
+    const [open, setOpen] = useState(false)
+    const [status, setStatus] = useState<any>(null)
+    const [history, setHistory] = useState<any[]>([])
+    const [memberData, setMemberData] = useState<any>(null)
+    const [due, setDue] = useState<Array<{ periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
+    // Per-period UI state for linking/search
+    const [selVoucherByPeriod, setSelVoucherByPeriod] = useState<Record<string, number | null>>({})
+    const [manualListByPeriod, setManualListByPeriod] = useState<Record<string, Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>>({})
+    const [searchByPeriod, setSearchByPeriod] = useState<Record<string, string>>({})
+    // Pagination for due rows
+    const [duePage, setDuePage] = useState(1)
+    const pageSize = 5
+    // Preload status so the indicator has color even before opening the modal
+    useEffect(() => {
+        let alive = true
+        async function loadStatusAndBasics() {
+            try {
+                const s = await (window as any).api?.payments?.status?.({ memberId })
+                if (alive) setStatus(s || null)
+            } catch { /* noop */ }
+        }
+        loadStatusAndBasics()
+        // Refresh when data across the app changes (e.g., marking payments paid)
+        const onChanged = () => loadStatusAndBasics()
+        try { window.addEventListener('data-changed', onChanged) } catch {}
+        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+    }, [memberId])
+
+    useEffect(() => {
+        if (!open) return
+        let alive = true
+        ;(async () => {
+            try {
+                const s = await (window as any).api?.payments?.status?.({ memberId })
+                const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
+                const member = await (window as any).api?.members?.get?.({ id: memberId })
+                if (alive) {
+                    setStatus(s || null)
+                    setMemberData(member || null)
+                    setHistory(h?.rows || [])
+                    // load due list for this member: from initial nextDue to today; only unpaid items
+                    if (s?.interval) {
+                        const today = new Date()
+                        const from = (s?.nextDue || s?.joinDate || new Date(today.getUTCFullYear(), 0, 1).toISOString().slice(0,10))
+                        const to = today.toISOString().slice(0,10)
+                        const res = await (window as any).api?.payments?.listDue?.({ interval: s.interval, from, to, memberId, includePaid: false })
+                        const rows = (res?.rows || []).filter((r: any) => r.memberId === memberId && !r.paid)
+                        setDue(rows.map((r: any) => ({ periodKey: r.periodKey, interval: r.interval, amount: r.amount, paid: r.paid, voucherId: r.voucherId, verified: r.verified })))
+                    } else { setDue([]) }
+                }
+            } catch { }
+        })()
+        return () => { alive = false }
+    }, [open, memberId])
+    // Reset pagination to page 1 when the due list changes
+    useEffect(() => { setDuePage(1) }, [due.length])
+    const color = status?.state === 'OVERDUE' ? 'var(--danger)' : status?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)'
+    return (
+        <>
+            <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
+            </button>
+            {open && (
+                <div className="modal-overlay" onClick={() => setOpen(false)}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
+                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
+                            <button className="btn" onClick={()=>setOpen(false)}>×</button>
+                        </header>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                            <div className="helper" style={{ fontWeight: 600 }}>{name}{memberNo ? ` (${memberNo})` : ''}</div>
+                            <span className="helper">•</span>
+                            <span className="helper">Eintritt: {status?.joinDate || '—'}</span>
+                            <span className="helper">•</span>
+                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `Überfällig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '—'}</span>
+                            <span className="helper">•</span>
+                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '—'}</span>
+                            <span className="helper">•</span>
+                            <span className="helper">Initiale Fälligkeit: {status?.nextDue || '—'}</span>
+                        </div>
+                        <MemberTimeline status={status} history={history} />
+                        {/* Due payments for this member */}
+                        <div className="card" style={{ padding: 10 }}>
+                            <strong>Fällige Beiträge</strong>
+                            {due.length === 0 ? (
+                                <div className="helper" style={{ marginTop: 6 }}>Aktuell keine offenen Perioden.</div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} — {due.length} offen</div>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
+                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
+                                        </div>
+                                    </div>
+                                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
+                                        <thead>
+                                            <tr>
+                                                <th align="left">Periode</th>
+                                                <th align="right">Betrag</th>
+                                                <th align="left">Verknüpfen</th>
+                                                <th align="left">Aktion</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {due.slice((duePage-1)*pageSize, duePage*pageSize).map((r, i) => {
+                                                const selVoucher = selVoucherByPeriod[r.periodKey] ?? null
+                                                const manualList = manualListByPeriod[r.periodKey] || []
+                                                const search = searchByPeriod[r.periodKey] || ''
+                                                return (
+                                                    <tr key={r.periodKey}>
+                                                        <td>{r.periodKey}</td>
+                                                        <td align="right">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.amount)}</td>
+                                                        <td>
+                                                            <div style={{ display: 'grid', gap: 6 }}>
+                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verknüpfen">
+                                                                    <option value="">— ohne Verknüpfung —</option>
+                                                                    {manualList.map(s => (
+                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} · {s.date} · {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} · {(s.description || s.counterparty || '')}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                                    <input className="input" placeholder="Buchung suchen…" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
+                                                                    <button className="btn" onClick={async () => {
+                                                                        try {
+                                                                            // widen range for earlier periods: from period start - 90 days to today
+                                                                            const { start, end } = periodRangeLocal(r.periodKey)
+                                                                            const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
+                                                                            const todayISO = new Date().toISOString().slice(0,10)
+                                                                            const fromISO = s.toISOString().slice(0,10)
+                                                                            const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 50 })
+                                                                            const list = (res?.rows || []).map((v: any) => ({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }))
+                                                                            setManualListByPeriod(prev => ({ ...prev, [r.periodKey]: list }))
+                                                                        } catch {}
+                                                                    }}>Suchen</button>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <button className="btn primary" onClick={async () => {
+                                                                try {
+                                                                    await (window as any).api?.payments?.markPaid?.({ memberId, periodKey: r.periodKey, interval: r.interval, amount: r.amount, voucherId: selVoucher || null })
+                                                                    // refresh blocks
+                                                                    const s = await (window as any).api?.payments?.status?.({ memberId })
+                                                                    const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
+                                                                    setStatus(s || null)
+                                                                    setHistory(h?.rows || [])
+                                                                    const nextDueList = due.filter((d) => d.periodKey !== r.periodKey)
+                                                                    setDue(nextDueList)
+                                                                    // cleanup per-row state
+                                                                    setSelVoucherByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
+                                                                    setManualListByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
+                                                                    setSearchByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
+                                                                    // adjust page if we are beyond last page after removal
+                                                                    const newTotalPages = Math.max(1, Math.ceil(nextDueList.length / pageSize))
+                                                                    setDuePage(p => Math.min(p, newTotalPages))
+                                                                    window.dispatchEvent(new Event('data-changed'))
+                                                                } catch (e: any) { alert(e?.message || String(e)) }
+                                                            }}>Bezahlen</button>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                        <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
+                                        <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
+                                        <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
+                                        <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+                            <button className="btn primary" onClick={async ()=>{
+                                try {
+                                    const addr = memberData?.address || null
+                                    const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
+                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
+                                } catch (e: any) { alert(e?.message || String(e)) }
+                            }}>Mitglied anschreiben</button>
+                        </div>
+                        <div className="card" style={{ padding: 10 }}>
+                            <strong>Historie</strong>
+                            <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
+                                <thead>
+                                    <tr>
+                                        <th align="left">Periode</th>
+                                        <th align="left">Datum</th>
+                                        <th align="right">Betrag</th>
+                                        <th align="left">Beleg</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {history.map((r,i)=> (
+                                        <tr key={i}>
+                                            <td>{r.periodKey}</td>
+                                            <td>{r.datePaid}</td>
+                                            <td align="right">{new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(r.amount)}</td>
+                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '—'} {r.description ? `· ${r.description}` : ''}</td>
+                                        </tr>
+                                    ))}
+                                    {history.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button className="btn" onClick={()=>setOpen(false)}>Schließen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    )
+}
+
+function MemberTimeline({ status, history }: { status: any; history: Array<{ periodKey: string; datePaid: string; amount: number }> }) {
+    // Build a horizontal timeline starting at join date and going forward to current (+a few future periods)
+    const interval: 'MONTHLY'|'QUARTERLY'|'YEARLY' = status?.interval || 'MONTHLY'
+    const today = new Date()
+    const currentKey = (() => {
+        const y = today.getUTCFullYear(); const m = today.getUTCMonth()+1
+        if (interval==='MONTHLY') return `${y}-${String(m).padStart(2,'0')}`
+        if (interval==='QUARTERLY') return `${y}-Q${Math.floor((m-1)/3)+1}`
+        return String(y)
+    })()
+    // helpers to move between period keys locally
+    function prevKeyLocal(key: string): string {
+        const [yStr, rest] = key.split('-'); const y = Number(yStr)
+        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q>1) return `${y}-Q${q-1}`; return `${y-1}-Q4` }
+        if (rest) { const m = Number(rest); if (m>1) return `${y}-${String(m-1).padStart(2,'0')}`; return `${y-1}-12` }
+        return String(y-1)
+    }
+    function nextKeyLocal(key: string): string {
+        const [yStr, rest] = key.split('-'); const y = Number(yStr)
+        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q<4) return `${y}-Q${q+1}`; return `${y+1}-Q1` }
+        if (rest) { const m = Number(rest); if (m<12) return `${y}-${String(m+1).padStart(2,'0')}`; return `${y+1}-01` }
+        return String(y+1)
+    }
+    function compareKeysLocal(a: string, b: string): number {
+        if (interval === 'MONTHLY') {
+            const [ay, am] = a.split('-'); const [by, bm] = b.split('-')
+            const ai = Number(ay)*12 + Number(am)
+            const bi = Number(by)*12 + Number(bm)
+            return ai === bi ? 0 : (ai < bi ? -1 : 1)
+        }
+        if (interval === 'QUARTERLY') {
+            const [ay, aqS] = a.split('-'); const [by, bqS] = b.split('-')
+            const aq = Number((aqS||'Q1').replace('Q','')); const bq = Number((bqS||'Q1').replace('Q',''))
+            const ai = Number(ay)*4 + aq
+            const bi = Number(by)*4 + bq
+            return ai === bi ? 0 : (ai < bi ? -1 : 1)
+        }
+        const ai = Number(a); const bi = Number(b)
+        return ai === bi ? 0 : (ai < bi ? -1 : 1)
+    }
+    function periodKeyFromDateLocal(d: Date): string { return (interval==='MONTHLY' ? `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}` : interval==='QUARTERLY' ? `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth()/3)+1}` : String(d.getUTCFullYear())) }
+    // Determine start at (current - pastCount) clamped to join date; end at current + futureCount
+    const joinKey = (() => { try { if (!status?.joinDate) return null; const jd = new Date(status.joinDate); if (isNaN(jd.getTime())) return null; return periodKeyFromDateLocal(jd) } catch { return null } })()
+    const pastCount = interval==='QUARTERLY' ? 2 : 5
+    const futureCount = 3
+    const startFromCurrent = (() => { let k = currentKey; for (let i=0;i<pastCount;i++) k = prevKeyLocal(k); return k })()
+    let startKey = startFromCurrent
+    if (joinKey && compareKeysLocal(joinKey, startKey) > 0) startKey = joinKey
+    // Clamp start to the first due, so items before initial due are not shown
+    const firstDueKeyForClamp = (() => {
+        if (status?.nextDue) { try { return periodKeyFromDateLocal(new Date(status.nextDue)) } catch { /* ignore */ } }
+        return null
+    })()
+    if (firstDueKeyForClamp && compareKeysLocal(firstDueKeyForClamp, startKey) > 0) startKey = firstDueKeyForClamp
+    // Determine end at current plus futureCount periods
+    const forward = futureCount
+    let endKey = currentKey
+    for (let i=0;i<forward;i++){ endKey = nextKeyLocal(endKey) }
+    // Build keys from start to end (inclusive)
+    const keys: string[] = []
+    let k = startKey
+    keys.push(k)
+    while (compareKeysLocal(k, endKey) < 0) { k = nextKeyLocal(k); keys.push(k) }
+    // Map paid keys
+    const paidSet = new Set((history||[]).map(h=>h.periodKey))
+    const nextDue = status?.nextDue || null
+    // Determine first due period key (anchor) from nextDue; fall back to current if missing
+    const firstDueKey = (() => {
+        if (nextDue) {
+            try { const d = new Date(nextDue); return periodKeyFromDateLocal(d) } catch { /* ignore */ }
+        }
+        return currentKey
+    })()
+    return (
+        <div className="card" style={{ padding: 10 }}>
+            <strong>Zeitstrahl</strong>
+            <div style={{ marginTop: 8, overflowX: 'auto' }}>
+                <svg width={Math.max(640, keys.length*56)} height={58} role="img" aria-label="Zeitstrahl Zahlungen">
+                    {/* baseline */}
+                    <line x1={12} y1={28} x2={Math.max(640, keys.length*56)-12} y2={28} stroke="var(--border)" strokeWidth={2} />
+                    {keys.map((pk, i) => {
+                        const x = 28 + i*56
+                        const isCurrent = pk===currentKey
+                        const isPaid = paidSet.has(pk)
+                        // Overdue if unpaid and period <= current and period >= firstDue
+                        const isBeforeOrEqCurrent = compareKeysLocal(pk, currentKey) <= 0
+                        const isOnOrAfterFirstDue = compareKeysLocal(pk, firstDueKey) >= 0
+                        const isOverdue = !isPaid && isBeforeOrEqCurrent && isOnOrAfterFirstDue
+                        const color = isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : (isCurrent ? 'var(--warning)' : 'var(--muted)'))
+                        return (
+                            <g key={pk}>
+                                <circle cx={x} cy={28} r={6} fill={color}>
+                                    <title>{`${pk} · ${isPaid ? 'bezahlt' : (isOverdue ? 'überfällig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
+                                </circle>
+                                <text x={x} y={12} textAnchor="middle" fontSize={10} fill="var(--text-dim)">{pk}</text>
+                                <text x={x} y={50} textAnchor="middle" fontSize={10} fill={isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : 'var(--text-dim)')}>
+                                    {isPaid ? 'bezahlt' : (isOverdue ? 'überfällig' : (isCurrent ? 'jetzt' : ''))}
+                                </text>
+                            </g>
+                        )
+                    })}
+                    {/* next due is shown above, avoid overlaying labels here */}
+                </svg>
+            </div>
+        </div>
+    )
+}
+
+function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
+    const [interval, setInterval] = useState<'MONTHLY'|'QUARTERLY'|'YEARLY'>('MONTHLY')
+    const [mode, setMode] = useState<'PERIOD'|'RANGE'>('PERIOD')
+    const [periodKey, setPeriodKey] = useState<string>(() => {
+        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+    })
+    const [from, setFrom] = useState<string>('')
+    const [to, setTo] = useState<string>('')
+    const [q, setQ] = useState('')
+    const [rows, setRows] = useState<Array<{ memberId: number; name: string; memberNo?: string|null; status: string; periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
+    const [busy, setBusy] = useState(false)
+
+    async function load() {
+        setBusy(true)
+        try {
+            const payload = mode === 'PERIOD' ? { interval, periodKey, q } : { interval, from, to, q }
+            const res = await (window as any).api?.payments?.listDue?.(payload)
+            setRows(res?.rows || [])
+        } finally { setBusy(false) }
+    }
+    useEffect(() => { load() }, [interval, mode, periodKey, from, to, q])
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal booking-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <h2 style={{ margin: 0 }}>Mitgliedsbeiträge zuordnen</h2>
+                    <button className="btn" onClick={onClose}>×</button>
+                </header>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select className="input" value={interval} onChange={e => {
+                        const v = e.target.value as any; setInterval(v)
+                        // auto-adjust example periodKey
+                        const d = new Date()
+                        setPeriodKey(v==='MONTHLY' ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : v==='QUARTERLY' ? `${d.getFullYear()}-Q${Math.floor(d.getMonth()/3)+1}` : String(d.getFullYear()))
+                    }} title="Intervall">
+                        <option value="MONTHLY">Monat</option>
+                        <option value="QUARTERLY">Quartal</option>
+                        <option value="YEARLY">Jahr</option>
+                    </select>
+                    <select className="input" value={mode} onChange={e => setMode(e.target.value as any)} title="Modus">
+                        <option value="PERIOD">Periode</option>
+                        <option value="RANGE">Zeitraum</option>
+                    </select>
+                    {mode === 'PERIOD' ? (
+                        <input className="input" value={periodKey} onChange={e => setPeriodKey(sanitizePeriodKey(e.target.value, interval))} title="Periode: YYYY-MM | YYYY-Q1..Q4 | YYYY" />
+                    ) : (
+                        <>
+                            <input className="input" type="date" value={from} onChange={e => setFrom(e.target.value)} />
+                            <input className="input" type="date" value={to} onChange={e => setTo(e.target.value)} />
+                        </>
+                    )}
+                    <input className="input" placeholder="Mitglied suchen…" value={q} onChange={e => setQ(e.target.value)} />
+                    <div className="helper">{busy ? 'Lade…' : `${rows.length} Einträge`}</div>
+                </div>
+                <table style={{ width: '100%' }} cellPadding={6}>
+                    <thead>
+                        <tr>
+                            <th align="left">Mitglied</th>
+                            <th>Periode</th>
+                            <th>Intervall</th>
+                            <th align="right">Betrag</th>
+                            <th>Vorschläge</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(r => (
+                            <PaymentsRow key={`${r.memberId}-${r.periodKey}`} row={r} onChanged={load} />
+                        ))}
+                        {rows.length === 0 && <tr><td colSpan={7}><div className="helper">Keine fälligen Beiträge</div></td></tr>}
+                    </tbody>
+                </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button className="btn" onClick={onClose}>Schließen</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string; memberNo?: string|null; status: string; periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }; onChanged: () => void }) {
+    const [suggestions, setSuggestions] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
+    const [selVoucher, setSelVoucher] = useState<number | null>(row.voucherId ?? null)
+    const [busy, setBusy] = useState(false)
+    const [search, setSearch] = useState('')
+    const [manualList, setManualList] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
+    // Status & history modal
+    const [showStatus, setShowStatus] = useState(false)
+    const [statusData, setStatusData] = useState<any>(null)
+    const [historyRows, setHistoryRows] = useState<any[]>([])
+    // Preload status so the inline indicator is colored without opening the modal
+    useEffect(() => {
+        let alive = true
+        async function loadStatus() {
+            try { const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId }); if (alive) setStatusData(s || null) } catch { }
+        }
+        loadStatus()
+        const onChanged = () => loadStatus()
+        try { window.addEventListener('data-changed', onChanged) } catch {}
+        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+    }, [row.memberId])
+
+    useEffect(() => {
+        if (!showStatus) return
+        let alive = true
+        ;(async () => {
+            try {
+                const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId })
+                const h = await (window as any).api?.payments?.history?.({ memberId: row.memberId, limit: 20 })
+                if (alive) { setStatusData(s || null); setHistoryRows(h?.rows || []) }
+            } catch { /* ignore */ }
+        })()
+        return () => { alive = false }
+    }, [showStatus, row.memberId])
+
+    useEffect(() => {
+        let active = true
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.payments?.suggestVouchers?.({ name: row.name, amount: row.amount, periodKey: row.periodKey })
+                if (active) setSuggestions(res?.rows || [])
+            } catch { /* ignore */ }
+        })()
+        return () => { active = false }
+    }, [row.memberId, row.periodKey, row.amount])
+
+    const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+    return (
+        <tr>
+            <td title={row.memberNo || undefined}>
+                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
+                <button
+                    className="btn ghost"
+                    title="Beitragsstatus & Historie"
+                    aria-label="Beitragsstatus & Historie"
+                    onClick={() => setShowStatus(true)}
+                    style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)') }}
+                >
+                    {/* history icon */}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
+                </button>
+                {showStatus && (
+                    <div className="modal-overlay" onClick={() => setShowStatus(false)}>
+                        <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', maxWidth: 1100, display: 'grid', gap: 10 }}>
+                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
+                                <button className="btn" onClick={()=>setShowStatus(false)}>×</button>
+                            </header>
+                            <div className="helper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
+                                <span className="badge" style={{ background: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--muted)'), color: '#fff' }}>
+                                    {statusData?.state === 'OVERDUE' ? `Überfällig (${statusData?.overdue})` : statusData?.state === 'OK' ? 'OK' : '—'}
+                                </span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <strong>Überblick</strong>
+                                    <ul style={{ margin: '6px 0 0 16px' }}>
+                                        <li>Eintritt: {statusData?.joinDate || '—'}</li>
+                                        <li>Letzte Zahlung: {statusData?.lastPeriod ? `${statusData.lastPeriod} (${statusData?.lastDate||''})` : '—'}</li>
+                                        <li>Initiale Fälligkeit: {statusData?.nextDue || '—'}</li>
+                                    </ul>
+                                </div>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <strong>Historie</strong>
+                                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
+                                        <thead>
+                                            <tr>
+                                                <th align="left">Periode</th>
+                                                <th align="left">Datum</th>
+                                                <th align="right">Betrag</th>
+                                                <th align="left">Beleg</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {historyRows.map((r,i)=> (
+                                                <tr key={i}>
+                                                    <td>{r.periodKey}</td>
+                                                    <td>{r.datePaid}</td>
+                                                    <td align="right">{eur.format(r.amount)}</td>
+                                                    <td>
+                                                        {r.voucherNo ? (
+                                                            <a href="#" onClick={(e)=>{ e.preventDefault(); if (r.voucherId) { const ev = new CustomEvent('apply-voucher-jump', { detail: { voucherId: r.voucherId } }); window.dispatchEvent(ev) } }}>{`#${r.voucherNo}`}</a>
+                                                        ) : '—'}
+                                                        {r.description ? ` · ${r.description}` : ''}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {historyRows.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                                <button className="btn" onClick={()=>setShowStatus(false)}>Schließen</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </td>
+            <td>{row.periodKey}</td>
+            <td>{row.interval}</td>
+            <td align="right">{eur.format(row.amount)}</td>
+            <td>
+                <div style={{ display: 'grid', gap: 6 }}>
+                    <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucher(e.target.value ? Number(e.target.value) : null)} title="Passende Buchung verknüpfen">
+                        <option value="">— ohne Verknüpfung —</option>
+                        {suggestions.map(s => (
+                            <option key={s.id} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
+                        ))}
+                        {manualList.map(s => (
+                            <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
+                        ))}
+                    </select>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <input className="input" placeholder="Buchung suchen…" value={search} onChange={e => setSearch(e.target.value)} title="Suche in Buchungen (Betrag/Datum/Text)" />
+                        <button className="btn" onClick={async () => {
+                            try {
+                                // widen range: search from period start - 90 days up to today to catch late postings
+                                const { start } = periodRangeLocal(row.periodKey)
+                                const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
+                                const todayISO = new Date().toISOString().slice(0,10)
+                                const fromISO = s.toISOString().slice(0,10)
+                                const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 50 })
+                                const list = (res?.rows || []).map((v: any) => ({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }))
+                                setManualList(list)
+                            } catch {}
+                        }}>Suchen</button>
+                    </div>
+                </div>
+            </td>
+            <td>{row.paid ? (row.verified ? 'bezahlt ✔︎ (verifiziert)' : 'bezahlt') : 'offen'}</td>
+            <td style={{ whiteSpace: 'nowrap' }}>
+                {row.paid ? (
+                    <button className="btn" onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.unmark?.({ memberId: row.memberId, periodKey: row.periodKey }); onChanged() } finally { setBusy(false) } }}>Rückgängig</button>
+                ) : (
+                    <button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.markPaid?.({ memberId: row.memberId, periodKey: row.periodKey, interval: row.interval, amount: row.amount, voucherId: selVoucher || null }); onChanged() } finally { setBusy(false) } }}>Als bezahlt markieren</button>
+                )}
+            </td>
+        </tr>
+    )
+}
+
+function sanitizePeriodKey(s: string, interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'): string {
+    const t = s.trim().toUpperCase()
+    if (interval === 'MONTHLY') {
+        const m = /^(\d{4})-(\d{1,2})$/.exec(t)
+        if (!m) return t
+        const y = m[1]; const mo = String(Math.max(1, Math.min(12, Number(m[2])))).padStart(2,'0')
+        return `${y}-${mo}`
+    }
+    if (interval === 'QUARTERLY') {
+        const m = /^(\d{4})-Q(\d)$/i.exec(t)
+        if (!m) return t
+        const y = m[1]; const q = Math.max(1, Math.min(4, Number(m[2])))
+        return `${y}-Q${q}`
+    }
+    const y = /^\d{4}$/.exec(t)?.[0]
+    return y || t
+}
+
+function periodRangeLocal(periodKey: string): { start: string; end: string } {
+    // mirror of backend periodRange for the renderer search UX
+    const [yStr, rest] = periodKey.split('-'); const y = Number(yStr)
+    if (/^Q\d$/.test(rest||'')) {
+        const q = Number((rest||'Q1').replace('Q',''))
+        const start = new Date(Date.UTC(y, (q-1)*3, 1))
+        const end = new Date(Date.UTC(y, q*3, 0))
+        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
+    }
+    if (rest) {
+        const m = Number(rest)
+        const start = new Date(Date.UTC(y, m-1, 1))
+        const end = new Date(Date.UTC(y, m, 0))
+        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
+    }
+    const start = new Date(Date.UTC(y, 0, 1))
+    const end = new Date(Date.UTC(y, 12, 0))
+    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
 }
 
 function DashboardEarmarksPeek() {
@@ -2709,7 +3891,8 @@ function BindingModal({ value, onClose, onSaved }: { value: { id?: number; code:
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
     const [draftError, setDraftError] = useState<string>('')
-    useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError('') }, [value])
+    const [askDelete, setAskDelete] = useState(false)
+    useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -2768,11 +3951,34 @@ function BindingModal({ value, onClose, onSaved }: { value: { id?: number; code:
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" onClick={async () => { await window.api?.bindings.upsert?.(v as any); onSaved(); onClose() }}>Speichern</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                    <div>
+                        {!!v.id && (
+                            <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={onClose}>Abbrechen</button>
+                        <button className="btn primary" onClick={async () => { await window.api?.bindings.upsert?.(v as any); onSaved(); onClose() }}>Speichern</button>
+                    </div>
                 </div>
             </div>
+            {askDelete && v.id && (
+                <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Zweckbindung löschen</h3>
+                            <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
+                        </div>
+                        <div>Möchtest du die Zweckbindung <strong>{v.code}</strong> – {v.name} wirklich löschen?</div>
+                        <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt erhalten; es wird nur die Zweckbindung entfernt.</div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
+                            <button className="btn danger" onClick={async () => { await window.api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {showColorPicker && (
                 <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
@@ -2821,8 +4027,9 @@ function BudgetModal({ value, onClose, onSaved }: { value: { id?: number; year: 
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
     const [draftError, setDraftError] = useState<string>('')
+    const [askDelete, setAskDelete] = useState(false)
     // Keep modal state in sync when opening with an existing budget so fields are prefilled
-    useEffect(() => { setV(value); setNameError(''); setDraftColor(value.color || '#00C853'); setDraftError('') }, [value])
+    useEffect(() => { setV(value); setNameError(''); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
     const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -2888,9 +4095,15 @@ function BudgetModal({ value, onClose, onSaved }: { value: { id?: number; year: 
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" onClick={async () => {
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                    <div>
+                        {!!v.id && (
+                            <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={onClose}>Abbrechen</button>
+                        <button className="btn primary" onClick={async () => {
                         const name = (v.name || '').trim()
                         if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
                         // Persist start/end dates and other fields
@@ -2911,8 +4124,25 @@ function BudgetModal({ value, onClose, onSaved }: { value: { id?: number; year: 
                         } as any)
                         onSaved(); onClose()
                     }}>Speichern</button>
+                    </div>
                 </div>
             </div>
+            {askDelete && v.id && (
+                <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0 }}>Budget löschen</h3>
+                            <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
+                        </div>
+                        <div>Möchtest du das Budget <strong>{(v.name || '').trim() || ('#' + v.id)}</strong> wirklich löschen?</div>
+                        <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
+                            <button className="btn danger" onClick={async () => { await window.api?.budgets.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {showColorPicker && (
                 <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
@@ -5287,7 +6517,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     eurFmt: Intl.NumberFormat
     fmtDate: (s?: string) => string
-    onEdit: (r: { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => void
+    onEdit: (r: { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[]; netAmount?: number; grossAmount?: number; vatRate?: number }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
     onToggleSort: (col: 'date' | 'net' | 'gross') => void
     sortDir: 'ASC' | 'DESC'
@@ -5355,7 +6585,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 {isLocked(r.date) ? (
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [] })}>✎</button>
+                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -5558,8 +6788,8 @@ function SettingsView({
     setNavLayout: (v: 'left' | 'top') => void
     navIconColorMode: 'color' | 'mono'
     setNavIconColorMode: (v: 'color' | 'mono') => void
-    colorTheme: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones'
-    setColorTheme: (v: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones') => void
+    colorTheme: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
+    setColorTheme: (v: 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm') => void
     journalRowStyle: 'both' | 'lines' | 'zebra' | 'none'
     setJournalRowStyle: (v: 'both' | 'lines' | 'zebra' | 'none') => void
     journalRowDensity: 'normal' | 'compact'
@@ -5578,112 +6808,136 @@ function SettingsView({
         const sample = '2025-09-11'
         const pretty = '11 Sep 2025'
         const [showDeleteAll, setShowDeleteAll] = useState(false)
+        const [showAdvanced, setShowAdvanced] = useState(false)
         const [deleteConfirmText, setDeleteConfirmText] = useState('')
         const canDeleteAll = deleteConfirmText === 'LÖSCHEN'
         const [showImportConfirm, setShowImportConfirm] = useState(false)
         const [busyImport, setBusyImport] = useState(false)
         return (
             <div style={{ display: 'grid', gap: 12 }}>
-                <div>
-                    <strong>Allgemein</strong>
-                    <div className="helper">Basiseinstellungen für Listen und Anzeige.</div>
-                </div>
-                <div className="row">
-                    <div className="field">
-                        <label>Journal: Anzahl der Einträge</label>
-                        <select className="input" value={journalLimit} onChange={(e) => setJournalLimit(Number(e.target.value))}>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Datumsformat</label>
-                        <select className="input" value={dateFmt} onChange={(e) => setDateFmt(e.target.value as any)}>
-                            <option value="ISO">ISO (z.B. {sample})</option>
-                            <option value="PRETTY">Lesbar (z.B. {pretty})</option>
-                        </select>
-                        <div className="helper">Wirkt u.a. in Buchungen (Datumsspalte) und Filter-Chips.</div>
-                    </div>
-                    <div className="field">
-                        <label>Buchungen: Zeilenlayout</label>
-                        <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
-                            <option value="both">Linien + Zebra</option>
-                            <option value="lines">Nur Linien</option>
-                            <option value="zebra">Nur Zebra</option>
-                            <option value="none">Ohne Linien/Zebra</option>
-                        </select>
-                        <div className="helper">„Nur Linien“ entspricht der Rechnungen-Tabelle. „Zebra“ hebt jede zweite Zeile leicht hervor.</div>
-                    </div>
-                    <div className="field">
-                        <label>Buchungen: Zeilenhöhe</label>
-                        <select className="input" value={journalRowDensity} onChange={(e) => setJournalRowDensity(e.target.value as any)}>
-                            <option value="normal">Normal</option>
-                            <option value="compact">Kompakt</option>
-                        </select>
-                        <div className="helper">„Kompakt“ reduziert die vertikale Polsterung der Tabellenzellen.</div>
-                    </div>
-                    <div className="field">
-                        <label>Menü-Layout</label>
-                        <select className="input" value={navLayout} onChange={(e) => setNavLayout(e.target.value as 'left' | 'top')}>
-                            <option value="left">Links (klassisch)</option>
-                            <option value="top">Oben (Icons, platzsparend)</option>
-                        </select>
-                        <div className="helper">„Oben“ blendet die Seitenleiste aus und zeigt eine kompakte Icon-Leiste im Kopfbereich.</div>
-                    </div>
-                    {navLayout === 'left' && (
+                {/* Cluster 1: Darstellung & Layout */}
+                <div className="card settings-card" style={{ padding: 12 }}>
+                    <div className="settings-title"><span aria-hidden>🖼️</span> <strong>Aussehen & Navigation</strong></div>
+                    <div className="settings-sub">Passe die Darstellung deiner Buchungen und Menüs an.</div>
+                    <div className="row">
                         <div className="field">
-                            <label>Seitenleiste</label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={sidebarCollapsed}
-                                    onChange={(e) => setSidebarCollapsed(e.target.checked)}
-                                />
-                                Kompakt (nur Icons)
-                            </label>
-                            <div className="helper">Gilt nur für das Menü links. Beschriftungen werden ausgeblendet.</div>
+                            <label>Buchungen: Zeilenlayout</label>
+                            <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
+                                <option value="both">Linien + Zebra</option>
+                                <option value="lines">Nur Linien</option>
+                                <option value="zebra">Nur Zebra</option>
+                                <option value="none">Ohne Linien/Zebra</option>
+                            </select>
+                            <div className="helper">„Nur Linien“ entspricht der Rechnungen-Tabelle. „Zebra“ hebt jede zweite Zeile leicht hervor.</div>
+                        </div>
+                        <div className="field">
+                            <label>Buchungen: Zeilenhöhe</label>
+                            <select className="input" value={journalRowDensity} onChange={(e) => setJournalRowDensity(e.target.value as any)}>
+                                <option value="normal">Normal</option>
+                                <option value="compact">Kompakt</option>
+                            </select>
+                            <div className="helper">„Kompakt“ reduziert die vertikale Polsterung der Tabellenzellen.</div>
+                        </div>
+                        <div className="field">
+                            <label>Menü-Layout</label>
+                            <select className="input" value={navLayout} onChange={(e) => setNavLayout(e.target.value as 'left' | 'top')}>
+                                <option value="left">Links (klassisch)</option>
+                                <option value="top">Oben (icons)</option>
+                            </select>
+                            <div className="helper">„Oben“ blendet die Seitenleiste aus und zeigt eine kompakte Icon-Leiste im Kopfbereich.</div>
+                        </div>
+                        {navLayout === 'left' && (
+                            <div className="field">
+                                <div className="label-row">
+                                    <label htmlFor="toggle-sidebar-compact">Kompakte Seitenleiste</label>
+                                    <input id="toggle-sidebar-compact" role="switch" aria-checked={sidebarCollapsed} className="toggle" type="checkbox" checked={sidebarCollapsed} onChange={(e) => setSidebarCollapsed(e.target.checked)} />
+                                </div>
+                            </div>
+                        )}
+                        <div className="field">
+                            <div className="label-row">
+                                <label htmlFor="toggle-menu-icons">Farbige Menüicons</label>
+                                <input id="toggle-menu-icons" role="switch" aria-checked={navIconColorMode === 'color'} className="toggle" type="checkbox" checked={navIconColorMode === 'color'} onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')} />
+                            </div>
+                        </div>
+                        <div className="field">
+                            <label>Farb-Theme</label>
+                            <select className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
+                                <option value="default">Standard</option>
+                                <option value="fiery-ocean">Fiery Ocean</option>
+                                <option value="peachy-delight">Peachy Delight</option>
+                                <option value="pastel-dreamland">Pastel Dreamland</option>
+                                <option value="ocean-breeze">Ocean Breeze</option>
+                                <option value="earthy-tones">Earthy Tones</option>
+                                <option value="monochrome-harmony">Monochrome Harmony</option>
+                                <option value="vintage-charm">Vintage Charm</option>
+                            </select>
+                            <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen).</div>
+                            <div className="swatches" aria-label="Farbvorschau">
+                                <span className="swatch" style={{ background: 'var(--bg)' }} title="Hintergrund" />
+                                <span className="swatch" style={{ background: 'var(--surface)' }} title="Fläche" />
+                                <span className="swatch" style={{ background: 'var(--accent)' }} title="Akzent" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Cluster 2: Anzeige & Lesbarkeit */}
+                <div className="card settings-card" style={{ padding: 12 }}>
+                    <div className="settings-title"><span aria-hidden>🔎</span> <strong>Anzeige & Lesbarkeit</strong></div>
+                    <div className="settings-sub">Kontrolliere Anzahl und Darstellung zentraler Informationen.</div>
+                    <div className="row">
+                        <div className="field">
+                            <label>Buchungen: Anzahl der Einträge</label>
+                            <select className="input" value={journalLimit} onChange={(e) => setJournalLimit(Number(e.target.value))}>
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
+                        <div className="field">
+                            <label>Datumsformat</label>
+                            <select className="input" value={dateFmt} onChange={(e) => setDateFmt(e.target.value as any)}>
+                                <option value="ISO">ISO (z.B. {sample})</option>
+                                <option value="PRETTY">Lesbar (z.B. {pretty})</option>
+                            </select>
+                            <div className="helper">Wirkt u.a. in Buchungen (Datumsspalte) und Filter-Chips.</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Cluster 3: Datenverwaltung & Sicherheit */}
+                <div className="card settings-card" style={{ padding: 12 }}>
+                    <div className="settings-title"><span aria-hidden>🗄️</span> <strong>Datenverwaltung & Sicherheit</strong></div>
+                    <div className="settings-sub">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="btn" onClick={async () => {
+                            try {
+                                const res = await window.api?.db.export?.()
+                                if (res?.filePath) notify('success', `Datenbank exportiert: ${res.filePath}`)
+                            } catch (e: any) {
+                                notify('error', e?.message || String(e))
+                            }
+                        }}>Exportieren</button>
+                        <button className="btn danger" onClick={() => setShowImportConfirm(true)}>Importieren…</button>
+                    </div>
+                    <div className="muted-sep" />
+                    <button className="btn" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced} aria-controls="advanced-danger">
+                        {showAdvanced ? 'Erweiterte Einstellungen ausblenden' : 'Erweiterte Einstellungen…'}
+                    </button>
+                    {showAdvanced && (
+                        <div id="advanced-danger" className="card" style={{ padding: 12, borderLeft: '4px solid var(--danger)', marginTop: 10 }}>
+                            <div style={{ display: 'grid', gap: 8 }}>
+                                <div>
+                                    <strong>Gefährliche Aktion</strong>
+                                    <div className="helper">Alle Buchungen löschen (inkl. Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
+                                </div>
+                                <div>
+                                    <button className="btn danger" onClick={() => { setDeleteConfirmText(''); setShowDeleteAll(true) }}>Alle Buchungen löschen…</button>
+                                </div>
+                            </div>
                         </div>
                     )}
-                    <div className="field">
-                        <label>Menü-Icons</label>
-                        <select className="input" value={navIconColorMode} onChange={(e) => setNavIconColorMode(e.target.value as any)}>
-                            <option value="mono">Monochrom</option>
-                            <option value="color">Farbig</option>
-                        </select>
-                        <div className="helper">Farbige Icons helfen bei der Orientierung. Monochrom ist dezenter.</div>
-                    </div>
-                    <div className="field">
-                        <label>Farb-Theme</label>
-                        <select className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
-                            <option value="default">Standard</option>
-                            <option value="fiery-ocean">Fiery Ocean</option>
-                            <option value="peachy-delight">Peachy Delight</option>
-                            <option value="pastel-dreamland">Pastel Dreamland</option>
-                            <option value="ocean-breeze">Ocean Breeze</option>
-                            <option value="earthy-tones">Earthy Tones</option>
-                        </select>
-                        <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen). Das aktuelle Design ist Standard.</div>
-                    </div>
-                </div>
-                <div className="card" style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div>
-                            <strong>Datenbank</strong>
-                            <div className="helper">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn" onClick={async () => {
-                                try {
-                                    const res = await window.api?.db.export?.()
-                                    if (res?.filePath) notify('success', `Datenbank exportiert: ${res.filePath}`)
-                                } catch (e: any) {
-                                    notify('error', e?.message || String(e))
-                                }
-                            }}>Exportieren</button>
-                            <button className="btn danger" onClick={() => setShowImportConfirm(true)}>Importieren…</button>
-                        </div>
-                    </div>
                 </div>
                 {showImportConfirm && (
                     <div className="modal-overlay" role="dialog" aria-modal="true">
@@ -5718,18 +6972,6 @@ function SettingsView({
                         </div>
                     </div>
                 )}
-                <div className="card" style={{ padding: 12, borderLeft: '4px solid var(--danger)' }}>
-                    <div style={{ display: 'grid', gap: 8 }}>
-                        <div>
-                            <strong>Gefährliche Aktion</strong>
-                            <div className="helper">Alle Buchungen löschen (inkl. Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
-                        </div>
-                        <div>
-                            <button className="btn danger" onClick={() => { setDeleteConfirmText(''); setShowDeleteAll(true) }}>Alle Buchungen löschen…</button>
-                        </div>
-                    </div>
-                </div>
-
                 {showDeleteAll && (
                     <div className="modal-overlay" role="dialog" aria-modal="true">
                         <div className="modal" style={{ display: 'grid', gap: 12 }}>
@@ -5796,11 +7038,24 @@ function SettingsView({
     }
 
     function StoragePane() {
-        const [info, setInfo] = useState<null | { root: string; dbPath: string; filesDir: string; configuredRoot: string | null }>(null)
+        // UI state for Backup-Verlauf expand/collapse
+        const [showBackupsAll, setShowBackupsAll] = useState(false)
+    const [info, setInfo] = useState<null | { root: string; dbPath: string; filesDir: string; configuredRoot: string | null }>(null)
     const [busy, setBusy] = useState(false) // disable buttons
+        const [busyBackup, setBusyBackup] = useState(false)
+        const [backups, setBackups] = useState<Array<{ filePath: string; size: number; mtime: number }>>([])
         const [error, setError] = useState<string>('')
         const [migratePrompt, setMigratePrompt] = useState<null | { kind: 'useOrMigrate'; sel: { root: string; dbPath: string } } | { kind: 'migrateEmpty'; sel: { root: string } }>(null)
         const [busyAction, setBusyAction] = useState(false)
+    const [restoreSel, setRestoreSel] = useState<null | { filePath: string }>(null)
+    const [restoreInfo, setRestoreInfo] = useState<null | { current?: Record<string, number>; backup?: Record<string, number>; error?: string }>(null)
+    const [busyRestore, setBusyRestore] = useState(false)
+    const [autoMode, setAutoMode] = useState<'OFF' | 'PROMPT' | 'SILENT'>('PROMPT')
+    const [intervalDays, setIntervalDays] = useState<number>(7)
+    const [lastAuto, setLastAuto] = useState<number | null>(null)
+    const [backupDir, setBackupDir] = useState<string>('')
+    const [autoPrompt, setAutoPrompt] = useState<null | { intervalDays: number; daysSince: number; nextDue?: number }>(null)
+    const [nextDue, setNextDue] = useState<number | null>(null)
 
         async function refresh() {
             setError('')
@@ -5812,7 +7067,69 @@ function SettingsView({
                 setError(e?.message || String(e))
             } finally { setBusy(false) }
         }
-        useEffect(() => { refresh() }, [])
+        async function refreshBackups() {
+            try {
+                const r = await window.api?.backup?.list?.()
+                if (r?.ok && r?.backups) setBackups(r.backups)
+            } catch { /* ignore */ }
+        }
+        useEffect(() => {
+            refresh();
+            refreshBackups();
+            (async () => {
+                try {
+                    const d = await window.api?.backup?.getDir?.()
+                    if (d?.ok && d?.dir) setBackupDir(String(d.dir))
+                    const m = await window.api?.settings?.get?.({ key: 'backup.auto' })
+                    const i = await window.api?.settings?.get?.({ key: 'backup.intervalDays' })
+                    const l = await window.api?.settings?.get?.({ key: 'backup.lastAuto' })
+                    // determine next due based on latest backup or lastAuto + interval
+                    try {
+                        const list = await window.api?.backup?.list?.()
+                        const lastMtime = list?.backups?.[0]?.mtime || 0
+                        const lastAny = Number(l?.value || 0)
+                        const inter = Number(i?.value || 7)
+                        const ref = Math.max(lastAny, lastMtime)
+                        if (ref) setNextDue(ref + inter * 24 * 60 * 60 * 1000)
+                        else setNextDue(null)
+                    } catch {}
+                    if (m?.value) setAutoMode(String(m.value).toUpperCase() as any)
+                    if (i?.value) setIntervalDays(Number(i.value) || 7)
+                    if (l?.value) setLastAuto(Number(l.value) || null)
+                } catch { }
+            })()
+            // Listen for auto-backup prompt from main
+            const unsub = window.api?.backup?.onPrompt?.((p) => {
+                setAutoPrompt(p)
+                if (p?.nextDue) setNextDue(p.nextDue)
+            })
+            return () => { try { unsub && unsub() } catch { } }
+        }, [])
+
+        async function makeBackupNow() {
+            setBusyBackup(true)
+            try {
+                const res = await window.api?.backup?.make?.('manual')
+                if (res?.ok && res?.filePath) {
+                    notify('success', `Backup erstellt: ${res.filePath}`)
+                    await refreshBackups()
+                } else {
+                    notify('error', res?.error || 'Backup fehlgeschlagen')
+                }
+            } catch (e: any) {
+                notify('error', e?.message || String(e))
+            } finally { setBusyBackup(false) }
+        }
+
+        // Keep nextDue in sync when inputs change
+        useEffect(() => {
+            try {
+                const lastMtime = backups && backups.length ? backups[0].mtime : 0
+                const ref = Math.max(lastAuto || 0, lastMtime)
+                if (ref) setNextDue(ref + intervalDays * 24 * 60 * 60 * 1000)
+                else setNextDue(null)
+            } catch { /* ignore */ }
+        }, [backups, lastAuto, intervalDays])
 
         async function doAction(kind: 'pick' | 'migrate' | 'use' | 'reset') {
             setBusy(true); setError('')
@@ -5903,6 +7220,15 @@ function SettingsView({
                     <strong>Speicherort der Datenbank</strong>
                     <div className="helper">Wähle, wo die Datei <code>database.sqlite</code> und die Anhänge gespeichert werden.</div>
                 </div>
+                {/* Hinweise direkt unter der Überschrift platzieren */}
+                <div className="helper">Hinweise:
+                    <ul style={{ margin: '4px 0 0 16px' }}>
+                        <li>„Ordner wählen…“ öffnet einen Dialog. Es wird noch nichts kopiert.</li>
+                        <li>Wenn im gewählten Ordner bereits eine <code>database.sqlite</code> liegt, kannst du diese verwenden oder deine aktuelle DB in diesen Ordner kopieren (migrieren).</li>
+                        <li>Wenn keine Datenbank vorhanden ist, kannst du die aktuelle Datenbank in den Ordner kopieren (migrieren).</li>
+                        <li>„Standard wiederherstellen“ nutzt den App-Datenordner (empfohlen, falls unsicher).</li>
+                    </ul>
+                </div>
                 {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
                 <div className="card" style={{ padding: 12 }}>
                     {info ? (
@@ -5920,13 +7246,87 @@ function SettingsView({
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
                     <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
                 </div>
-                <div className="helper">Hinweise:
-                    <ul style={{ margin: '4px 0 0 16px' }}>
-                        <li>„Ordner wählen…“ öffnet einen Dialog. Es wird noch nichts kopiert.</li>
-                        <li>Wenn im gewählten Ordner bereits eine <code>database.sqlite</code> liegt, kannst du diese verwenden oder deine aktuelle DB in diesen Ordner kopieren (migrieren).</li>
-                        <li>Wenn keine Datenbank vorhanden ist, kannst du die aktuelle Datenbank in den Ordner kopieren (migrieren).</li>
-                        <li>„Standard wiederherstellen“ nutzt den App-Datenordner (empfohlen, falls unsicher).</li>
-                    </ul>
+        {backupDir && (
+                    <div className="helper" style={{ wordBreak: 'break-all' }}>Backup-Ordner: {backupDir}</div>
+                )}
+                {/* Backup Sektion */}
+                <div className="card" style={{ padding: 12, marginTop: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'grid', gap: 4 }}>
+                            <div className="settings-title"><strong>Backup-Einstellungen</strong></div>
+                            <div className="helper">Automatische Sicherungen beim Start; manuelle Sicherungen jederzeit.</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn" disabled={busyBackup} onClick={makeBackupNow}>Backup jetzt</button>
+                            <button className="btn" onClick={async () => {
+                                const r = await window.api?.backup?.setDir?.()
+                                if (r?.ok) {
+                                    setBackupDir(String(r.dir))
+                                    const moved = (r as any)?.moved ?? 0
+                                    const msg = moved > 0 ? `Backup-Ordner aktualisiert · ${moved} Sicherung(en) übernommen` : 'Backup-Ordner aktualisiert'
+                                    notify('success', msg)
+                                    await refreshBackups()
+                                }
+                            }}>Backup-Ordner wählen…</button>
+                            <button className="btn" onClick={() => window.api?.backup?.openFolder?.()}>Backup-Ordner öffnen</button>
+                        </div>
+                    </div>
+                    {/* Auto-Backup Toggle + Einstellungen */}
+                    <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+                        <div className="field" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
+                            <input id="toggle-auto-backup" role="switch" aria-checked={autoMode !== 'OFF'} className="toggle" type="checkbox"
+                                checked={autoMode !== 'OFF'}
+                                onChange={async (e) => {
+                                    const on = e.currentTarget.checked
+                                    const next = on ? (autoMode === 'OFF' ? 'PROMPT' : autoMode) : 'OFF'
+                                    setAutoMode(next as any)
+                                    await window.api?.settings?.set?.({ key: 'backup.auto', value: next })
+                                }} />
+                            <label htmlFor="toggle-auto-backup" style={{ marginRight: 12 }}>Automatisches Backup</label>
+                        </div>
+                        <div className="row">
+                            <div className="field" style={{ minWidth: 160 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Modus
+                                    <span className="helper" title="Nachfragen: fragt beim Start, ob gesichert werden soll. Automatisch: legt ohne Nachfrage ein Backup an.">ⓘ</span>
+                                </label>
+                                <select className="input" value={autoMode === 'OFF' ? 'PROMPT' : autoMode} disabled={autoMode === 'OFF'} onChange={async (e) => {
+                                    const v = (e.target.value as 'PROMPT' | 'SILENT')
+                                    setAutoMode(v)
+                                    await window.api?.settings?.set?.({ key: 'backup.auto', value: v })
+                                }}>
+                                    <option value="PROMPT">Nachfragen</option>
+                                    <option value="SILENT">Automatisch (ohne Nachfrage)</option>
+                                </select>
+                            </div>
+                            <div className="field" style={{ minWidth: 160 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Intervall (Tage)
+                                    <span className="helper" title="Tage zwischen automatischen Sicherungen (1–30).">ⓘ</span>
+                                </label>
+                                <select className="input" disabled={autoMode === 'OFF'} value={Math.min(30, Math.max(1, intervalDays))}
+                                    onChange={async (e) => {
+                                        const n = Math.max(1, Math.min(30, Number(e.target.value) || 7))
+                                        setIntervalDays(n)
+                                        await window.api?.settings?.set?.({ key: 'backup.intervalDays', value: n })
+                                    }}>
+                                    {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
+                                        <option key={n} value={n}>{n}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        {/* Prominente Anzeige: Letztes Backup + Nächstes Fälligkeitsdatum */}
+                        <div style={{ padding: 8, borderRadius: 8, background: 'color-mix(in oklab, var(--surface) 90%, transparent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {(() => {
+                                const last = backups && backups.length ? new Date(backups[0].mtime).toLocaleString('de-DE') : '—'
+                                const nd = nextDue ? new Date(nextDue).toLocaleString('de-DE') : '—'
+                                return <>
+                                    <div><strong>Letztes Backup:</strong> <span className="helper">{last}</span></div>
+                                    <div className="helper">Letztes Auto-Backup: {lastAuto ? new Date(lastAuto).toLocaleString('de-DE') : '—'}</div>
+                                    <div className="helper">Nächstes fällig: {nd}</div>
+                                </>
+                            })()}
+                        </div>
+                    </div>
                 </div>
                 {migratePrompt && (
                     migratePrompt.kind === 'useOrMigrate' ? (
@@ -5948,6 +7348,161 @@ function SettingsView({
                             onMigrate={() => applyMigrate(migratePrompt.sel.root)}
                         />
                     )
+                )}
+                <div className="card" style={{ padding: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                        <div><strong>Letzte Backups</strong><div className="helper">Die letzten Sicherungen im aktuellen Backup-Ordner.</div></div>
+                    </div>
+                    {backups.length === 0 ? (
+                        <div className="helper" style={{ marginTop: 8 }}>Noch keine Backups vorhanden.</div>
+                    ) : (
+                        <div style={{ overflow: 'auto', maxHeight: 260, border: '1px solid var(--border)', borderRadius: 8 }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>Datei</th>
+                                        <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>Datum</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>Größe</th>
+                                        <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {backups.map((b, i) => (
+                                        <tr key={i}>
+                                            <td style={{ padding: '6px 8px', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{b.filePath}</td>
+                                            <td style={{ padding: '6px 8px' }}>{new Date(b.mtime).toLocaleString('de-DE')}</td>
+                                            <td style={{ padding: '6px 8px', textAlign: 'right' }}>{(b.size / 1024 / 1024).toFixed(2)} MB</td>
+                                            <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                                <button className="btn danger" onClick={async () => {
+                                                    setRestoreSel({ filePath: b.filePath })
+                                                    setRestoreInfo(null)
+                                                    try {
+                                                        const [cur, bak] = await Promise.all([
+                                                            window.api?.backup?.inspectCurrent?.(),
+                                                            window.api?.backup?.inspect?.(b.filePath)
+                                                        ])
+                                                        setRestoreInfo({ current: cur?.counts || {}, backup: bak?.counts || {} })
+                                                    } catch (e: any) {
+                                                        setRestoreInfo({ error: e?.message || String(e) })
+                                                    }
+                                                }}>Wiederherstellen…</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                {restoreSel && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyRestore && setRestoreSel(null)}
+                         style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklab, black 40%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 700, width: 'min(92vw, 700px)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <h2 style={{ margin: 0 }}>Backup wiederherstellen</h2>
+                                <button className="btn ghost" onClick={() => setRestoreSel(null)} disabled={busyRestore} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>✕</button>
+                            </div>
+                            <div className="card" style={{ padding: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span aria-hidden>🗂️</span>
+                                <div className="helper" style={{ wordBreak: 'break-all' }}>{restoreSel.filePath}</div>
+                            </div>
+                            {!restoreInfo && <div className="helper">Lade Vergleich …</div>}
+                            {restoreInfo?.error && <div style={{ color: 'var(--danger)' }}>{restoreInfo.error}</div>}
+                            {restoreInfo && !restoreInfo.error && (
+                                <div className="card" style={{ padding: 12 }}>
+                                    <div className="helper" style={{ marginBottom: 6 }}>Vergleich: aktuelle Datenbank vs. Backup</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, alignItems: 'start' }}>
+                                        <div className="helper">Tabelle</div>
+                                        <div className="helper">Aktuell</div>
+                                        <div className="helper">Backup</div>
+                                        {Array.from(new Set([...(Object.keys(restoreInfo.current || {})), ...(Object.keys(restoreInfo.backup || {}))])).map(k => (
+                                            <React.Fragment key={k}>
+                                                <div>{k}</div>
+                                                <div>{(restoreInfo.current || {})[k] ?? '—'}</div>
+                                                <div>{(restoreInfo.backup || {})[k] ?? '—'}</div>
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                    <div className="helper" style={{ marginTop: 8 }}>Hinweis: Die Anzeige umfasst zentrale Tabellen (z. B. vouchers, invoices, members). Es kann zusätzliche Tabellen geben.</div>
+                                </div>
+                            )}
+                            <div className="card" style={{ padding: 12, borderLeft: '4px solid var(--danger)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span aria-hidden>⚠️</span>
+                                    <div className="helper">Achtung: Die aktuelle Datenbank wird durch das Backup ersetzt. Dieser Vorgang kann nicht rückgängig gemacht werden (außer über ein weiteres Backup).</div>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                <button className="btn" onClick={() => setRestoreSel(null)} disabled={busyRestore}>Abbrechen</button>
+                                <button className="btn danger" disabled={busyRestore || !restoreInfo} onClick={async () => {
+                                    try {
+                                        setBusyRestore(true)
+                                        const r = await window.api?.backup?.restore?.(restoreSel.filePath)
+                                        if (r?.ok) {
+                                            notify('success', 'Backup wiederhergestellt. Die App wird neu geladen …')
+                                            window.dispatchEvent(new Event('data-changed'))
+                                            bumpDataVersion()
+                                            window.setTimeout(() => window.location.reload(), 600)
+                                        } else {
+                                            notify('error', r?.error || 'Wiederherstellung fehlgeschlagen')
+                                        }
+                                    } catch (e: any) {
+                                        notify('error', e?.message || String(e))
+                                    } finally { setBusyRestore(false) }
+                                }}>Ja, wiederherstellen</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {autoPrompt && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setAutoPrompt(null)}
+                         style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklab, black 40%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 560, width: 'min(92vw, 560px)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
+                                <button className="btn ghost" onClick={() => setAutoPrompt(null)} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>✕</button>
+                            </div>
+                            <div className="card" style={{ padding: 12 }}>
+                                <div className="helper">Seit der letzten Sicherung sind <strong>{autoPrompt.daysSince}</strong> Tag(e) vergangen.</div>
+                                <div className="helper">Intervall: alle <strong>{autoPrompt.intervalDays}</strong> Tage.</div>
+                                {autoPrompt.nextDue && (
+                                    <div className="helper">Nächstes fällig: <strong>{new Date(autoPrompt.nextDue).toLocaleString('de-DE')}</strong></div>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                <button className="btn" onClick={async () => {
+                                    // Snooze for today
+                                    const now = new Date()
+                                    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+                                    await window.api?.settings?.set?.({ key: 'backup.skipUntil', value: end.getTime() })
+                                    setAutoPrompt(null)
+                                }}>Heute überspringen</button>
+                                <button className="btn" onClick={() => setAutoPrompt(null)}>Später</button>
+                                <button className="btn" onClick={async () => {
+                                    try {
+                                        setBusyBackup(true)
+                                        const r = await window.api?.backup?.make?.('auto')
+                                        if (r?.ok) {
+                                            notify('success', 'Backup erstellt')
+                                            await window.api?.settings?.set?.({ key: 'backup.lastAuto', value: Date.now() })
+                                            await refreshBackups()
+                                            // update nextDue after successful backup
+                                            try {
+                                                const list = await window.api?.backup?.list?.()
+                                                const lastMtime = list?.backups?.[0]?.mtime || 0
+                                                const inter = intervalDays
+                                                const ref = Math.max(Date.now(), lastMtime)
+                                                setNextDue(ref + inter * 24 * 60 * 60 * 1000)
+                                            } catch {}
+                                        } else {
+                                            notify('error', r?.error || 'Backup fehlgeschlagen')
+                                        }
+                                    } catch (e: any) { notify('error', e?.message || String(e)) }
+                                    finally { setBusyBackup(false); setAutoPrompt(null) }
+                                }}>Jetzt sichern</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         )
@@ -6022,10 +7577,11 @@ function SettingsView({
         const [year, setYear] = useState<number>(() => new Date().getFullYear())
         const [prev, setPrev] = useState<null | { totals: { net: number; vat: number; gross: number }; bySphere: any[]; byPaymentMethod: any[]; byType: any[]; cashBalance: { BAR: number; BANK: number }; from: string; to: string }>(null)
         const [busy, setBusy] = useState(false)
-        const [previewLoading, setPreviewLoading] = useState(false) // controls the preview "Lade …" only
+    const [previewLoading, setPreviewLoading] = useState(false) // controls the preview "Lade …" only
         const [err, setErr] = useState('')
-    const [status, setStatus] = useState<{ closedUntil: string | null } | null>(null)
+        const [status, setStatus] = useState<{ closedUntil: string | null } | null>(null)
         const [confirmAction, setConfirmAction] = useState<null | { type: 'close' | 'reopen' }>(null)
+    const [lastExportPath, setLastExportPath] = useState<string | null>(null)
         const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
         // Allow closing the confirmation modal with Escape as a safety valve
@@ -6059,7 +7615,10 @@ function SettingsView({
             setBusy(true); setErr('')
             try {
                 const res = await window.api?.yearEnd?.export?.({ year })
-                if (res?.filePath) notify('success', `Export erstellt: ${res.filePath}`)
+                if (res?.filePath) {
+                    setLastExportPath(res.filePath)
+                    notify('success', `Export erstellt: ${res.filePath}`)
+                }
             } catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
             finally { setBusy(false) }
         }
@@ -6090,62 +7649,111 @@ function SettingsView({
             finally { setBusy(false); setConfirmAction(null) }
         }
 
+        // Derived UI helpers
+    const closedUntil = status?.closedUntil || null
+    const isLocked = !!closedUntil
+    const lockedYear = isLocked ? Number(String(closedUntil).slice(0, 4)) : null
+    const closeDisabled = lockedYear !== null && year <= lockedYear
+    const closeDisabledHint = closeDisabled ? `Bereits abgeschlossen bis ${closedUntil}.` : ''
+
         return (
             <div style={{ display: 'grid', gap: 12 }}>
                 <div>
                     <strong>Jahresabschluss</strong>
                     <div className="helper">Vorschau, Export und Abschluss des Geschäftsjahres.</div>
                 </div>
-                {status && (
-                    <div className="card" style={{ padding: 12, background: 'var(--panel)' }}>
-                        <div className="helper">Aktueller Sperrstatus</div>
-                        <div>
-                            {status.closedUntil
-                                ? <span>Abgeschlossen bis <strong>{status.closedUntil}</strong>. Buchungen bis zu diesem Datum sind gesperrt.</span>
-                                : <span>Derzeit ist kein Jahr abgeschlossen.</span>}
+
+                {/* Sektion 1: Status & Zeitraum */}
+                <section className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, background: isLocked ? 'color-mix(in oklab, var(--danger) 12%, transparent)' : 'color-mix(in oklab, var(--accent) 12%, transparent)' }}>
+                            <span aria-hidden>{isLocked ? '🛡️' : '🛡️'}</span>
+                            <div>
+                                <div className="helper">Sperrstatus</div>
+                                <div>
+                                    {isLocked ? (
+                                        <span>Abgeschlossen bis <strong>{closedUntil}</strong>. Buchungen bis zu diesem Datum sind gesperrt.</span>
+                                    ) : (
+                                        <span>Derzeit ist kein Jahr abgeschlossen.</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="field" style={{ minWidth: 160 }}>
+                            <label>Jahr</label>
+                            <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+                                {[...new Set([new Date().getFullYear(), ...yearsAvail])].sort((a, b) => b - a).map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
-                )}
-                <div className="row" style={{ alignItems: 'end' }}>
-                    <div className="field">
-                        <label>Jahr</label>
-                        <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-                            {[...new Set([new Date().getFullYear(), ...yearsAvail])].sort((a, b) => b - a).map(y => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
+                </section>
+
+                {/* Sektion 2: Aktionen */}
+                <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+                    <div className="helper">Interaktive Schritte</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="btn" disabled={busy} onClick={doExport} title="XLSX-Export: enthält Zusammenfassung, Journal und Monatsverlauf">📤 Export-Paket</button>
+                        {!closeDisabled && (
+                            <button className="btn danger" disabled={busy} onClick={() => setConfirmAction({ type: 'close' })} title="Buchungen werden gesperrt, Export empfohlen">✅ Jahr abschließen…</button>
+                        )}
+                        {closeDisabled && (
+                            <button className="btn" disabled={busy} onClick={() => setConfirmAction({ type: 'reopen' })} title="Periode wieder öffnen">Wieder öffnen…</button>
+                        )}
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" disabled={busy} onClick={refresh}>Vorschau aktualisieren</button>
-                        <button className="btn" disabled={busy} onClick={doExport}>Export-Paket erstellen</button>
-                        <button className="btn danger" disabled={busy} onClick={() => setConfirmAction({ type: 'close' })}>Jahr abschließen…</button>
-                        <button className="btn" disabled={busy} onClick={() => setConfirmAction({ type: 'reopen' })}>Wieder öffnen…</button>
-                    </div>
-                </div>
+                    {closeDisabled && (
+                        <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel)' }}>
+                            <span aria-hidden>🔒</span>
+                            <div>Bereits abgeschlossen bis <strong>{closedUntil}</strong>.</div>
+                        </div>
+                    )}
+                    {lastExportPath && (
+                        <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div className="helper" title={lastExportPath} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Gespeichert unter: {lastExportPath}</div>
+                            <button className="btn" onClick={() => window.api?.shell?.showItemInFolder?.(lastExportPath)}>Im Ordner anzeigen</button>
+                        </div>
+                    )}
+                </section>
+
                 {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
                 {previewLoading && <div className="helper">Lade …</div>}
+
+                {/* Sektion 3: Finanzübersicht */}
                 {prev && (
-                    <div className="card" style={{ padding: 12 }}>
+                    <section className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
                         <div className="helper">Zeitraum: {prev.from} – {prev.to}</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper">Netto</div>
-                                <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.net)}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span aria-hidden>🧾</span>
+                                    <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.net)}</div>
+                                </div>
                             </div>
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper">MwSt</div>
-                                <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.vat)}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span aria-hidden>🧾</span>
+                                    <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.vat)}</div>
+                                </div>
                             </div>
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper">Brutto</div>
-                                <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.gross)}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span aria-hidden>💰</span>
+                                    <div style={{ fontWeight: 600 }}>{eur.format(prev.totals.gross)}</div>
+                                </div>
                             </div>
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper">Kassenbestand (BAR/BANK; YTD)</div>
-                                <div style={{ fontWeight: 600 }}>{eur.format(prev.cashBalance.BAR)} · {eur.format(prev.cashBalance.BANK)}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span aria-hidden>🏦</span>
+                                    <div style={{ fontWeight: 600 }}>{eur.format(prev.cashBalance.BAR)} · {eur.format(prev.cashBalance.BANK)}</div>
+                                </div>
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div>
                                 <strong>Nach Sphäre</strong>
                                 <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
@@ -6155,6 +7763,12 @@ function SettingsView({
                                             <tr key={i}><td>{s.key}</td><td align="right">{eur.format(s.gross)}</td></tr>
                                         ))}
                                     </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td align="left"><span className="helper">Summe</span></td>
+                                            <td align="right"><strong>{eur.format(prev.bySphere.reduce((a: number, x: any) => a + (Number(x.gross) || 0), 0))}</strong></td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                             <div>
@@ -6166,10 +7780,16 @@ function SettingsView({
                                             <tr key={i}><td>{p.key || '—'}</td><td align="right">{eur.format(p.gross)}</td></tr>
                                         ))}
                                     </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td align="left"><span className="helper">Summe</span></td>
+                                            <td align="right"><strong>{eur.format(prev.byPaymentMethod.reduce((a: number, x: any) => a + (Number(x.gross) || 0), 0))}</strong></td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 )}
                 {confirmAction && (
                     <div className="modal-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true">
@@ -6199,15 +7819,17 @@ function SettingsView({
                         </div>
                     </div>
                 )}
-                <div className="card" style={{ padding: 12 }}>
-                    <strong>Wie funktioniert der Jahresabschluss?</strong>
-                    <ul style={{ marginTop: 8 }}>
-                        <li>Wählen Sie ein Jahr und klicken Sie auf „Vorschau“, um die Summen und den Kassenbestand zu prüfen.</li>
-                        <li>Mit „Export-Paket erstellen“ wird eine Excel-Datei mit Zusammenfassung, Journal und Monatsübersicht unter „Dokumente/VereinPlannerExports“ gespeichert.</li>
-                        <li>„Jahr abschließen…“ sperrt alle Buchungen des gewählten Jahres gegen Änderungen (Erstellen/Ändern/Löschen).</li>
-                        <li>„Wieder öffnen…“ hebt die Sperre für das gewählte Jahr wieder auf. Vorgänge werden im Import-/Audit-Log protokolliert.</li>
-                    </ul>
-                </div>
+                {/* Sektion 4: Hilfebereich */}
+                <section className="card" style={{ padding: 12 }}>
+                    <details>
+                        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Wie funktioniert der Jahresabschluss?</summary>
+                        <ul style={{ marginTop: 8 }}>
+                            <li>„Export-Paket“ erstellt aktuell eine Excel-Datei (XLSX) mit Zusammenfassung, Journal und Monatsverlauf im Ordner „Dokumente/VereinPlannerExports“.</li>
+                            <li>„Jahr abschließen…“ sperrt alle Buchungen des gewählten Jahres gegen Änderungen (Erstellen/Ändern/Löschen).</li>
+                            <li>„Wieder öffnen…“ hebt die Sperre für das gewählte Jahr wieder auf. Vorgänge werden im Audit-Log protokolliert.</li>
+                        </ul>
+                    </details>
+                </section>
             </div>
         )
     }

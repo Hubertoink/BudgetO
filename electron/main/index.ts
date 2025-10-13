@@ -1,5 +1,7 @@
 import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
 import { getDb } from './db/database'
+import { getSetting, setSetting } from './services/settings'
+import * as backup from './services/backup'
 import { applyMigrations } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import path from 'node:path'
@@ -117,6 +119,58 @@ app.whenReady().then(() => {
     registerIpcHandlers()
     createMenu()
     createWindow()
+
+    // Auto-backup on startup (configurable)
+    ;(async () => {
+        try {
+            const mode = (getSetting<string>('backup.auto') || 'PROMPT').toUpperCase() as 'SILENT' | 'PROMPT' | 'OFF'
+            const intervalDays = Number(getSetting<number>('backup.intervalDays') || 7)
+            const lastAuto = Number(getSetting<number>('backup.lastAuto') || 0)
+            const skipUntil = Number(getSetting<number>('backup.skipUntil') || 0)
+            if (mode === 'OFF') return
+            const now = Date.now()
+            // Determine last backup time using either last auto-backup or the latest backup file timestamp
+            let lastAny = lastAuto
+            try { const list = backup.listBackups(); const m = list.backups?.[0]?.mtime || 0; if (m > lastAny) lastAny = m } catch { }
+            const due = !lastAny || (now - lastAny) > intervalDays * 24 * 60 * 60 * 1000
+            if (!due) return
+            // Respect skip-until (renderer can set this to end-of-day)
+            if (skipUntil && now < skipUntil) return
+            if (mode === 'SILENT') {
+                try { await backup.makeBackup('auto') } catch { /* ignore */ }
+                setSetting('backup.lastAuto', now)
+            } else if (mode === 'PROMPT') {
+                // Prefer in-app modal: send an event to the renderer with days since the last backup
+                const win = BrowserWindow.getAllWindows()[0]
+                try {
+                    const list = backup.listBackups()
+                    const lastMtime = list.backups?.[0]?.mtime || 0
+                    const reference = Math.max(lastAny, lastMtime)
+                    const daysSince = reference ? Math.floor((now - reference) / (24 * 60 * 60 * 1000)) : intervalDays
+                    const nextDue = reference ? (reference + intervalDays * 24 * 60 * 60 * 1000) : now
+                    if (win) {
+                        win.webContents.send('backup:prompt', { intervalDays, daysSince, nextDue })
+                    } else {
+                        // Fallback to native dialog if no window available
+                        const res = await dialog.showMessageBox({
+                            type: 'question',
+                            buttons: ['Jetzt sichern', 'Später'],
+                            defaultId: 0,
+                            cancelId: 1,
+                            title: 'Automatische Sicherung',
+                            message: 'Seit der letzten Sicherung sind mehr als ' + intervalDays + ' Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?',
+                        })
+                        if (res.response === 0) {
+                            try { await backup.makeBackup('auto') } catch { /* ignore */ }
+                            setSetting('backup.lastAuto', now)
+                        }
+                    }
+                } catch {
+                    // As a safety, do nothing on error
+                }
+            }
+        } catch { /* ignore */ }
+    })()
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow()

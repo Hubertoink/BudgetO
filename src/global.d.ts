@@ -124,8 +124,24 @@ declare global {
                 cashBalance: (payload: any) => Promise<{ BAR: number; BANK: number }>
                 years: () => Promise<{ years: number[] }>
             }
+            settings: {
+                get: (payload: { key: string }) => Promise<{ value: any }>
+                set: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>
+            }
             quotes: {
                 weekly: (payload?: { date?: string }) => Promise<{ text: string; author?: string; source?: string; id?: number }>
+            }
+            backup: {
+                make: (reason?: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>
+                list: () => Promise<{ ok: boolean; dir?: string; backups?: Array<{ filePath: string; size: number; mtime: number }>; error?: string }>
+                openFolder: () => Promise<{ ok: boolean; error?: string | null }>
+                getDir: () => Promise<{ ok: boolean; dir?: string; error?: string }>
+                setDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string }>
+                resetDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string }>
+                inspect: (filePath: string) => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
+                inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
+                restore: (filePath: string) => Promise<{ ok: boolean; error?: string }>
+                onPrompt: (cb: (p: { intervalDays: number; daysSince: number; nextDue?: number }) => void) => () => void
             }
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>

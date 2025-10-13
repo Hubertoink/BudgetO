@@ -407,6 +407,10 @@ export const VoucherUpdateInput = z.object({
     transferTo: PaymentMethod.nullable().optional(),
     earmarkId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
+    // amounts (optional): provide either netAmount (+ optional vatRate) OR grossAmount
+    netAmount: z.number().optional(),
+    vatRate: z.number().optional(),
+    grossAmount: z.number().optional(),
     tags: z.array(z.string()).optional()
 })
 export const VoucherUpdateOutput = z.object({ id: z.number(), warnings: z.array(z.string()).optional() })
@@ -607,7 +611,7 @@ export type TVouchersClearAllInput = z.infer<typeof VouchersClearAllInput>
 export type TVouchersClearAllOutput = z.infer<typeof VouchersClearAllOutput>
 
 // Tags CRUD
-export const TagsListInput = z.object({ q: z.string().optional(), includeUsage: z.boolean().optional() }).optional()
+export const TagsListInput = z.object({ q: z.string().optional(), includeUsage: z.boolean().optional(), scope: z.enum(['FINANCE','MEMBER']).optional() }).optional()
 export const TagsListOutput = z.object({ rows: z.array(z.object({ id: z.number(), name: z.string(), color: z.string().nullable().optional(), usage: z.number().optional() })) })
 export const TagUpsertInput = z.object({ id: z.number().optional(), name: z.string(), color: z.string().nullable().optional() })
 export const TagUpsertOutput = z.object({ id: z.number() })
@@ -622,15 +626,42 @@ export type TTagDeleteOutput = z.infer<typeof TagDeleteOutput>
 
 // Members CRUD
 export const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
-export const MembersListInput = z.object({ q: z.string().optional(), status: z.enum(['ACTIVE','NEW','PAUSED','LEFT','ALL']).optional(), limit: z.number().min(1).max(200).default(50).optional(), offset: z.number().min(0).default(0).optional() }).optional()
-export const MembersListOutput = z.object({ rows: z.array(z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })), total: z.number() })
-export const MemberCreateInput = z.object({ memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })
+export const MembersListInput = z.object({
+    q: z.string().optional(),
+    status: z.enum(['ACTIVE','NEW','PAUSED','LEFT','ALL']).optional(),
+    limit: z.number().min(1).max(200).default(50).optional(),
+    offset: z.number().min(0).default(0).optional(),
+    sortBy: z.enum(['memberNo', 'name', 'email', 'status']).optional(),
+    sort: z.enum(['ASC', 'DESC']).optional()
+}).optional()
+export const BoardRole = z.enum(['V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'])
+export const MembersListOutput = z.object({ rows: z.array(z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, boardRole: BoardRole.nullable().optional(), createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })), total: z.number() })
+export const MemberCreateInput = z.object({ memberNo: z.string(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), boardRole: BoardRole.nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })
 export const MemberCreateOutput = z.object({ id: z.number() })
-export const MemberUpdateInput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string().optional(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })
+export const MemberUpdateInput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string().optional(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), boardRole: BoardRole.nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })
 export const MemberUpdateOutput = z.object({ id: z.number() })
 export const MemberDeleteInput = z.object({ id: z.number() })
 export const MemberDeleteOutput = z.object({ id: z.number() })
+export const MemberGetInput = z.object({ id: z.number() })
+export const MemberGetOutput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, boardRole: BoardRole.nullable().optional(), createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() }).nullable()
 
+// Membership payments (Phase 3)
+export const PaymentsListDueInput = z.object({ interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), periodKey: z.string().optional(), from: z.string().optional(), to: z.string().optional(), q: z.string().optional(), includePaid: z.boolean().optional(), memberId: z.number().optional() })
+export const PaymentsListDueOutput = z.object({ rows: z.array(z.object({ memberId: z.number(), name: z.string(), memberNo: z.string().nullable().optional(), status: MemberStatus, periodKey: z.string(), interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), amount: z.number(), paid: z.number(), voucherId: z.number().nullable().optional(), verified: z.number().optional() })), total: z.number() })
+export const PaymentsMarkPaidInput = z.object({ memberId: z.number(), periodKey: z.string(), interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), amount: z.number(), voucherId: z.number().nullable().optional(), datePaid: z.string().nullable().optional() })
+export const PaymentsMarkPaidOutput = z.object({ ok: z.boolean() })
+export const PaymentsUnmarkInput = z.object({ memberId: z.number(), periodKey: z.string() })
+export const PaymentsUnmarkOutput = z.object({ ok: z.boolean() })
+export const PaymentsSuggestVouchersInput = z.object({ name: z.string().nullable().optional(), amount: z.number(), periodKey: z.string() })
+export const PaymentsSuggestVouchersOutput = z.object({ rows: z.array(z.object({ id: z.number(), voucherNo: z.string(), date: z.string(), description: z.string().nullable().optional(), counterparty: z.string().nullable().optional(), gross: z.number() })) })
+export type TPaymentsListDueInput = z.infer<typeof PaymentsListDueInput>
+export type TPaymentsListDueOutput = z.infer<typeof PaymentsListDueOutput>
+export type TPaymentsMarkPaidInput = z.infer<typeof PaymentsMarkPaidInput>
+export type TPaymentsMarkPaidOutput = z.infer<typeof PaymentsMarkPaidOutput>
+export type TPaymentsUnmarkInput = z.infer<typeof PaymentsUnmarkInput>
+export type TPaymentsUnmarkOutput = z.infer<typeof PaymentsUnmarkOutput>
+export type TPaymentsSuggestVouchersInput = z.infer<typeof PaymentsSuggestVouchersInput>
+export type TPaymentsSuggestVouchersOutput = z.infer<typeof PaymentsSuggestVouchersOutput>
 // Settings (simple key-value)
 export const SettingsGetInput = z.object({ key: z.string() })
 export const SettingsGetOutput = z.object({ value: z.any().optional() })

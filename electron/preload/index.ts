@@ -78,7 +78,17 @@ contextBridge.exposeInMainWorld('api', {
         list: (payload?: any) => ipcRenderer.invoke('members.list', payload),
         create: (payload: any) => ipcRenderer.invoke('members.create', payload),
         update: (payload: any) => ipcRenderer.invoke('members.update', payload),
-        delete: (payload: any) => ipcRenderer.invoke('members.delete', payload)
+        delete: (payload: any) => ipcRenderer.invoke('members.delete', payload),
+        get: (payload: any) => ipcRenderer.invoke('members.get', payload),
+        writeLetter: (payload: any) => ipcRenderer.invoke('members.writeLetter', payload)
+    },
+    payments: {
+        listDue: (payload: any) => ipcRenderer.invoke('payments.listDue', payload),
+        markPaid: (payload: any) => ipcRenderer.invoke('payments.markPaid', payload),
+        unmark: (payload: any) => ipcRenderer.invoke('payments.unmark', payload),
+        suggestVouchers: (payload: any) => ipcRenderer.invoke('payments.suggestVouchers', payload),
+        status: (payload: any) => ipcRenderer.invoke('payments.status', payload),
+        history: (payload: any) => ipcRenderer.invoke('payments.history', payload)
     },
     invoiceFiles: {
         open: (payload: any) => ipcRenderer.invoke('invoiceFiles.open', payload),
@@ -114,6 +124,22 @@ contextBridge.exposeInMainWorld('api', {
     settings: {
         get: (payload: any) => ipcRenderer.invoke('settings.get', payload),
         set: (payload: any) => ipcRenderer.invoke('settings.set', payload)
+    },
+    backup: {
+        make: (reason?: string) => ipcRenderer.invoke('backup.make', { reason }),
+        list: () => ipcRenderer.invoke('backup.list'),
+        openFolder: () => ipcRenderer.invoke('backup.openFolder'),
+        getDir: () => ipcRenderer.invoke('backup.getDir'),
+        setDir: () => ipcRenderer.invoke('backup.setDir'),
+        resetDir: () => ipcRenderer.invoke('backup.resetDir'),
+        inspect: (filePath: string) => ipcRenderer.invoke('backup.inspect', { filePath }),
+        inspectCurrent: () => ipcRenderer.invoke('backup.inspectCurrent'),
+        restore: (filePath: string) => ipcRenderer.invoke('backup.restore', { filePath }),
+        onPrompt: (cb: (p: { intervalDays: number; daysSince: number; nextDue?: number }) => void) => {
+            const handler = (_e: any, payload: { intervalDays: number; daysSince: number; nextDue?: number }) => cb(payload)
+            ipcRenderer.on('backup:prompt', handler)
+            return () => ipcRenderer.removeListener('backup:prompt', handler)
+        }
     },
     app: {
         version: () => ipcRenderer.invoke('app.version')

@@ -1,10 +1,10 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
-import { listMembers, createMember, updateMember, deleteMember } from '../repositories/members'
+import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
 import fs from 'node:fs'
@@ -19,6 +19,8 @@ import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
+import * as backup from '../services/backup'
+import * as mp from '../repositories/members_payments'
 
 export function registerIpcHandlers() {
     // App info
@@ -500,6 +502,8 @@ export function registerIpcHandlers() {
     ipcMain.handle('vouchers.clearAll', async (_e, payload) => {
         const parsed = VouchersClearAllInput.parse(payload)
         if (!parsed.confirm) throw new Error('Nicht bestätigt')
+        // Safety: backup before destructive action
+        try { await backup.makeBackup('preClearAll') } catch { /* ignore */ }
         const res = clearAllVouchers()
         return VouchersClearAllOutput.parse(res)
     })
@@ -563,6 +567,8 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('imports.execute', async (_e, payload) => {
         const parsed = ImportExecuteInput.parse(payload)
+        // Safety: backup before potentially large data modification
+        try { await backup.makeBackup('preImportRows') } catch { /* ignore */ }
         const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
         return ImportExecuteOutput.parse(res as any)
     })
@@ -643,6 +649,8 @@ export function registerIpcHandlers() {
         const { root } = getAppDataDir()
         const dbPath = path.join(root, 'database.sqlite')
         try {
+            // Safety: create a backup before replacing the DB
+            try { await backup.makeBackup('preImport') } catch { /* ignore backup errors */ }
             // Close DB before replacing file
             try { closeDb() } catch { }
             fs.copyFileSync(importPath, dbPath)
@@ -774,6 +782,41 @@ export function registerIpcHandlers() {
         const res = deleteMember(parsed.id)
         return MemberDeleteOutput.parse(res)
     })
+    ipcMain.handle('members.get', async (_e, payload) => {
+        const parsed = MemberGetInput.parse(payload)
+        const res = getMemberById(parsed.id)
+        return MemberGetOutput.parse(res)
+    })
+
+    // Membership payments
+    ipcMain.handle('payments.listDue', async (_e, payload) => {
+        const parsed = PaymentsListDueInput.parse(payload)
+        const res = mp.listDue(parsed as any)
+        return PaymentsListDueOutput.parse(res as any)
+    })
+    ipcMain.handle('payments.markPaid', async (_e, payload) => {
+        const parsed = PaymentsMarkPaidInput.parse(payload)
+        const res = mp.markPaid(parsed as any)
+        return PaymentsMarkPaidOutput.parse(res as any)
+    })
+    ipcMain.handle('payments.unmark', async (_e, payload) => {
+        const parsed = PaymentsUnmarkInput.parse(payload)
+        const res = mp.unmark(parsed as any)
+        return PaymentsUnmarkOutput.parse(res as any)
+    })
+    ipcMain.handle('payments.suggestVouchers', async (_e, payload) => {
+        const parsed = PaymentsSuggestVouchersInput.parse(payload)
+        const res = mp.suggestVouchers(parsed as any)
+        return PaymentsSuggestVouchersOutput.parse(res as any)
+    })
+    ipcMain.handle('payments.status', async (_e, payload) => {
+        const res = mp.status(payload as any)
+        return res as any
+    })
+    ipcMain.handle('payments.history', async (_e, payload) => {
+        const res = mp.history(payload as any)
+        return res as any
+    })
 
     // Year-end (Jahresabschluss)
     ipcMain.handle('yearEnd.preview', async (_e, payload) => {
@@ -788,6 +831,8 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('yearEnd.close', async (_e, payload) => {
         const parsed = YearEndCloseInput.parse(payload)
+        // Safety: create a backup before locking a period
+        try { await backup.makeBackup('preClose') } catch { /* ignore backup errors */ }
         const res = yearEnd.closeYear(parsed.year)
         return YearEndCloseOutput.parse(res as any)
     })
@@ -899,11 +944,149 @@ export function registerIpcHandlers() {
         return SettingsSetOutput.parse({ ok: true })
     })
 
+    // Backups: make/list/openFolder
+    ipcMain.handle('backup.make', async (_e, payload?: { reason?: string }) => {
+        try {
+            const res = await backup.makeBackup(payload?.reason)
+            return { ok: true, filePath: res.filePath }
+        } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.list', async () => {
+        try { return { ok: true, ...backup.listBackups() } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.openFolder', async () => {
+        try { return await backup.openBackupFolder() } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.getDir', async () => {
+        try { return { ok: true, dir: backup.getBackupDir() } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.setDir', async () => {
+        try {
+            const pick = await dialog.showOpenDialog({ title: 'Backup-Ordner wählen…', properties: ['openDirectory', 'createDirectory'] })
+            if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
+            const res = backup.setBackupDirWithMigration(pick.filePaths[0])
+            return { ok: res.ok, dir: res.dir, moved: (res as any).moved }
+        } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.resetDir', async () => {
+        try { const res = backup.setBackupDirWithMigration(null); return { ok: res.ok, dir: res.dir, moved: (res as any).moved } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.inspect', async (_e, payload: { filePath: string }) => {
+        try { return backup.inspectBackup(payload.filePath) } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.inspectCurrent', async () => {
+        try { return backup.inspectCurrent() } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+    ipcMain.handle('backup.restore', async (_e, payload: { filePath: string }) => {
+        try { return backup.restoreBackup(payload.filePath) } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+
     // Shell helpers: reveal exported files or open folders
     ipcMain.handle('shell.showItemInFolder', async (_e, payload: { fullPath: string }) => {
         try { shell.showItemInFolder(payload.fullPath); return { ok: true } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
     })
     ipcMain.handle('shell.openPath', async (_e, payload: { fullPath: string }) => {
         try { const res = await shell.openPath(payload.fullPath); return { ok: !res, error: res || null } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
+
+    // Members: quick letter generation (RTF) and open
+    ipcMain.handle('members.writeLetter', async (_e, payload: { id?: number; name: string; address?: string | null; memberNo?: string | null }) => {
+        try {
+            // If no address provided from renderer, try to load from DB by id
+            let effectiveAddress = (payload.address || '')
+            if ((!effectiveAddress || !effectiveAddress.trim()) && payload.id) {
+                try {
+                    const m = getMemberById(Number(payload.id))
+                    if (m?.address) effectiveAddress = String(m.address)
+                } catch { /* ignore */ }
+            }
+            // Prepare address block (top-left): Name, then street, then "ZIP City"
+            const rawAddr = (effectiveAddress || '').trim()
+            let street = '', zipCity = ''
+            if (rawAddr) {
+                const idx = rawAddr.lastIndexOf(',')
+                if (idx >= 0) { street = rawAddr.slice(0, idx).trim(); zipCity = rawAddr.slice(idx + 1).trim() }
+                else { street = rawAddr }
+            }
+
+            // Build current date (German locale)
+            const today = new Date()
+            const datePretty = today.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+            // Try to extract city from address (expecting "Straße, PLZ Ort")
+            let city = ''
+            if (zipCity) {
+                const m = /^(?:\d{4,5}\s+)?(.+)$/.exec(zipCity || '')
+                city = (m?.[1] || '').trim()
+            }
+            const dateLine = (city ? (city + ', ') : '') + datePretty
+
+            // Simple letter body with placeholders (use real umlauts; encoder will convert)
+            const subjectPlaceholder = '<<Betreff eintragen>>'
+            const bodyParas = [
+                `Sehr geehrte/r ${payload.name},`,
+                'wir kontaktieren Sie bezüglich Ihrer Mitgliedsbeiträge.',
+                'Bitte melden Sie sich bei Rückfragen.',
+                'Mit freundlichen Grüßen',
+                'Ihr Verein'
+            ]
+
+            // RTF helpers: escape control chars and encode non-ASCII as Unicode escapes
+            function rtfUnicodeEncode(s: string): string {
+                const map: Record<string, string> = { 'ä': "\\u228?", 'ö': "\\u246?", 'ü': "\\u252?", 'Ä': "\\u196?", 'Ö': "\\u214?", 'Ü': "\\u220?", 'ß': "\\u223?" }
+                let out = ''
+                for (const ch of s) {
+                    if (ch === '\\' || ch === '{' || ch === '}') { out += '\\' + ch; continue }
+                    const code = ch.codePointAt(0) as number
+                    if (code < 128) { out += ch } else if (map[ch]) { out += map[ch] } else {
+                        // RTF expects signed 16-bit for \uN; clamp
+                        const signed = ((code & 0xFFFF) > 0x7FFF) ? (code & 0xFFFF) - 0x10000 : (code & 0xFFFF)
+                        out += `\\u${signed}?`
+                    }
+                }
+                return out
+            }
+
+            // Determine salutation
+            const name = payload.name || ''
+            const lastName = (() => { const parts = name.trim().split(/\s+/); return parts.length ? parts[parts.length - 1] : name })()
+            const hasHerr = /\bHerr\b/i.test(name)
+            const hasFrau = /\bFrau\b/i.test(name)
+            const salutation = hasHerr ? `Sehr geehrter Herr ${lastName},` : hasFrau ? `Sehr geehrte Frau ${lastName},` : `Sehr geehrte/r ${name},`
+
+            // Minimal, Word-compatible RTF with margins and font table
+            const rtf = [
+                '{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1',
+                '{\\fonttbl{\\f0 Arial;}}',
+                '\\paperw11906\\paperh16838\\margl1134\\margr1134\\margt1134\\margb1134', // ~2cm margins
+                '\\fs22',
+                // Address block (top-left) with real RTF line breaks
+                '{\\pard ' + rtfUnicodeEncode(payload.name || '')
+                    + (street ? ' \\line ' + rtfUnicodeEncode(street) : '')
+                    + (zipCity ? ' \\line ' + rtfUnicodeEncode(zipCity) : '')
+                    + ' \\par}\\par',
+                // Subject (bold)
+                '{\\pard\\b ' + rtfUnicodeEncode('Betreff: ' + subjectPlaceholder) + ' \\b0 \\par}',
+                // City + Pretty Date
+                '{\\pard ' + rtfUnicodeEncode(dateLine) + ' \\par}\\par',
+                // Salutation and body paragraphs
+                '{\\pard ' + rtfUnicodeEncode(salutation) + ' \\par}\\par',
+                '{\\pard ' + rtfUnicodeEncode('wir wenden uns an Sie bezüglich Ihrer Mitgliedsbeiträge im Verein.') + ' \\par}\\par',
+                '{\\pard ' + rtfUnicodeEncode('Falls Sie Fragen oder Unklarheiten haben, melden Sie sich bitte bei uns. Wir stehen Ihnen gerne zur Verfügung.') + ' \\par}\\par',
+                '{\\pard ' + rtfUnicodeEncode('Mit freundlichen Grüßen') + ' \\par}',
+                '{\\pard ' + rtfUnicodeEncode('Ihr Vereinsvorstand') + ' \\par}',
+                '}'
+            ].join('\n')
+
+            const os = process.platform
+            const tmpDir = os === 'win32' ? (process.env.TEMP || process.env.TMP || '.') : (process.env.TMPDIR || '/tmp')
+            const fname = `Mitglied_${(payload.memberNo || payload.name || 'Brief').toString().replace(/[^a-zA-Z0-9_-]+/g,'_')}_${Date.now()}.rtf`
+            const fullPath = path.join(tmpDir, fname)
+            // Write as ASCII-safe string (contains only ASCII and RTF escapes), avoid UTF-8 BOM issues
+            fs.writeFileSync(fullPath, rtf, 'ascii')
+            await shell.openPath(fullPath)
+            return { ok: true, filePath: fullPath }
+        } catch (e: any) {
+            return { ok: false, error: e?.message || String(e) }
+        }
     })
 }
