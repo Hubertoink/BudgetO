@@ -12,6 +12,8 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
+let quitting = false
+
 async function createWindow() {
     const win = new BrowserWindow({
         width: 1280,
@@ -37,7 +39,7 @@ async function createWindow() {
     win.on('unmaximize', () => win.webContents.send('window:unmaximized', false))
 
     // Content Security Policy via headers (relaxed in dev for Vite/HMR)
-    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headersListener: (details: Electron.OnHeadersReceivedListenerDetails, callback: (response: Electron.HeadersReceivedResponse) => void) => void = (details, callback) => {
         const devCsp = [
             "default-src 'self' http://localhost:5173;",
             "base-uri 'self';",
@@ -70,7 +72,8 @@ async function createWindow() {
                 'Content-Security-Policy': [csp]
             }
         })
-    })
+    }
+    session.defaultSession.webRequest.onHeadersReceived(headersListener)
 
     if (isDev) {
         const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
@@ -179,4 +182,29 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
+})
+
+// Ensure we fully tear down background resources so the process can exit cleanly on Windows
+app.on('before-quit', () => {
+    quitting = true
+    try {
+        // Destroy any remaining BrowserWindows (incl. offscreen PDF windows)
+        for (const w of BrowserWindow.getAllWindows()) {
+            try { w.removeAllListeners() } catch {}
+            try { w.destroy() } catch {}
+        }
+    } catch {}
+    try {
+        // Close DB to release file handles
+        const { closeDb } = require('./db/database')
+        closeDb()
+    } catch {}
+})
+
+app.on('will-quit', () => {
+    try {
+        // Best-effort DB close in case before-quit didn't run
+        const { closeDb } = require('./db/database')
+        closeDb()
+    } catch {}
 })
