@@ -1,5 +1,5 @@
 import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
-import { getDb } from './db/database'
+import { getDb, releaseAppLock } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
 import { applyMigrations } from './db/migrations'
@@ -199,6 +199,7 @@ app.on('before-quit', () => {
         const { closeDb } = require('./db/database')
         closeDb()
     } catch {}
+    try { releaseAppLock() } catch {}
 })
 
 app.on('will-quit', () => {
@@ -207,4 +208,5 @@ app.on('will-quit', () => {
         const { closeDb } = require('./db/database')
         closeDb()
     } catch {}
+    try { releaseAppLock() } catch {}
 })
