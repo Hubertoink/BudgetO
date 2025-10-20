@@ -1,5 +1,5 @@
 import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
-import { getDb, releaseAppLock } from './db/database'
+import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
 import { applyMigrations } from './db/migrations'
@@ -11,8 +11,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
-
-let quitting = false
 
 async function createWindow() {
     const win = new BrowserWindow({
@@ -27,7 +25,7 @@ async function createWindow() {
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,
-            sandbox: false, // Changed to false to allow localStorage persistence
+            sandbox: true,
             nodeIntegration: false,
             webSecurity: true,
             devTools: isDev
@@ -39,7 +37,7 @@ async function createWindow() {
     win.on('unmaximize', () => win.webContents.send('window:unmaximized', false))
 
     // Content Security Policy via headers (relaxed in dev for Vite/HMR)
-    const headersListener: (details: Electron.OnHeadersReceivedListenerDetails, callback: (response: Electron.HeadersReceivedResponse) => void) => void = (details, callback) => {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
         const devCsp = [
             "default-src 'self' http://localhost:5173;",
             "base-uri 'self';",
@@ -72,8 +70,7 @@ async function createWindow() {
                 'Content-Security-Policy': [csp]
             }
         })
-    }
-    session.defaultSession.webRequest.onHeadersReceived(headersListener)
+    })
 
     if (isDev) {
         const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
@@ -129,48 +126,16 @@ app.whenReady().then(() => {
             const mode = (getSetting<string>('backup.auto') || 'PROMPT').toUpperCase() as 'SILENT' | 'PROMPT' | 'OFF'
             const intervalDays = Number(getSetting<number>('backup.intervalDays') || 7)
             const lastAuto = Number(getSetting<number>('backup.lastAuto') || 0)
-            const skipUntil = Number(getSetting<number>('backup.skipUntil') || 0)
             if (mode === 'OFF') return
             const now = Date.now()
-            // Determine last backup time using either last auto-backup or the latest backup file timestamp
-            let lastAny = lastAuto
-            try { const list = backup.listBackups(); const m = list.backups?.[0]?.mtime || 0; if (m > lastAny) lastAny = m } catch { }
-            const due = !lastAny || (now - lastAny) > intervalDays * 24 * 60 * 60 * 1000
+            const due = !lastAuto || (now - lastAuto) > intervalDays * 24 * 60 * 60 * 1000
             if (!due) return
-            // Respect skip-until (renderer can set this to end-of-day)
-            if (skipUntil && now < skipUntil) return
             if (mode === 'SILENT') {
                 try { await backup.makeBackup('auto') } catch { /* ignore */ }
                 setSetting('backup.lastAuto', now)
             } else if (mode === 'PROMPT') {
-                // Prefer in-app modal: send an event to the renderer with days since the last backup
-                const win = BrowserWindow.getAllWindows()[0]
-                try {
-                    const list = backup.listBackups()
-                    const lastMtime = list.backups?.[0]?.mtime || 0
-                    const reference = Math.max(lastAny, lastMtime)
-                    const daysSince = reference ? Math.floor((now - reference) / (24 * 60 * 60 * 1000)) : intervalDays
-                    const nextDue = reference ? (reference + intervalDays * 24 * 60 * 60 * 1000) : now
-                    if (win) {
-                        win.webContents.send('backup:prompt', { intervalDays, daysSince, nextDue })
-                    } else {
-                        // Fallback to native dialog if no window available
-                        const res = await dialog.showMessageBox({
-                            type: 'question',
-                            buttons: ['Jetzt sichern', 'Später'],
-                            defaultId: 0,
-                            cancelId: 1,
-                            title: 'Automatische Sicherung',
-                            message: 'Seit der letzten Sicherung sind mehr als ' + intervalDays + ' Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?',
-                        })
-                        if (res.response === 0) {
-                            try { await backup.makeBackup('auto') } catch { /* ignore */ }
-                            setSetting('backup.lastAuto', now)
-                        }
-                    }
-                } catch {
-                    // As a safety, do nothing on error
-                }
+                // Renderer will handle user-facing prompt with a custom modal
+                // (We avoid showing a native OS message box here to keep UX consistent.)
             }
         } catch { /* ignore */ }
     })()
@@ -182,31 +147,4 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
-})
-
-// Ensure we fully tear down background resources so the process can exit cleanly on Windows
-app.on('before-quit', () => {
-    quitting = true
-    try {
-        // Destroy any remaining BrowserWindows (incl. offscreen PDF windows)
-        for (const w of BrowserWindow.getAllWindows()) {
-            try { w.removeAllListeners() } catch {}
-            try { w.destroy() } catch {}
-        }
-    } catch {}
-    try {
-        // Close DB to release file handles
-        const { closeDb } = require('./db/database')
-        closeDb()
-    } catch {}
-    try { releaseAppLock() } catch {}
-})
-
-app.on('will-quit', () => {
-    try {
-        // Best-effort DB close in case before-quit didn't run
-        const { closeDb } = require('./db/database')
-        closeDb()
-    } catch {}
-    try { releaseAppLock() } catch {}
 })

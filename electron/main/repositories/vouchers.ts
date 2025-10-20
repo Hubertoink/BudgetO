@@ -470,7 +470,7 @@ export function batchAssignTags(params: {
     const ids = (d.prepare(`SELECT id FROM vouchers${whereSql}`).all(...args) as any[]).map(r => r.id)
     if (!ids.length) return { updated: 0 }
     // Ensure tags exist (upsert by name)
-    const exist = d.prepare("SELECT id, name FROM tags WHERE scope = 'FINANCE'").all() as any[]
+    const exist = d.prepare('SELECT id, name FROM tags').all() as any[]
     const byName = new Map<string, number>(exist.map(r => [String(r.name).toLowerCase(), r.id]))
     const tagIds: number[] = []
     for (const nameRaw of params.tags) {
@@ -479,7 +479,7 @@ export function batchAssignTags(params: {
         const key = name.toLowerCase()
         let id = byName.get(key)
         if (!id) {
-            const info = d.prepare("INSERT INTO tags(name, scope) VALUES (?, 'FINANCE')").run(name)
+            const info = d.prepare('INSERT INTO tags(name) VALUES (?)').run(name)
             id = Number(info.lastInsertRowid)
             byName.set(key, id)
         }

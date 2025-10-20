@@ -108,16 +108,24 @@ export default function App() {
         if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
     }, [activePage])
 
-    // Shared DB mode info (rw/ro): show a small read-only indicator in the header when DB is opened read-only
-    const [dbOpenInfo, setDbOpenInfo] = useState<{ mode: 'rw' | 'ro'; owner?: string | undefined } | null>(null)
+    // Auto-backup prompt (renderer-side modal)
+    const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
     useEffect(() => {
-        let cancelled = false
-        async function load() {
-            try { const info = await (window as any).api?.db?.openInfo?.(); if (!cancelled) setDbOpenInfo(info || null) } catch { }
-        }
-        load()
-        const id = window.setInterval(load, 60000)
-        return () => { cancelled = true; window.clearInterval(id) }
+        // Decide locally if a prompt should be shown; mirrors logic from main but with modal UX
+        let disposed = false
+        ;(async () => {
+            try {
+                const mode = String((await window.api?.settings?.get?.({ key: 'backup.auto' }))?.value || 'PROMPT').toUpperCase()
+                if (mode !== 'PROMPT') return
+                const intervalDays = Number((await window.api?.settings?.get?.({ key: 'backup.intervalDays' }))?.value || 7)
+                const lastAuto = Number((await window.api?.settings?.get?.({ key: 'backup.lastAuto' }))?.value || 0)
+                const now = Date.now()
+                const due = !lastAuto || (now - lastAuto) > intervalDays * 24 * 60 * 60 * 1000
+                if (!due) return
+                if (!disposed) setAutoBackupPrompt({ intervalDays })
+            } catch { /* ignore */ }
+        })()
+        return () => { disposed = true }
     }, [])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -537,10 +545,7 @@ export default function App() {
 
     // Active earmarks for selection in forms (used in filters and forms)
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
-    // FINANCE-scoped tag definitions for Buchungen/Rechnungen UI (filters, suggestions)
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
-    // MEMBER-scoped tag definitions for Mitglieder suggestions
-    const [memberTagDefs, setMemberTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
     async function loadEarmarks() {
         const res = await window.api?.bindings.list?.({ activeOnly: true })
         if (res) setEarmarks(res.rows.map(r => ({ id: r.id, code: r.code, name: r.name, color: (r as any).color })))
@@ -549,20 +554,12 @@ export default function App() {
     useEffect(() => { loadEarmarks() }, [])
     useEffect(() => {
         let cancelled = false
-        async function loadFinance() {
-            try {
-                const res = await window.api?.tags?.list?.({ scope: 'FINANCE' })
-                if (!cancelled && res?.rows) setTagDefs(res.rows)
-            } catch { /* ignore */ }
+        async function load() {
+            const res = await window.api?.tags?.list?.({})
+            if (!cancelled && res?.rows) setTagDefs(res.rows)
         }
-        async function loadMember() {
-            try {
-                const res = await window.api?.tags?.list?.({ scope: 'MEMBER' })
-                if (!cancelled && res?.rows) setMemberTagDefs(res.rows)
-            } catch { /* ignore */ }
-        }
-        loadFinance(); loadMember()
-        const onTagsChanged = () => { loadFinance(); loadMember() }
+        load()
+        const onTagsChanged = () => load()
         window.addEventListener('tags-changed', onTagsChanged)
         return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
     }, [])
@@ -699,13 +696,6 @@ export default function App() {
                         </button>
                     )}
                     <TopHeaderOrg />
-                    {/* Read-only badge for side layout */}
-                    {!isTopNav && dbOpenInfo?.mode === 'ro' && (
-                        <span title={`Nur Lesen – gesperrt durch ${dbOpenInfo?.owner || 'anderen Benutzer'}`}
-                              style={{ marginLeft: 8, fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'color-mix(in oklab, #FFC107 40%, transparent)', color: '#7A5D00', border: '1px solid #E0B400' }}>
-                            Nur Lesen
-                        </span>
-                    )}
                 </div>
                 {isTopNav ? (
                     <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
@@ -760,16 +750,7 @@ export default function App() {
                         ))}
                     </nav>
                 ) : null}
-                {isTopNav && (
-                    <div style={{ justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
-                        {dbOpenInfo?.mode === 'ro' && (
-                            <span title={`Nur Lesen – gesperrt durch ${dbOpenInfo?.owner || 'anderen Benutzer'}`}
-                                  style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'color-mix(in oklab, #FFC107 40%, transparent)', color: '#7A5D00', border: '1px solid #E0B400' }}>
-                                Nur Lesen
-                            </span>
-                        )}
-                    </div>
-                )}
+                {isTopNav && <div />}
                 {/* Window controls */}
                 <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
                     <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
@@ -1172,7 +1153,6 @@ export default function App() {
                                                     if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
                                                 }
                                                 const res = await window.api?.vouchers.update?.(payload)
-                                                try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                                                 notify('success', 'Buchung gespeichert')
                                                 const w = (res as any)?.warnings as string[] | undefined
                                                 if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
@@ -1919,6 +1899,29 @@ export default function App() {
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
             )}
+            {/* Auto-backup prompt modal (renderer) */}
+            {autoBackupPrompt && (
+                <AutoBackupPromptModal
+                    intervalDays={autoBackupPrompt.intervalDays}
+                    onClose={() => setAutoBackupPrompt(null)}
+                    onBackupNow={async () => {
+                        try {
+                            const res = await window.api?.backup?.make?.('auto')
+                            if (res?.filePath) {
+                                await window.api?.settings?.set?.({ key: 'backup.lastAuto', value: Date.now() })
+                                notify('success', 'Backup erstellt')
+                                window.dispatchEvent(new Event('data-changed'))
+                            } else {
+                                notify('error', 'Backup konnte nicht erstellt werden')
+                            }
+                        } catch (e: any) {
+                            notify('error', e?.message || String(e))
+                        } finally {
+                            setAutoBackupPrompt(null)
+                        }
+                    }}
+                />
+            )}
             {/* Time Filter Modal for Buchungen */}
             <TimeFilterModal
                 open={activePage === 'Buchungen' && showTimeFilter}
@@ -2202,6 +2205,8 @@ function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgN
         </div>, document.body
     ) : null
 }
+
+// duplicate AutoBackupPromptModal removed; see single definition below
 function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
     const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
     const [loading, setLoading] = useState(false)
@@ -2456,6 +2461,26 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
     )
 }
 
+function AutoBackupPromptModal({ intervalDays, onClose, onBackupNow }: { intervalDays: number; onClose: () => void; onBackupNow: () => Promise<void> }) {
+    return (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
+                    <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                    Seit der letzten Sicherung sind mehr als {intervalDays} Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button className="btn" onClick={onClose}>Später</button>
+                    <button className="btn primary" onClick={onBackupNow}>Jetzt sichern</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // Basic Members UI: list with search and add/edit modal (Phase 1)
 function MembersView() {
     const [q, setQ] = useState('')
@@ -2464,16 +2489,16 @@ function MembersView() {
     const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
     useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
     useEffect(() => { try { localStorage.setItem('members.sort', sort) } catch { } }, [sort])
-    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[]; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
+    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
     const [total, setTotal] = useState(0)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
     const [busy, setBusy] = useState(false)
     const [showPayments, setShowPayments] = useState(false)
-    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; tags?: string[];
+    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
         mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
-    const [formTab, setFormTab] = useState<'PERSON'|'FINANCE'|'MANDATE'|'MEMBERSHIP'|'MISC'>('PERSON')
+    const [formTab, setFormTab] = useState<'PERSON'|'FINANCE'|'MANDATE'|'MEMBERSHIP'>('PERSON')
     // Members delete confirm (app-styled modal)
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
     const [deleteBusy, setDeleteBusy] = useState(false)
@@ -2488,25 +2513,9 @@ function MembersView() {
     useEffect(() => { try { localStorage.setItem('invite.body', inviteBody) } catch {} }, [inviteBody])
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
 
-    // MEMBER tag definitions (for suggestions in the form)
-    const [memberTagDefs, setMemberTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
-    useEffect(() => {
-        let cancelled = false
-        async function loadMemberTags() {
-            try {
-                const res = await window.api?.tags?.list?.({ scope: 'MEMBER' })
-                if (!cancelled && res?.rows) setMemberTagDefs(res.rows)
-            } catch { /* ignore */ }
-        }
-        loadMemberTags()
-        const onTagsChanged = () => loadMemberTags()
-        window.addEventListener('tags-changed', onTagsChanged)
-        return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
-    }, [])
-
     // Column preferences for members table
     const [showColumnsModal, setShowColumnsModal] = useState(false)
-    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showBoardTable: boolean }>(() => {
+    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showBoardTable: boolean; showNotes: boolean }>(() => {
         try {
             const raw = localStorage.getItem('members.columns')
             if (raw) {
@@ -2515,11 +2524,12 @@ function MembersView() {
                     showIBAN: parsed.showIBAN ?? true,
                     showContribution: parsed.showContribution ?? true,
                     showAddress: parsed.showAddress ?? false,
-                    showBoardTable: parsed.showBoardTable ?? false
+                    showBoardTable: parsed.showBoardTable ?? false,
+                    showNotes: parsed.showNotes ?? false
                 }
             }
         } catch {}
-        return { showIBAN: true, showContribution: true, showAddress: false, showBoardTable: false }
+        return { showIBAN: true, showContribution: true, showAddress: false, showBoardTable: false, showNotes: false }
     })
     useEffect(() => { try { localStorage.setItem('members.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
     // Optional separate board table
@@ -2674,7 +2684,7 @@ function MembersView() {
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
                         style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
                     <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
-                        name: '', status: 'ACTIVE', boardRole: null, tags: [], memberNo: null, email: null, phone: null, address: null,
+                        name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
                     } }) }}>+ Neu</button>
@@ -2703,7 +2713,7 @@ function MembersView() {
                                     <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ background: def.color, color: '#fff' }}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
                                     <td>{r.name}</td>
                                     <td>{r.memberNo || '—'}</td>
-                                    <td>{r.email ? (<a href={`mailto:${String(r.email).trim()}`} title="E-Mail senden">{String(r.email).trim()}</a>) : '—'}</td>
+                                    <td>{r.email || '—'}</td>
                                     <td>{r.phone || '—'}</td>
                                     <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                         <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
@@ -2715,7 +2725,6 @@ function MembersView() {
                                             address: r.address ?? null,
                                             status: r.status as any,
                                             boardRole: (r as any).boardRole ?? null,
-                                            tags: r.tags || [],
                                             iban: (r as any).iban ?? null,
                                             bic: (r as any).bic ?? null,
                                             contribution_amount: (r as any).contribution_amount ?? null,
@@ -2753,7 +2762,7 @@ function MembersView() {
                         <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
-                        <th align="left">Tags</th>
+                        {colPrefs.showNotes && (<th align="left">Anmerkungen</th>)}
                         <th align="center">Aktionen</th>
                     </tr>
                 </thead>
@@ -2768,7 +2777,7 @@ function MembersView() {
                                     <MemberStatusButton memberId={r.id} name={r.name} memberNo={r.memberNo || undefined} />
                                 ) : null}
                             </td>
-                            <td>{r.email ? (<a href={`mailto:${String(r.email).trim()}`} title="E-Mail senden">{String(r.email).trim()}</a>) : '—'}</td>
+                            <td>{r.email || '—'}</td>
                             <td>{r.phone || '—'}</td>
                             {colPrefs.showAddress && (<td>{r.address || '—'}</td>)}
                             {colPrefs.showIBAN && (<td>{r.iban || '—'}</td>)}
@@ -2776,7 +2785,11 @@ function MembersView() {
                             <td>{(() => { const s = String(r.status || '').toUpperCase(); const c = (s === 'ACTIVE') ? '#00C853' : (s === 'LEFT') ? 'var(--danger)' : '#FFD600'; return (
                                 <span title={s} aria-label={`Status: ${s}`} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c }} />
                             ) })()}</td>
-                            <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.tags || []).join(', ')}</td>
+                            {colPrefs.showNotes && (
+                                <td title={r.notes || undefined} style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {r.notes ? (r.notes.length > 120 ? (r.notes.slice(0, 120) + '…') : r.notes) : '—'}
+                                </td>
+                            )}
                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                 <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
                                     id: r.id,
@@ -2787,7 +2800,6 @@ function MembersView() {
                                     address: r.address ?? null,
                                     status: r.status as any,
                                     boardRole: (r as any).boardRole ?? null,
-                                    tags: r.tags || [],
                                     iban: (r as any).iban ?? null,
                                     bic: (r as any).bic ?? null,
                                     contribution_amount: (r as any).contribution_amount ?? null,
@@ -2802,7 +2814,7 @@ function MembersView() {
                             </td>
                         </tr>
                     ))}
-                    {rows.length === 0 && (() => { const colSpan = 9 - (colPrefs.showIBAN ? 0 : 1) - (colPrefs.showContribution ? 0 : 1) + (colPrefs.showAddress ? 1 : 0); return (
+                    {rows.length === 0 && (() => { const base = 6; const colSpan = base + (colPrefs.showAddress ? 1 : 0) + (colPrefs.showIBAN ? 1 : 0) + (colPrefs.showContribution ? 1 : 0) + (colPrefs.showNotes ? 1 : 0); return (
                         <tr><td colSpan={colSpan}><div className="helper">Keine Einträge</div></td></tr>
                     )})()}
                 </tbody>
@@ -2830,12 +2842,11 @@ function MembersView() {
                         </header>
                         {/* Tabs */}
                         <div role="tablist" aria-label="Mitglied bearbeiten" style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', padding: '4px 0' }}>
-                            {([
+                                {([
                                 { k: 'PERSON', label: 'Persönliches', color: '#2962FF' },
                                 { k: 'FINANCE', label: 'Finanzdaten', color: '#00C853' },
                                 { k: 'MANDATE', label: 'Mandat', color: '#FFD600' },
-                                { k: 'MEMBERSHIP', label: 'Mitgliedschaft', color: '#7C4DFF' },
-                                { k: 'MISC', label: 'Sonstiges', color: '#FF9100' }
+                                { k: 'MEMBERSHIP', label: 'Mitgliedschaft', color: '#7C4DFF' }
                             ] as Array<{k: any; label: string; color: string}>).map(t => {
                                 const active = formTab === t.k
                                 const bg = active ? 'color-mix(in oklab, ' + t.color + ' 25%, transparent)' : undefined
@@ -2883,16 +2894,8 @@ function MembersView() {
                                                 </select>
                                             </div>
                                             <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                <label>Tags (Komma-getrennt)</label>
-                                                <input className="input" placeholder="z.B. Jugend, Vorstand" value={(form.draft.tags || []).join(', ')} onChange={(e) => setForm({ ...form, draft: { ...form.draft, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} />
-                                                {!!memberTagDefs.length && (
-                                                    <div className="helper">Vorschläge: {memberTagDefs.slice(0, 8).map(t => (
-                                                        <button key={t.id} className="btn ghost" onClick={() => {
-                                                            const list = (form.draft.tags || [])
-                                                            if (!list.some(x => x.toLowerCase() === t.name.toLowerCase())) setForm({ ...form, draft: { ...form.draft, tags: [...list, t.name] } })
-                                                        }}>{t.name}</button>
-                                                    ))}</div>
-                                                )}
+                                                <label>Anmerkungen</label>
+                                                <textarea className="input" rows={3} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical' }} />
                                             </div>
                                         </div>
                                     </div>
@@ -2960,14 +2963,7 @@ function MembersView() {
                                         </div>
                                     </div>
                                 )}
-                                {formTab === 'MISC' && (
-                                    <div className="card" style={{ padding: 10 }}>
-                                        <div className="helper" title="Freitext-Notizen (einfacher Text)">Sonstiges</div>
-                                        <div className="row" style={{ marginTop: 6 }}>
-                                            <div className="field" style={{ gridColumn: '1 / span 2' }}><label>Notizen</label><input className="input" placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} /></div>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* MISC tab removed; Anmerkungen jetzt unter Persönliches */}
                             </div>
                             {/* Right-side info column removed to maximize space */}
                         </div>
@@ -3027,6 +3023,10 @@ function MembersView() {
                                 Adresse anzeigen
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                                <input type="checkbox" checked={colPrefs.showNotes} onChange={(e)=>setColPrefs(p=>({ ...p, showNotes: e.target.checked }))} />
+                                Anmerkungen anzeigen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                                 <input type="checkbox" checked={colPrefs.showBoardTable} onChange={(e)=>setColPrefs(p=>({ ...p, showBoardTable: e.target.checked }))} />
                                 Vorstand oben als eigene Tabelle
                             </label>
@@ -3084,7 +3084,7 @@ function MembersView() {
                                 <button className="btn primary" disabled={!inviteEmails.length} onClick={() => {
                                     const subject = encodeURIComponent(inviteSubject || '')
                                     const body = encodeURIComponent(inviteBody || '')
-                                    const bccRaw = inviteEmails.join(';')
+                                    const bccRaw = inviteEmails.join(',')
                                     const mailto = `mailto:?bcc=${encodeURIComponent(bccRaw)}&subject=${subject}&body=${body}`
                                     if (mailto.length <= 1800 && inviteEmails.length <= 50) {
                                         try { window.location.href = mailto } catch { /* ignore */ }
@@ -4306,8 +4306,7 @@ function InvoicesView() {
         let cancelled = false
         ;(async () => {
             try {
-                // Load FINANCE-scoped tags for vouchers area
-                const t = await window.api?.tags?.list?.({ scope: 'FINANCE' })
+                const t = await window.api?.tags?.list?.({})
                 if (!cancelled) setTags((t?.rows || []).map(r => ({ id: r.id, name: r.name, color: r.color ?? null })))
             } catch { }
             try {
@@ -4622,7 +4621,6 @@ function InvoicesView() {
                 }
                 const res = await window.api?.invoices?.update?.(payload as any)
                 if (res?.id) {
-                    try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                     setForm(null)
                     setFormFiles([])
                     // Flash the updated invoice row
@@ -7104,8 +7102,6 @@ function SettingsView({
     }
 
     function StoragePane() {
-        // UI state for Backup-Verlauf expand/collapse
-        const [showBackupsAll, setShowBackupsAll] = useState(false)
     const [info, setInfo] = useState<null | { root: string; dbPath: string; filesDir: string; configuredRoot: string | null }>(null)
     const [busy, setBusy] = useState(false) // disable buttons
         const [busyBackup, setBusyBackup] = useState(false)
@@ -7120,8 +7116,6 @@ function SettingsView({
     const [intervalDays, setIntervalDays] = useState<number>(7)
     const [lastAuto, setLastAuto] = useState<number | null>(null)
     const [backupDir, setBackupDir] = useState<string>('')
-    const [autoPrompt, setAutoPrompt] = useState<null | { intervalDays: number; daysSince: number; nextDue?: number }>(null)
-    const [nextDue, setNextDue] = useState<number | null>(null)
 
         async function refresh() {
             setError('')
@@ -7149,27 +7143,11 @@ function SettingsView({
                     const m = await window.api?.settings?.get?.({ key: 'backup.auto' })
                     const i = await window.api?.settings?.get?.({ key: 'backup.intervalDays' })
                     const l = await window.api?.settings?.get?.({ key: 'backup.lastAuto' })
-                    // determine next due based on latest backup or lastAuto + interval
-                    try {
-                        const list = await window.api?.backup?.list?.()
-                        const lastMtime = list?.backups?.[0]?.mtime || 0
-                        const lastAny = Number(l?.value || 0)
-                        const inter = Number(i?.value || 7)
-                        const ref = Math.max(lastAny, lastMtime)
-                        if (ref) setNextDue(ref + inter * 24 * 60 * 60 * 1000)
-                        else setNextDue(null)
-                    } catch {}
                     if (m?.value) setAutoMode(String(m.value).toUpperCase() as any)
                     if (i?.value) setIntervalDays(Number(i.value) || 7)
                     if (l?.value) setLastAuto(Number(l.value) || null)
                 } catch { }
             })()
-            // Listen for auto-backup prompt from main
-            const unsub = window.api?.backup?.onPrompt?.((p) => {
-                setAutoPrompt(p)
-                if (p?.nextDue) setNextDue(p.nextDue)
-            })
-            return () => { try { unsub && unsub() } catch { } }
         }, [])
 
         async function makeBackupNow() {
@@ -7186,16 +7164,6 @@ function SettingsView({
                 notify('error', e?.message || String(e))
             } finally { setBusyBackup(false) }
         }
-
-        // Keep nextDue in sync when inputs change
-        useEffect(() => {
-            try {
-                const lastMtime = backups && backups.length ? backups[0].mtime : 0
-                const ref = Math.max(lastAuto || 0, lastMtime)
-                if (ref) setNextDue(ref + intervalDays * 24 * 60 * 60 * 1000)
-                else setNextDue(null)
-            } catch { /* ignore */ }
-        }, [backups, lastAuto, intervalDays])
 
         async function doAction(kind: 'pick' | 'migrate' | 'use' | 'reset') {
             setBusy(true); setError('')
@@ -7312,7 +7280,8 @@ function SettingsView({
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
                     <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
                 </div>
-        {backupDir && (
+        const [showBackupsAll, setShowBackupsAll] = useState(false)
+                {backupDir && (
                     <div className="helper" style={{ wordBreak: 'break-all' }}>Backup-Ordner: {backupDir}</div>
                 )}
                 {/* Backup Sektion */}
@@ -7339,7 +7308,8 @@ function SettingsView({
                     </div>
                     {/* Auto-Backup Toggle + Einstellungen */}
                     <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-                        <div className="field" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
+                        <div className="field" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label htmlFor="toggle-auto-backup" style={{ marginRight: 12 }}>Automatisches Backup</label>
                             <input id="toggle-auto-backup" role="switch" aria-checked={autoMode !== 'OFF'} className="toggle" type="checkbox"
                                 checked={autoMode !== 'OFF'}
                                 onChange={async (e) => {
@@ -7348,47 +7318,36 @@ function SettingsView({
                                     setAutoMode(next as any)
                                     await window.api?.settings?.set?.({ key: 'backup.auto', value: next })
                                 }} />
-                            <label htmlFor="toggle-auto-backup" style={{ marginRight: 12 }}>Automatisches Backup</label>
                         </div>
                         <div className="row">
                             <div className="field" style={{ minWidth: 160 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Modus
-                                    <span className="helper" title="Nachfragen: fragt beim Start, ob gesichert werden soll. Automatisch: legt ohne Nachfrage ein Backup an.">ⓘ</span>
-                                </label>
-                                <select className="input" value={autoMode === 'OFF' ? 'PROMPT' : autoMode} disabled={autoMode === 'OFF'} onChange={async (e) => {
-                                    const v = (e.target.value as 'PROMPT' | 'SILENT')
+                                <label>Modus</label>
+                                <select className="input" value={autoMode} disabled={autoMode === 'OFF'} onChange={async (e) => {
+                                    const v = e.target.value as 'OFF' | 'PROMPT' | 'SILENT'
                                     setAutoMode(v)
                                     await window.api?.settings?.set?.({ key: 'backup.auto', value: v })
                                 }}>
+                                    <option value="OFF">Aus</option>
                                     <option value="PROMPT">Nachfragen</option>
                                     <option value="SILENT">Automatisch (ohne Nachfrage)</option>
                                 </select>
                             </div>
                             <div className="field" style={{ minWidth: 160 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Intervall (Tage)
-                                    <span className="helper" title="Tage zwischen automatischen Sicherungen (1–30).">ⓘ</span>
-                                </label>
-                                <select className="input" disabled={autoMode === 'OFF'} value={Math.min(30, Math.max(1, intervalDays))}
-                                    onChange={async (e) => {
-                                        const n = Math.max(1, Math.min(30, Number(e.target.value) || 7))
-                                        setIntervalDays(n)
-                                        await window.api?.settings?.set?.({ key: 'backup.intervalDays', value: n })
-                                    }}>
-                                    {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
-                                        <option key={n} value={n}>{n}</option>
-                                    ))}
-                                </select>
+                                <label>Intervall (Tage)</label>
+                                <input className="input" type="number" min={1} disabled={autoMode === 'OFF'} value={intervalDays} onChange={async (e) => {
+                                    const n = Math.max(1, Number(e.target.value) || 1)
+                                    setIntervalDays(n)
+                                    await window.api?.settings?.set?.({ key: 'backup.intervalDays', value: n })
+                                }} />
                             </div>
                         </div>
-                        {/* Prominente Anzeige: Letztes Backup + Nächstes Fälligkeitsdatum */}
+                        {/* Prominente Anzeige: Letztes Backup */}
                         <div style={{ padding: 8, borderRadius: 8, background: 'color-mix(in oklab, var(--surface) 90%, transparent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {(() => {
                                 const last = backups && backups.length ? new Date(backups[0].mtime).toLocaleString('de-DE') : '—'
-                                const nd = nextDue ? new Date(nextDue).toLocaleString('de-DE') : '—'
                                 return <>
                                     <div><strong>Letztes Backup:</strong> <span className="helper">{last}</span></div>
                                     <div className="helper">Letztes Auto-Backup: {lastAuto ? new Date(lastAuto).toLocaleString('de-DE') : '—'}</div>
-                                    <div className="helper">Nächstes fällig: {nd}</div>
                                 </>
                             })()}
                         </div>
@@ -7461,9 +7420,8 @@ function SettingsView({
                     )}
                 </div>
                 {restoreSel && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyRestore && setRestoreSel(null)}
-                         style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklab, black 40%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
-                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 700, width: 'min(92vw, 700px)' }}>
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyRestore && setRestoreSel(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 700 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <h2 style={{ margin: 0 }}>Backup wiederherstellen</h2>
                                 <button className="btn ghost" onClick={() => setRestoreSel(null)} disabled={busyRestore} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>✕</button>
@@ -7516,56 +7474,6 @@ function SettingsView({
                                         notify('error', e?.message || String(e))
                                     } finally { setBusyRestore(false) }
                                 }}>Ja, wiederherstellen</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {autoPrompt && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setAutoPrompt(null)}
-                         style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklab, black 40%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
-                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 560, width: 'min(92vw, 560px)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
-                                <button className="btn ghost" onClick={() => setAutoPrompt(null)} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>✕</button>
-                            </div>
-                            <div className="card" style={{ padding: 12 }}>
-                                <div className="helper">Seit der letzten Sicherung sind <strong>{autoPrompt.daysSince}</strong> Tag(e) vergangen.</div>
-                                <div className="helper">Intervall: alle <strong>{autoPrompt.intervalDays}</strong> Tage.</div>
-                                {autoPrompt.nextDue && (
-                                    <div className="helper">Nächstes fällig: <strong>{new Date(autoPrompt.nextDue).toLocaleString('de-DE')}</strong></div>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                <button className="btn" onClick={async () => {
-                                    // Snooze for today
-                                    const now = new Date()
-                                    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-                                    await window.api?.settings?.set?.({ key: 'backup.skipUntil', value: end.getTime() })
-                                    setAutoPrompt(null)
-                                }}>Heute überspringen</button>
-                                <button className="btn" onClick={() => setAutoPrompt(null)}>Später</button>
-                                <button className="btn" onClick={async () => {
-                                    try {
-                                        setBusyBackup(true)
-                                        const r = await window.api?.backup?.make?.('auto')
-                                        if (r?.ok) {
-                                            notify('success', 'Backup erstellt')
-                                            await window.api?.settings?.set?.({ key: 'backup.lastAuto', value: Date.now() })
-                                            await refreshBackups()
-                                            // update nextDue after successful backup
-                                            try {
-                                                const list = await window.api?.backup?.list?.()
-                                                const lastMtime = list?.backups?.[0]?.mtime || 0
-                                                const inter = intervalDays
-                                                const ref = Math.max(Date.now(), lastMtime)
-                                                setNextDue(ref + inter * 24 * 60 * 60 * 1000)
-                                            } catch {}
-                                        } else {
-                                            notify('error', r?.error || 'Backup fehlgeschlagen')
-                                        }
-                                    } catch (e: any) { notify('error', e?.message || String(e)) }
-                                    finally { setBusyBackup(false); setAutoPrompt(null) }
-                                }}>Jetzt sichern</button>
                             </div>
                         </div>
                     </div>
@@ -8102,7 +8010,7 @@ function SettingsView({
     )
 }
 
-function TagModal({ value, onClose, onSaved, notify, scope }: { value: { id?: number; name: string; color?: string | null }; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; scope?: 'FINANCE' | 'MEMBER' }) {
+function TagModal({ value, onClose, onSaved, notify }: { value: { id?: number; name: string; color?: string | null }; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
     const [v, setV] = useState(value)
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
@@ -8143,9 +8051,7 @@ function TagModal({ value, onClose, onSaved, notify, scope }: { value: { id?: nu
                         try {
                             const payload = { ...v, name: (v.name || '').trim() }
                             if (!payload.name) { notify?.('error', 'Bitte einen Namen eingeben'); return }
-                            const p: any = { ...payload }
-                            if (scope) p.scope = scope
-                            await window.api?.tags?.upsert?.(p)
+                            await window.api?.tags?.upsert?.(payload as any)
                             window.dispatchEvent(new Event('tags-changed'))
                             onSaved()
                         } catch (e: any) {
@@ -8198,37 +8104,27 @@ function TagModal({ value, onClose, onSaved, notify, scope }: { value: { id?: nu
 
 // Global Tags Manager Modal
 function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void; notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; onChanged?: () => void }) {
-    const [scope, setScope] = useState<'FINANCE' | 'MEMBER'>(() => {
-        try { return (localStorage.getItem('tags.manager.scope') as 'FINANCE' | 'MEMBER') || 'FINANCE' } catch { return 'FINANCE' }
-    })
     const [tags, setTags] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     const [edit, setEdit] = useState<null | { id?: number; name: string; color?: string | null }>(null)
     const [busy, setBusy] = useState(false)
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; name: string }>(null)
-    async function refresh(sc: 'FINANCE' | 'MEMBER' = scope) {
+    async function refresh() {
         try {
             setBusy(true)
-            const res = await window.api?.tags?.list?.({ includeUsage: true, scope: sc })
+            const res = await window.api?.tags?.list?.({ includeUsage: true })
             if (res?.rows) setTags(res.rows)
         } finally { setBusy(false) }
     }
-    useEffect(() => { refresh(scope) }, [scope])
-    useEffect(() => { try { localStorage.setItem('tags.manager.scope', scope) } catch { } }, [scope])
+    useEffect(() => { refresh() }, [])
     const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
     const colorSwatch = (c?: string | null) => c ? (<span title={c} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: c, verticalAlign: 'middle' }} />) : '—'
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <h2 style={{ margin: 0 }}>Tags verwalten</h2>
-                        <select className="input" value={scope} onChange={(e) => setScope(e.target.value as any)} title="Bereich">
-                            <option value="FINANCE">Buchungen</option>
-                            <option value="MEMBER">Mitglieder</option>
-                        </select>
-                    </div>
+                    <h2 style={{ margin: 0 }}>Tags verwalten</h2>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={() => refresh(scope)} disabled={busy}>Aktualisieren</button>
+                        <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
                         <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
                         <button className="btn danger" onClick={onClose}>Schließen</button>
                     </div>
@@ -8264,8 +8160,7 @@ function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void;
                     <TagModal
                         value={edit}
                         onClose={() => setEdit(null)}
-                        onSaved={async () => { await refresh(scope); setEdit(null); notify('success', 'Tag gespeichert'); onChanged?.() }}
-                        scope={scope}
+                        onSaved={async () => { await refresh(); setEdit(null); notify('success', 'Tag gespeichert'); onChanged?.() }}
                         notify={notify}
                     />
                 )}
@@ -8277,7 +8172,7 @@ function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void;
                                 <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>✕</button>
                             </div>
                             <div>Den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
-                            <div className="helper">Hinweis: Der Tag wird aus allen {scope === 'FINANCE' ? 'Buchungen' : 'Mitgliedern'} entfernt.</div>
+                            <div className="helper">Hinweis: Der Tag wird aus allen Buchungen entfernt.</div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                                 <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
                                 <button className="btn danger" onClick={async () => {
@@ -9013,7 +8908,6 @@ function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters
                 const res = await window.api?.vouchers.batchAssignTags?.({ tags, ...currentFilters })
                 const n = res?.updated ?? 0
                 onApplied(n)
-                try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                 onClose()
             } else if (mode === 'BUDGET') {
                 if (!budgetId) { notify?.('error', 'Bitte ein Budget wählen'); return }

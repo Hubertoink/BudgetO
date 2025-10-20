@@ -108,7 +108,6 @@ contextBridge.exposeInMainWorld('api', {
     db: {
         export: () => ipcRenderer.invoke('db.export'),
         import: () => ipcRenderer.invoke('db.import'),
-        openInfo: () => ipcRenderer.invoke('db.openInfo'),
         location: {
             get: () => ipcRenderer.invoke('db.location.get'),
             pick: () => ipcRenderer.invoke('db.location.pick'),
@@ -135,12 +134,7 @@ contextBridge.exposeInMainWorld('api', {
         resetDir: () => ipcRenderer.invoke('backup.resetDir'),
         inspect: (filePath: string) => ipcRenderer.invoke('backup.inspect', { filePath }),
         inspectCurrent: () => ipcRenderer.invoke('backup.inspectCurrent'),
-        restore: (filePath: string) => ipcRenderer.invoke('backup.restore', { filePath }),
-        onPrompt: (cb: (p: { intervalDays: number; daysSince: number; nextDue?: number }) => void) => {
-            const handler = (_e: any, payload: { intervalDays: number; daysSince: number; nextDue?: number }) => cb(payload)
-            ipcRenderer.on('backup:prompt', handler)
-            return () => ipcRenderer.removeListener('backup:prompt', handler)
-        }
+        restore: (filePath: string) => ipcRenderer.invoke('backup.restore', { filePath })
     },
     app: {
         version: () => ipcRenderer.invoke('app.version')

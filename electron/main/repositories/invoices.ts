@@ -20,10 +20,10 @@ function computeStatus(gross: number, paid: number): InvoiceStatus {
 function setInvoiceTags(d: DB, invoiceId: number, tags?: string[]) {
   if (!tags || !tags.length) return
   const tRows = (tags || []).map(t => String(t).trim()).filter(Boolean)
-  // ensure FINANCE-scoped tags exist
+  // ensure tags exist
   for (const name of tRows) {
-    try { d.prepare("INSERT OR IGNORE INTO tags(name, scope) VALUES (?, 'FINANCE')").run(name) } catch {}
-    const t = d.prepare("SELECT id FROM tags WHERE name=? AND scope = 'FINANCE'").get(name) as any
+    try { d.prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)').run(name) } catch {}
+    const t = d.prepare('SELECT id FROM tags WHERE name=?').get(name) as any
     if (t) d.prepare('INSERT OR IGNORE INTO invoice_tags(invoice_id, tag_id) VALUES (?,?)').run(invoiceId, t.id)
   }
 }

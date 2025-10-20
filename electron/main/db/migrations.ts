@@ -415,18 +415,6 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE members ADD COLUMN board_role TEXT CHECK(board_role IN ('V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'));
     `
   }
-  ,
-  {
-    version: 20,
-    up: `
-    -- Scope tags by domain (FINANCE vs MEMBER)
-    ALTER TABLE tags ADD COLUMN scope TEXT; -- null for existing rows
-    UPDATE tags SET scope = 'FINANCE' WHERE scope IS NULL;
-    -- Drop old unique index on name, if any, and create a scoped unique index
-    DROP INDEX IF EXISTS idx_tags_name;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_unique ON tags(name, scope);
-    `
-  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

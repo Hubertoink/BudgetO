@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import { app } from 'electron'
 
 const require = createRequire(import.meta.url)
@@ -23,9 +22,6 @@ export function getAppDataDir() {
 
 type DB = any
 let db: DB | undefined
-let appLockMode: 'rw' | 'ro' | undefined
-let appLockHeld = false
-let appLockOwner: string | undefined
 
 // Simple app-level JSON config (outside DB) to remember custom DB location
 type AppConfig = { dbRoot?: string }
@@ -56,45 +52,6 @@ export function getCurrentDbInfo() {
     return { root, filesDir, dbPath }
 }
 
-function getLockPath(): string {
-    const { root } = getAppDataDir()
-    return path.join(root, 'db.lock')
-}
-
-function acquireAppLock(): { mode: 'rw' | 'ro'; owner?: string } {
-    if (appLockMode) return { mode: appLockMode, owner: appLockOwner }
-    const lockPath = getLockPath()
-    try {
-        const fd = fs.openSync(lockPath, 'wx')
-        const info = { host: os.hostname(), user: process.env.USERNAME || process.env.USER || 'user', pid: process.pid, startedAt: Date.now() }
-        fs.writeFileSync(fd, JSON.stringify(info), 'utf8')
-        fs.closeSync(fd)
-        appLockMode = 'rw'
-        appLockHeld = true
-        appLockOwner = `${info.user}@${info.host} (pid ${info.pid})`
-    } catch (e: any) {
-        if (e?.code === 'EEXIST') {
-            appLockMode = 'ro'
-            try {
-                const raw = fs.readFileSync(lockPath, 'utf8')
-                const o = JSON.parse(raw)
-                appLockOwner = `${o.user || 'user'}@${o.host || 'host'}${o.pid ? ` (pid ${o.pid})` : ''}`
-            } catch { /* ignore */ }
-        } else {
-            // On unexpected error, fall back to read-only to be safe
-            appLockMode = 'ro'
-        }
-    }
-    return { mode: appLockMode!, owner: appLockOwner }
-}
-
-export function releaseAppLock() {
-    if (appLockHeld && appLockMode === 'rw') {
-        try { fs.unlinkSync(getLockPath()) } catch { /* ignore */ }
-    }
-    appLockHeld = false
-}
-
 export function getDb(): DB {
     if (db) return db
     if (!BetterSqlite3) {
@@ -110,15 +67,9 @@ export function getDb(): DB {
     }
     const { root } = getAppDataDir()
     const dbPath = path.join(root, 'database.sqlite')
-    const { mode } = acquireAppLock()
-    db = new BetterSqlite3(dbPath, { readonly: mode === 'ro', fileMustExist: mode === 'ro' })
-    // Busy timeout to wait for locks instead of failing immediately
-    try { db.pragma('busy_timeout = 5000') } catch { /* ignore */ }
-    // WAL only when we are the writer
-    if (mode === 'rw') {
-        try { db.pragma('journal_mode = WAL') } catch { /* ignore */ }
-    }
-    try { db.pragma('foreign_keys = ON') } catch { /* ignore */ }
+    db = new BetterSqlite3(dbPath)
+    db.pragma('journal_mode = WAL')
+    db.pragma('foreign_keys = ON')
     return db
 }
 
@@ -133,11 +84,6 @@ export function closeDb() {
         db.close()
         db = undefined
     }
-}
-
-export function getDbOpenInfo(): { mode: 'rw' | 'ro'; owner?: string | undefined } {
-    if (!appLockMode) { acquireAppLock() }
-    return { mode: appLockMode || 'rw', owner: appLockOwner }
 }
 
 // Migrate database and attachments to a new root directory.

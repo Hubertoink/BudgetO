@@ -141,7 +141,6 @@ declare global {
                 inspect: (filePath: string) => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
                 inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
                 restore: (filePath: string) => Promise<{ ok: boolean; error?: string }>
-                onPrompt: (cb: (p: { intervalDays: number; daysSince: number; nextDue?: number }) => void) => () => void
             }
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>

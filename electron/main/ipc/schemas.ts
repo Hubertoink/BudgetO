@@ -611,7 +611,7 @@ export type TVouchersClearAllInput = z.infer<typeof VouchersClearAllInput>
 export type TVouchersClearAllOutput = z.infer<typeof VouchersClearAllOutput>
 
 // Tags CRUD
-export const TagsListInput = z.object({ q: z.string().optional(), includeUsage: z.boolean().optional(), scope: z.enum(['FINANCE','MEMBER']).optional() }).optional()
+export const TagsListInput = z.object({ q: z.string().optional(), includeUsage: z.boolean().optional() }).optional()
 export const TagsListOutput = z.object({ rows: z.array(z.object({ id: z.number(), name: z.string(), color: z.string().nullable().optional(), usage: z.number().optional() })) })
 export const TagUpsertInput = z.object({ id: z.number().optional(), name: z.string(), color: z.string().nullable().optional() })
 export const TagUpsertOutput = z.object({ id: z.number() })

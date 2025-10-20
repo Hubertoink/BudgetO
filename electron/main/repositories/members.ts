@@ -36,8 +36,8 @@ function setMemberTags(d: DB, memberId: number, tags?: string[]) {
   const clean = (tags || []).map(t => String(t).trim()).filter(Boolean)
   if (!clean.length) return
   for (const name of clean) {
-    d.prepare("INSERT OR IGNORE INTO tags(name, scope) VALUES (?, 'MEMBER')").run(name)
-    const t = d.prepare("SELECT id FROM tags WHERE name = ? AND scope = 'MEMBER'").get(name) as any
+    d.prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)').run(name)
+    const t = d.prepare('SELECT id FROM tags WHERE name = ?').get(name) as any
     if (t?.id) d.prepare('INSERT OR IGNORE INTO member_tags(member_id, tag_id) VALUES (?,?)').run(memberId, t.id)
   }
 }
