@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('api', {
             }
         }
     },
+    workQueue: {
+        summary: () => ipcRenderer.invoke('workQueue.summary')
+    },
     ping: () => 'pong',
     vouchers: {
         create: (payload: any) => ipcRenderer.invoke('vouchers.create', payload),

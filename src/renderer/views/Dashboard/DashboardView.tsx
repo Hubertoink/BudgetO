@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
-import ReportsCashBars from './charts/ReportsCashBars'
+import BalanceAreaChart from './BalanceAreaChart'
+import IncomeExpenseBars from './IncomeExpenseBars'
+import EarmarksUsageBars from './EarmarksUsageBars'
+import BudgetDeviationList from './BudgetDeviationList'
+import WorkQueueCard from './WorkQueueCard'
+// LiquidityForecastArea removed per request
+import type { CommonFilters } from './types'
 
 export default function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
@@ -208,45 +213,135 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        {(() => {
-          const now = new Date()
-          const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
-          const f = period === 'MONAT'
-            ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-            : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-          const t = period === 'MONAT'
-            ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-            : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-          return (
-            <>
-              <ReportsMonthlyChart from={f} to={t} />
-              <ReportsCashBars from={f} to={t} />
-            </>
-          )
-        })()}
-      </div>
+      {(() => {
+        const now = new Date()
+        const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+        const f = period === 'MONAT'
+          ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+          : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+        const t = period === 'MONAT'
+          ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+          : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+        const filters: CommonFilters = { from: f, to: t }
+        return (
+          <>
+            {/* Hauptsektion: links groß, rechts Stack */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+              <BalanceAreaChart {...filters} />
+              <div style={{ display: 'grid', gap: 12 }}>
+                <WorkQueueCard {...filters} />
+                <BudgetDeviationList {...filters} limit={5} />
+                <EarmarksUsageBars {...filters} limit={5} />
+              </div>
+            </div>
 
-      <DashboardEarmarksPeek />
+            {/* Zweite Reihe */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+              <IncomeExpenseBars {...filters} />
+            </div>
+          </>
+        )
+      })()}
+
       <DashboardRecentActivity />
     </div>
   )
 }
 
-function DashboardEarmarksPeek() {
-  return (
-    <div className="card" style={{ padding: 12 }}>
-      <div className="helper">Zweckbindungen (aktiv, Vorschau)</div>
-      <div className="helper">—</div>
-    </div>
-  )
-}
-
 function DashboardRecentActivity() {
+  const [rows, setRows] = React.useState<Array<any>>([])
+  const [loading, setLoading] = React.useState(false)
+  const eur = React.useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+  React.useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const res = await (window as any).api?.audit?.recent?.({ limit: 20 })
+        const r = (res?.rows || res || []) as any[]
+        if (alive) setRows(r)
+      } catch { if (alive) setRows([]) } finally { if (alive) setLoading(false) }
+    }
+    load()
+    const onChanged = () => load()
+    window.addEventListener('data-changed', onChanged)
+    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+  }, [])
+
+  function describe(row: any): { title: string; details?: string; tone?: 'ok' | 'warn' | 'err' } {
+    const a = String(row.action || '').toUpperCase()
+    const e = String(row.entity || '')
+    const d = row.diff || {}
+    if (e === 'vouchers') {
+      if (a === 'CREATE') {
+        const v = d.data || {}
+        const amount = v.grossAmount ?? v.netAmount ?? 0
+        const label = `${v.type || ''} ${v.paymentMethod || ''}`.trim()
+        return { title: `Beleg ${label} ${eur.format(amount)} erstellt`, details: (v.description || '').slice(0, 80) }
+      }
+      if (a === 'UPDATE') {
+        const ch = d.changes || {}
+        const changes: string[] = []
+        const add = (k: string, from?: any, to?: any, fmt?: (x:any)=>string) => {
+          const f = fmt ? fmt(from) : String(from ?? '—')
+          const t = fmt ? fmt(to) : String(to ?? '—')
+          if (f === t) return
+          const nameMap: Record<string,string> = { grossAmount: 'Brutto', netAmount: 'Netto', vatRate: 'USt%', paymentMethod: 'Zahlweg', description: 'Beschreibung', date: 'Datum', sphere: 'Sphäre', type: 'Art', earmarkId: 'Zweckbindung', budgetId: 'Budget' }
+          const nm = nameMap[k] || k
+          changes.push(`${nm}: ${f} → ${t}`)
+        }
+        add('date', d.before?.date, d.after?.date)
+        add('type', d.before?.type, d.after?.type)
+        add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod)
+        add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
+        add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
+        add('sphere', d.before?.sphere, d.after?.sphere)
+        add('earmarkId', d.before?.earmarkId, d.after?.earmarkId)
+        add('budgetId', d.before?.budgetId, d.after?.budgetId)
+        if (changes.length === 0) changes.push('Felder aktualisiert')
+        return { title: `Beleg #${row.entityId} geändert`, details: changes.slice(0, 3).join(' · '), tone: 'ok' }
+      }
+      if (a === 'DELETE') {
+        const s = d.snapshot || {}
+        return { title: `Beleg #${row.entityId} gelöscht`, details: `${eur.format(Math.abs(Number(s.grossAmount||0)))} · ${(s.description || '').slice(0, 80)}`, tone: 'err' }
+      }
+      if (a === 'REVERSE') {
+        return { title: `Storno erstellt für Beleg #${d.originalId}`, details: 'Automatisch gegen gebucht.', tone: 'warn' }
+      }
+      if (a === 'CLEAR_ALL') {
+        return { title: `Alle Belege gelöscht`, details: `${d.deleted || 0} Einträge entfernt`, tone: 'err' }
+      }
+    }
+    if (e === 'imports' && a === 'EXECUTE') {
+      return { title: `Import ausgeführt (${d.format || 'Datei'})`, details: `importiert ${d.imported || 0}, übersprungen ${d.skipped || 0}, Fehler ${d.errorCount || 0}` }
+    }
+    // Fallback
+    return { title: `${a} ${e} #${row.entityId || ''}`.trim(), details: '' }
+  }
+
   return (
     <div className="card" style={{ padding: 12 }}>
       <div className="helper">Letzte Aktivitäten</div>
-      <div className="helper">—</div>
+      {rows.length === 0 && !loading && <div className="helper">Keine Einträge.</div>}
+      <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+        {rows.map((r: any) => {
+          const info = describe(r)
+          const ts = r.createdAt ? String(r.createdAt).replace('T', ' ').slice(0, 16) : '—'
+          const color = info.tone === 'err' ? 'var(--danger)' : info.tone === 'warn' ? '#f9a825' : 'var(--accent)'
+          return (
+            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'baseline' }}>
+              <div className="helper" style={{ whiteSpace: 'nowrap' }}>{ts}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span className="chip" style={{ background: 'color-mix(in oklab, '+color+' 20%, transparent)', borderColor: color }}>{String(r.action).toUpperCase()}</span>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.title}</div>
+                </div>
+                {info.details ? <div className="helper" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.details}</div> : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -824,25 +824,9 @@ export default function App() {
 
             {/* Main content */}
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
-                            {/* Compact badge kept only for Tag (earmark/budget badges removed to avoid redundancy) */}
-                            {filterTag && (() => {
-                                const td = (tagDefs || []).find(t => (t.name || '').toLowerCase() === (filterTag || '').toLowerCase())
-                                const bg = td?.color || undefined
-                                const fg = contrastText(bg)
-                                return (
-                                    <span
-                                        key="badge-tag"
-                                        className="badge"
-                                        title={`Tag: ${filterTag}`}
-                                        onClick={async () => { setFilterTag(null); setPage(1); await loadRecent() }}
-                                        style={{ cursor: 'pointer', background: bg, color: bg ? fg : undefined }}
-                                    >
-                                        # {filterTag}
-                                    </span>
-                                )
-                            })()}
-                            {/* Active filter indicator: clears all filters on click */}
-                            {activeChips.length > 0 && (
+                            {/* Removed top-left Tag badge to avoid duplication with chips below */}
+                            {/* Active filter indicator (global). Hidden on Buchungen, where a local inline button is rendered next to badges. */}
+                            {activeChips.length > 0 && activePage !== 'Buchungen' && (
                                 <button
                                     className="btn"
                                     title="Filter zurücksetzen"
@@ -990,7 +974,7 @@ export default function App() {
                                         <option value="BAR">Bar</option>
                                         <option value="BANK">Bank</option>
                                     </select>
-                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }}>Filter zurücksetzen</button>
+                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }} style={{ padding: '6px 10px' }}>Filter zurücksetzen</button>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <button className="btn" onClick={() => setShowExportOptions(true)}>Exportieren…</button>
@@ -1013,13 +997,24 @@ export default function App() {
                     )}
 
                     {activePage === 'Buchungen' && activeChips.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
                             {activeChips.map((c) => (
                                 <span key={c.key} className="chip">
                                     {c.label}
                                     <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
                                 </span>
                             ))}
+                            <button
+                                className="btn"
+                                title="Filter zurücksetzen"
+                                onClick={async () => {
+                                    setFrom(''); setTo(''); setFilterSphere(null); setFilterType(null); setFilterPM(null); setFilterEarmark(null); setFilterBudgetId(null); setFilterTag(null); setQ(''); setPage(1);
+                                    await loadRecent()
+                                }}
+                                style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', borderColor: 'var(--accent)', padding: '6px 10px' }}
+                            >
+                                Filter zurücksetzen
+                            </button>
                         </div>
                     )}
 

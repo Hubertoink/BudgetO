@@ -863,6 +863,24 @@ export function registerIpcHandlers() {
         return YearEndStatusOutput.parse(res as any)
     })
 
+    // Work queue (dashboard): lightweight summary counts
+    ipcMain.handle('workQueue.summary', async () => {
+        try {
+            const d = getDb()
+            const rowA = d.prepare("SELECT COUNT(1) as c FROM vouchers v WHERE (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) = 0").get() as any
+            const unlinkedReceiptsCount = Number(rowA?.c || 0)
+            const st = yearEnd.status()
+            let lockedEntriesCount = 0
+            if (st?.closedUntil) {
+                const r = d.prepare('SELECT COUNT(1) as c FROM vouchers WHERE date <= ?').get(st.closedUntil) as any
+                lockedEntriesCount = Number(r?.c || 0)
+            }
+            return { ok: true, unlinkedReceiptsCount, lockedEntriesCount }
+        } catch (e: any) {
+            return { ok: false, error: e?.message || String(e) }
+        }
+    })
+
     // Invoices
     ipcMain.handle('invoices.create', async (_e, payload) => {
         const parsed = InvoiceCreateInput.parse(payload)
