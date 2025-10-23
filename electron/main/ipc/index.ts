@@ -596,7 +596,10 @@ export function registerIpcHandlers() {
         const parsed = AttachmentOpenInput.parse(payload)
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const res = await shell.openPath(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
+        const res = await shell.openPath(src)
         const ok = !res
         return AttachmentOpenOutput.parse({ ok })
     })
@@ -606,14 +609,28 @@ export function registerIpcHandlers() {
         if (!f) throw new Error('Datei nicht gefunden')
         const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
         if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        fs.copyFileSync(f.filePath, save.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        fs.copyFileSync(src, save.filePath)
         return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
     })
     ipcMain.handle('attachments.read', async (_e, payload) => {
         const parsed = AttachmentReadInput.parse(payload)
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const buff = fs.readFileSync(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        const buff = fs.readFileSync(src)
         const dataBase64 = Buffer.from(buff).toString('base64')
         return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
     })
@@ -893,7 +910,10 @@ export function registerIpcHandlers() {
         const parsed = AttachmentOpenInput.parse(payload)
         const f = getInvoiceFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const res = await shell.openPath(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
+        const res = await shell.openPath(src)
         const ok = !res
         return AttachmentOpenOutput.parse({ ok })
     })
@@ -903,14 +923,28 @@ export function registerIpcHandlers() {
         if (!f) throw new Error('Datei nicht gefunden')
         const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
         if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        fs.copyFileSync(f.filePath, save.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        fs.copyFileSync(src, save.filePath)
         return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
     })
     ipcMain.handle('invoiceFiles.read', async (_e, payload) => {
         const parsed = AttachmentReadInput.parse(payload)
         const f = getInvoiceFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const buff = fs.readFileSync(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        const buff = fs.readFileSync(src)
         const dataBase64 = Buffer.from(buff).toString('base64')
         return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
     })

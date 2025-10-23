@@ -13,10 +13,22 @@ try {
 }
 
 export function getAppDataDir() {
-    const root = getConfiguredRoot()
-    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true })
+    let root = getConfiguredRoot()
+    try {
+        if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true })
+    } catch {
+        // Fallback: configured root ist nicht verfügbar (z. B. Netzwerklaufwerk entfernt)
+        // Verwende den Standard-App-Datenordner, damit der Prozess nicht abstürzt.
+        root = app.getPath('userData')
+        try { if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true }) } catch { /* last resort: ignore, other calls will throw with clearer errors */ }
+    }
     const filesDir = path.join(root, 'files')
-    if (!fs.existsSync(filesDir)) fs.mkdirSync(filesDir, { recursive: true })
+    try {
+        if (!fs.existsSync(filesDir)) fs.mkdirSync(filesDir, { recursive: true })
+    } catch {
+        // Wenn selbst der files-Ordner nicht angelegt werden kann, belasse ihn als Pfad;
+        // nachgelagerte Funktionen behandeln dies und liefern verständlichere Fehlermeldungen.
+    }
     return { root, filesDir }
 }
 
@@ -93,12 +105,6 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
     if (!newRoot || typeof newRoot !== 'string') throw new Error('Ungültiger Zielordner')
     const normalizedTarget = path.resolve(newRoot)
     if (!fs.existsSync(normalizedTarget)) fs.mkdirSync(normalizedTarget, { recursive: true })
-
-    const currentInfo = getCurrentDbInfo()
-    const srcRoot = currentInfo.root
-    const srcDbPath = currentInfo.dbPath
-    const srcFilesDir = currentInfo.filesDir
-
     const dstRoot = normalizedTarget
     const dstFilesDir = path.join(dstRoot, 'files')
     if (!fs.existsSync(dstFilesDir)) fs.mkdirSync(dstFilesDir, { recursive: true })
@@ -108,10 +114,23 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
     try { closeDb() } catch { }
 
     if (mode === 'use') {
+        // Use existing folder: do not depend on current root availability
         if (!fs.existsSync(dstDbPath)) throw new Error('Im gewählten Ordner wurde keine database.sqlite gefunden')
-        // Save config and return; do not touch files
         writeAppConfig({ ...readAppConfig(), dbRoot: dstRoot })
         return { root: dstRoot, dbPath: dstDbPath, filesDir: dstFilesDir }
+    }
+
+    // copy-overwrite requires access to current DB as source
+    let srcRoot = ''
+    let srcDbPath = ''
+    let srcFilesDir = ''
+    try {
+        const currentInfo = getCurrentDbInfo()
+        srcRoot = currentInfo.root
+        srcDbPath = currentInfo.dbPath
+        srcFilesDir = currentInfo.filesDir
+    } catch (e: any) {
+        throw new Error('Aktueller Speicherort ist nicht verfügbar. Verwende bitte "Bestehende verwenden" oder setze auf Standard zurück.')
     }
 
     // copy-overwrite: copy DB file
@@ -133,8 +152,6 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
         }
         d.close()
     } catch (e) {
-        // If anything fails, leave DB as-is; user can reattach files manually
-        // Re-throw to signal UI
         throw new Error('Migration der Anhänge fehlgeschlagen: ' + (e as any)?.message)
     }
 

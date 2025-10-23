@@ -116,6 +116,11 @@ contextBridge.exposeInMainWorld('api', {
             chooseAndMigrate: () => ipcRenderer.invoke('db.location.chooseAndMigrate'),
             useExisting: () => ipcRenderer.invoke('db.location.useExisting'),
             resetDefault: () => ipcRenderer.invoke('db.location.resetDefault')
+        },
+        onInitFailed: (cb: (info: { message: string }) => void) => {
+            const handler = (_: any, info: { message: string }) => { try { cb(info) } catch { } }
+            ipcRenderer.on('db:initFailed', handler)
+            return () => ipcRenderer.removeListener('db:initFailed', handler)
         }
     },
     quotes: {

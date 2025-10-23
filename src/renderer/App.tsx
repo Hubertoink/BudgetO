@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
+import DbInitFailedModal from './components/modals/DbInitFailedModal'
 import TimeFilterModal from './components/modals/TimeFilterModal'
 import MetaFilterModal from './components/modals/MetaFilterModal'
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
@@ -70,6 +71,15 @@ function TopHeaderOrg() {
 }
 
 export default function App() {
+    // DB init failure handling
+    const [dbInitError, setDbInitError] = useState<null | { message?: string }>(null)
+    const [dbInitBusy, setDbInitBusy] = useState(false)
+    useEffect(() => {
+        const off = (window as any).api?.db?.onInitFailed?.((info: any) => {
+            setDbInitError({ message: info?.message || '' })
+        })
+        return () => { try { off && off() } catch {} }
+    }, [])
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
     const bumpDataVersion = () => setRefreshKey((k) => k + 1)
@@ -1894,6 +1904,53 @@ export default function App() {
                             notify('error', e?.message || String(e))
                         } finally {
                             setAutoBackupPrompt(null)
+                        }
+                    }}
+                />
+            )}
+            {/* DB init failed modal */}
+            {dbInitError && (
+                <DbInitFailedModal
+                    message={dbInitError.message}
+                    busy={dbInitBusy}
+                    onUseExisting={async () => {
+                        try {
+                            setDbInitBusy(true)
+                            await (window as any).api?.db?.location?.useExisting?.()
+                            window.location.reload()
+                        } catch (e: any) {
+                            setDbInitBusy(false)
+                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
+                        }
+                    }}
+                    onChooseAndMigrate={async () => {
+                        try {
+                            setDbInitBusy(true)
+                            await (window as any).api?.db?.location?.chooseAndMigrate?.()
+                            window.location.reload()
+                        } catch (e: any) {
+                            setDbInitBusy(false)
+                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
+                        }
+                    }}
+                    onResetDefault={async () => {
+                        try {
+                            setDbInitBusy(true)
+                            await (window as any).api?.db?.location?.resetDefault?.()
+                            window.location.reload()
+                        } catch (e: any) {
+                            setDbInitBusy(false)
+                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
+                        }
+                    }}
+                    onImportFile={async () => {
+                        try {
+                            setDbInitBusy(true)
+                            await (window as any).api?.db?.import?.()
+                            window.location.reload()
+                        } catch (e: any) {
+                            setDbInitBusy(false)
+                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
                         }
                     }}
                 />
@@ -6786,7 +6843,7 @@ function SettingsView({
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
                     <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
                 </div>
-        const [showBackupsAll, setShowBackupsAll] = useState(false)
+                {/* state hook must not be rendered; moved to top of component – leftover text removed */}
                 {backupDir && (
                     <div className="helper" style={{ wordBreak: 'break-all' }}>Backup-Ordner: {backupDir}</div>
                 )}
