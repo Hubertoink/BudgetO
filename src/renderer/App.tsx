@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
+import SmartRestoreModal from './components/modals/SmartRestoreModal'
+import SetupWizardModal from './components/modals/SetupWizardModal'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -546,6 +548,21 @@ export default function App() {
     // Active earmarks for selection in forms (used in filters and forms)
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
+    // First-start setup wizard visibility
+    const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
+    useEffect(() => {
+        let alive = true
+        ;(async () => {
+            try {
+                const r = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
+                if (!alive) return
+                if (!r || !r.value) setShowSetupWizard(true)
+            } catch {
+                if (alive) setShowSetupWizard(true)
+            }
+        })()
+        return () => { alive = false }
+    }, [])
     async function loadEarmarks() {
         const res = await window.api?.bindings.list?.({ activeOnly: true })
         if (res) setEarmarks(res.rows.map(r => ({ id: r.id, code: r.code, name: r.name, color: (r as any).color })))
@@ -728,7 +745,7 @@ export default function App() {
                                 { key: 'Einstellungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94a7.97 7.97 0 0 0 .06-1l2.03-1.58-1.92-3.32-2.39.5a7.97 7.97 0 0 0-1.73-1l-.36-2.43h-3.84l-.36 2.43a7.97 7.97 0 0 0-1.73 1l-2.39-.5-1.92 3.32L4.8 11.94c0 .34.02.67.06 1L2.83 14.5l1.92 3.32 2.39-.5c.53.4 1.12.74 1.73 1l.36 2.43h3.84l.36-2.43c.61-.26 1.2-.6 1.73-1l2.39.5 1.92-3.32-2.03-1.56zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" /></svg>) }
                             ]
                         ].map((group, gi, arr) => (
-                            <>
+                            <React.Fragment key={`nav-group-${gi}`}>
                                 {group.map(({ key, icon }) => (
                                     <button
                                         key={key}
@@ -746,7 +763,7 @@ export default function App() {
                                 {gi < arr.length - 1 && (
                                     <span aria-hidden style={{ display: 'inline-block', width: 1, height: 24, background: 'var(--border)', margin: '0 8px' }} />
                                 )}
-                            </>
+                            </React.Fragment>
                         ))}
                     </nav>
                 ) : null}
@@ -1135,6 +1152,11 @@ export default function App() {
                                         <form onSubmit={async (e) => {
                                             e.preventDefault()
                                             try {
+                                                // Validate transfer direction
+                                                if (editRow.type === 'TRANSFER' && (!editRow.transferFrom || !editRow.transferTo)) {
+                                                    notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
+                                                    return
+                                                }
                                                 const payload: any = { id: editRow.id, date: editRow.date, description: editRow.description ?? null, type: editRow.type, sphere: editRow.sphere, earmarkId: editRow.earmarkId, budgetId: editRow.budgetId, tags: editRow.tags || [] }
                                                 if (editRow.type === 'TRANSFER') {
                                                     delete payload.paymentMethod
@@ -1189,14 +1211,21 @@ export default function App() {
                                                     <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                                                     <div className="row">
                                                         <div className="field">
-                                                            <label>Datum</label>
+                                                            <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                             <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
                                                         </div>
                                                         <div className="field">
                                                             <label>Art</label>
                                                             <div className="btn-group" role="group" aria-label="Art wählen">
                                                                 {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                                    <button key={t} type="button" className="btn" onClick={() => setEditRow({ ...editRow, type: t })} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                                    <button key={t} type="button" className="btn" onClick={() => {
+                                                                        const newRow = { ...editRow, type: t }
+                                                                        if (t === 'TRANSFER' && (!newRow.transferFrom || !newRow.transferTo)) {
+                                                                            newRow.transferFrom = 'BAR'
+                                                                            newRow.transferTo = 'BANK'
+                                                                        }
+                                                                        setEditRow(newRow)
+                                                                    }} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -1212,15 +1241,13 @@ export default function App() {
                                                         </div>
                                                         {editRow.type === 'TRANSFER' ? (
                                                             <div className="field">
-                                                                <label>Richtung</label>
+                                                                <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                                 <select value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
                                                                     onChange={(e) => {
                                                                         const v = e.target.value
                                                                         if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
                                                                         else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
-                                                                        else setEditRow({ ...editRow, transferFrom: null, transferTo: null })
                                                                     }}>
-                                                                    <option value="->">—</option>
                                                                     <option value="BAR->BANK">BAR → BANK</option>
                                                                     <option value="BANK->BAR">BANK → BAR</option>
                                                                 </select>
@@ -1244,7 +1271,7 @@ export default function App() {
                                                     <div className="row">
                                                         {editRow.type === 'TRANSFER' ? (
                                                             <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                                <label>Betrag (Transfer)</label>
+                                                                <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                                 <span className="adorn-wrap">
                                                                     <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
                                                                         onChange={(e) => {
@@ -1258,7 +1285,7 @@ export default function App() {
                                                         ) : (
                                                             <>
                                                                 <div className="field">
-                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
+                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                                     <div style={{ display: 'flex', gap: 8 }}>
                                                                         <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
                                                                             <option value="NET">Netto</option>
@@ -1308,27 +1335,29 @@ export default function App() {
                                                 </div>
                                             </div>
 
-                                            {/* Block C – Beschreibung & Tags */}
-                                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
-                                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                                <div className="row">
-                                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                        <label>Beschreibung</label>
-                                                        <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                            {/* Block C+D – Beschreibung & Tags + Anhänge */}
+                                            <div className="block-grid" style={{ marginBottom: 8 }}>
+                                                {/* Block C – Beschreibung & Tags */}
+                                                <div className="card" style={{ padding: 12 }}>
+                                                    <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                                                    <div className="row">
+                                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                            <label>Beschreibung</label>
+                                                            <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                                        </div>
+                                                        <TagsEditor
+                                                            label="Tags"
+                                                            value={editRow.tags || []}
+                                                            onChange={(tags) => setEditRow({ ...editRow, tags })}
+                                                            tagDefs={tagDefs}
+                                                        />
                                                     </div>
-                                                    <TagsEditor
-                                                        label="Tags"
-                                                        value={editRow.tags || []}
-                                                        onChange={(tags) => setEditRow({ ...editRow, tags })}
-                                                        tagDefs={tagDefs}
-                                                    />
                                                 </div>
-                                            </div>
 
-                                            {/* Block D – Anhänge */}
-                                            <div
-                                                className="card"
-                                                style={{ marginTop: 0, padding: 12 }}
+                                                {/* Block D – Anhänge */}
+                                                <div
+                                                    className="card"
+                                                    style={{ padding: 12 }}
                                                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                                                 onDrop={async (e) => {
                                                     e.preventDefault(); e.stopPropagation();
@@ -1397,6 +1426,7 @@ export default function App() {
                                                         <div className="helper">Keine Dateien vorhanden</div>
                                                     )
                                                 )}
+                                            </div>
                                             </div>
                                             {confirmDeleteAttachment && (
                                                 <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
@@ -1523,6 +1553,7 @@ export default function App() {
                             bumpDataVersion={bumpDataVersion}
                             openTagsManager={() => setShowTagsManager(true)}
                             labelForCol={labelForCol}
+                            openSetupWizard={() => setShowSetupWizard(true)}
                         />
                     )}
 
@@ -1590,24 +1621,25 @@ export default function App() {
                                 {/* Delete-Dialog für Zweckbindungen wird nun im Bearbeiten-Modal gehandhabt */}
                             </div>
 
+                            {/* Übersicht der Zweckbindungen in Kachelform – analog zu Budgets */}
                             <EarmarkUsageCards
-                                bindings={bindings}
+                                bindings={bindings as any}
                                 from={from || undefined}
                                 to={to || undefined}
                                 sphere={filterSphere || undefined}
+                                onEdit={(b: any) => setEditBinding({ id: b.id, code: b.code, name: b.name, description: b.description ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, isActive: !!b.isActive, color: b.color ?? null, budget: (b as any).budget ?? null })}
                             />
                         </>
                     )}
 
                     {activePage === 'Budgets' && (
-                        <div className="card" style={{ padding: 12 }}>
+                        <div style={{ display: 'grid', gap: 12 }}>
+                            <div className="card" style={{ padding: 12 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
                                 <button className="btn primary" onClick={() => setEditBudget({ year: new Date().getFullYear(), sphere: 'IDEELL', amountPlanned: 0, categoryId: null, projectId: null, earmarkId: null })}>+ Neu</button>
                             </div>
-                            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                                <button className="btn" onClick={loadBudgets}>Aktualisieren</button>
-                            </div>
+                                {/* Aktualisieren-Button entfernt gemäß Vorgabe */}
                             {/* Simple table for now (legacy), will be replaced by tiles below */}
                             <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
                                 <thead>
@@ -1644,7 +1676,8 @@ export default function App() {
                                     )}
                                 </tbody>
                             </table>
-                            {/* Tiles UI */}
+                            </div>
+                            {/* Übersicht ohne Rahmen gemäß Vorgabe */}
                             <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
                             {editBudget && (
                                 <BudgetModal
@@ -1702,14 +1735,21 @@ export default function App() {
                                 <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                                 <div className="row">
                                     <div className="field">
-                                        <label>Datum</label>
+                                        <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
                                     </div>
                                     <div className="field">
                                         <label>Art</label>
                                         <div className="btn-group" role="group" aria-label="Art wählen">
                                             {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                <button key={t} type="button" className="btn" onClick={() => setQa({ ...qa, type: t })} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                <button key={t} type="button" className="btn" onClick={() => {
+                                                    const newQa = { ...qa, type: t }
+                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
+                                                        (newQa as any).transferFrom = 'BAR';
+                                                        (newQa as any).transferTo = 'BANK'
+                                                    }
+                                                    setQa(newQa)
+                                                }} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -1724,15 +1764,13 @@ export default function App() {
                                     </div>
                                     {qa.type === 'TRANSFER' ? (
                                         <div className="field">
-                                            <label>Richtung</label>
+                                            <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <select value={`${(qa as any).transferFrom ?? ''}->${(qa as any).transferTo ?? ''}`}
                                                 onChange={(e) => {
                                                     const v = e.target.value
                                                     if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
                                                     else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
-                                                    else setQa({ ...(qa as any), transferFrom: undefined, transferTo: undefined } as any)
                                                 }}>
-                                                <option value="->">—</option>
                                                 <option value="BAR->BANK">BAR → BANK</option>
                                                 <option value="BANK->BAR">BANK → BAR</option>
                                             </select>
@@ -1756,7 +1794,7 @@ export default function App() {
                                 <div className="row">
                                     {qa.type === 'TRANSFER' ? (
                                         <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Betrag (Transfer)</label>
+                                            <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <span className="adorn-wrap">
                                                 <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                     onChange={(e) => {
@@ -1770,7 +1808,7 @@ export default function App() {
                                     ) : (
                                         <>
                                             <div className="field">
-                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
+                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                 <div style={{ display: 'flex', gap: 8 }}>
                                                     <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
                                                         <option value="NET">Netto</option>
@@ -1820,30 +1858,32 @@ export default function App() {
                             </div>
                             </div>
 
-                            {/* Block C – Beschreibung & Tags */}
-                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                <div className="row">
-                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                        <label>Beschreibung</label>
-                                        <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
-                                        <datalist id="desc-suggestions">
-                                            {descSuggest.map((d, i) => (<option key={i} value={d} />))}
-                                        </datalist>
+                            {/* Block C+D – Beschreibung & Tags + Anhänge */}
+                            <div className="block-grid" style={{ marginBottom: 8 }}>
+                                {/* Block C – Beschreibung & Tags */}
+                                <div className="card" style={{ padding: 12 }}>
+                                    <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                                    <div className="row">
+                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Beschreibung</label>
+                                            <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                            <datalist id="desc-suggestions">
+                                                {descSuggest.map((d, i) => (<option key={i} value={d} />))}
+                                            </datalist>
+                                        </div>
+                                        <TagsEditor
+                                            label="Tags"
+                                            value={(qa as any).tags || []}
+                                            onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
+                                            tagDefs={tagDefs}
+                                        />
                                     </div>
-                                    <TagsEditor
-                                        label="Tags"
-                                        value={(qa as any).tags || []}
-                                        onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
-                                        tagDefs={tagDefs}
-                                    />
                                 </div>
-                            </div>
 
-                            {/* Block D – Anhänge */}
-                            <div
-                                className="card"
-                                style={{ marginTop: 0, padding: 12 }}
+                                {/* Block D – Anhänge */}
+                                <div
+                                    className="card"
+                                    style={{ padding: 12 }}
                                 onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
                                 onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
                             >
@@ -1871,6 +1911,7 @@ export default function App() {
                                     </ul>
                                 )}
                             </div>
+                            </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
                                 <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
                                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1895,8 +1936,8 @@ export default function App() {
                     </div>
                 ))}
             </div>
-            {/* Global Floating Action Button: + Buchung (hidden in Einstellungen und Mitglieder) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && (
+            {/* Global Floating Action Button: + Buchung (hidden in Einstellungen, Mitglieder und Rechnungen) */}
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
             )}
             {/* Auto-backup prompt modal (renderer) */}
@@ -1950,6 +1991,23 @@ export default function App() {
                     onClose={() => setShowTagsManager(false)}
                     notify={notify}
                     onChanged={() => { setShowTagsManager(false); setShowTagsManager(true); /* simple reload of list */ }}
+                />
+            )}
+            {showSetupWizard && (
+                <SetupWizardModal
+                    onClose={() => setShowSetupWizard(false)}
+                    navLayout={navLayout}
+                    setNavLayout={(v) => { setNavLayout(v); try { localStorage.setItem('ui.navLayout', v) } catch {} }}
+                    navIconColorMode={navIconColorMode}
+                    setNavIconColorMode={(v) => { setNavIconColorMode(v); try { localStorage.setItem('ui.navIconColorMode', v) } catch {} }}
+                    colorTheme={colorTheme}
+                    setColorTheme={(v) => { setColorTheme(v); try { localStorage.setItem('ui.colorTheme', v) } catch {}; try { document.documentElement.setAttribute('data-color-theme', v) } catch {} }}
+                    journalRowStyle={journalRowStyle}
+                    setJournalRowStyle={(v) => { setJournalRowStyle(v); try { localStorage.setItem('ui.journalRowStyle', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-style', v) } catch {} }}
+                    journalRowDensity={journalRowDensity}
+                    setJournalRowDensity={(v) => { setJournalRowDensity(v); try { localStorage.setItem('ui.journalRowDensity', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-density', v) } catch {} }}
+                    existingTags={tagDefs as any}
+                    notify={notify}
                 />
             )}
 
@@ -3826,6 +3884,23 @@ function DashboardRecentActivity() {
         } catch { }
         return iso
     }, [])
+    // Local date formatter (YYYY-MM-DD) honoring global preference
+    const dateFmtPref = useMemo(() => {
+        try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' }
+    }, [])
+    const fmtDate = useMemo(() => {
+        const pretty = (s?: string) => {
+            if (!s) return ''
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+            if (!m) return s || ''
+            const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3])
+            const dt = new Date(Date.UTC(y, mo - 1, d))
+            const mon = dt.toLocaleString('de-DE', { month: 'short' }).replace('.', '')
+            const dd = String(d).padStart(2, '0')
+            return `${dd} ${mon} ${y}`
+        }
+        return (s?: string) => dateFmtPref === 'PRETTY' ? pretty(s) : (s || '')
+    }, [dateFmtPref])
 
     const load = useCallback(async () => {
         try {
@@ -3860,7 +3935,7 @@ function DashboardRecentActivity() {
             if (dt?.description) extra.push(String(dt.description))
             if (typeof dt?.grossAmount === 'number') extra.push(eur.format(dt.grossAmount))
             if (dt?.type) extra.push(String(dt.type))
-            return { icon: '＋', msg, badge: typeBadge(dt?.type), extra: extra.join(' · ') }
+            return { icon: '＋', msg, badge: typeBadge(dt?.type), extra: extra.join(' · '), date: dt?.date || null }
         }
         if (a === 'DELETE') {
             const snap = d?.snapshot || {}
@@ -3869,7 +3944,7 @@ function DashboardRecentActivity() {
             const extra: string[] = []
             if (snap?.description) extra.push(String(snap.description))
             if (typeof snap?.grossAmount === 'number') extra.push(eur.format(snap.grossAmount))
-            return { icon: '🗑', msg, badge: typeBadge(snap?.type), extra: extra.join(' · ') }
+            return { icon: '🗑', msg, badge: typeBadge(snap?.type), extra: extra.join(' · '), date: snap?.date || null }
         }
         if (a === 'UPDATE') {
             const after = d?.after || {}
@@ -3898,17 +3973,17 @@ function DashboardRecentActivity() {
                 if (from !== to) parts.push(`${label[k] || k}: ${from} → ${to}`)
                 if (parts.length >= 4) { parts.push('…'); break }
             }
-            return { icon: '✎', msg: `Beleg #${id} geändert`, badge: typeBadge(typeCur), extra: parts.join(' · ') || '—' }
+            return { icon: '✎', msg: `Beleg #${id} geändert`, badge: typeBadge(typeCur), extra: parts.join(' · ') || '—', date: (after?.date ?? before?.date) || null }
         }
         if (a === 'REVERSE') {
             const orig = d?.originalId
-            return { icon: '↩', msg: `Storno erstellt zu #${orig ?? '—'}`, badge: null, extra: `neuer Beleg #${id}` }
+            return { icon: '↩', msg: `Storno erstellt zu #${orig ?? '—'}`, badge: null, extra: `neuer Beleg #${id}`, date: null }
         }
         if (a === 'CLEAR_ALL') {
             const n = d?.deleted
-            return { icon: '⚠', msg: `Alle Belege gelöscht`, badge: null, extra: typeof n === 'number' ? `${n} Stück` : '' }
+            return { icon: '⚠', msg: `Alle Belege gelöscht`, badge: null, extra: typeof n === 'number' ? `${n} Stück` : '', date: null }
         }
-        return { icon: 'ℹ', msg: `${a} ${row.entity} #${id}`, badge: null, extra: '' }
+        return { icon: 'ℹ', msg: `${a} ${row.entity} #${id}`, badge: null, extra: '', date: null }
     }
 
     const formatted = rows
@@ -3929,6 +4004,7 @@ function DashboardRecentActivity() {
                 <thead>
                     <tr>
                         <th align="left" style={{ width: 180 }}>Zeit</th>
+                        <th align="left" style={{ width: 100 }}>Datum</th>
                         <th align="left" style={{ width: 60 }}>Typ</th>
                         <th align="left">Aktion</th>
                         <th align="left">Details</th>
@@ -3938,6 +4014,7 @@ function DashboardRecentActivity() {
                     {formatted.map(({ r, desc }) => (
                         <tr key={r.id}>
                             <td>{fmtDateTime(r.createdAt)}</td>
+                            <td>{desc.date ? fmtDate(desc.date) : '—'}</td>
                             <td>{desc.badge}</td>
                             <td title={`${r.action} ${r.entity}`}>{desc.icon} {desc.msg}</td>
                             <td>{desc.extra || '—'}</td>
@@ -4966,7 +5043,7 @@ function InvoicesView() {
                                     <input className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" />
                                 </div>
                                 <div className="field">
-                                    <label>Partei</label>
+                                    <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" />
                                     {/* datalist placed later */}
                                 </div>
@@ -4975,7 +5052,7 @@ function InvoicesView() {
                                     <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
                                 </div>
                                 <div className="field">
-                                    <label>Betrag (EUR)</label>
+                                    <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} />
                                     <div className="helper">{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : 'Bitte Betrag eingeben' })()}</div>
                                 </div>
@@ -5315,6 +5392,11 @@ function useQuickAdd(today: string, create: (p: any) => Promise<any>, onOpenFile
     }
 
     async function onQuickSave() {
+        // Validate transfer direction
+        if (qa.type === 'TRANSFER' && (!(qa as any).transferFrom || !(qa as any).transferTo)) {
+            notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
+            return
+        }
         const payload: any = {
             date: qa.date,
             type: qa.type,
@@ -5502,8 +5584,8 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
     )
 }
 
-function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
-    const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number }>>({})
+function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null; startDate?: string | null; endDate?: string | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; onEdit?: (b: any) => void }) {
+    const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
     useEffect(() => {
         let alive = true
         async function run() {
@@ -5525,28 +5607,58 @@ function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ i
                 const u = usage[b.id]
                 const bg = b.color || undefined
                 const fg = contrastText(bg)
+                const budget = u?.budget ?? b.budget ?? 0
+                const released = Math.max(0, u?.released ?? 0)
+                const pct = budget > 0 ? Math.min(100, Math.round((released / budget) * 100)) : 0
+                const startDate = (b as any).startDate ?? u?.startDate ?? null
+                const endDate = (b as any).endDate ?? u?.endDate ?? null
+                const totalCount = (u as any)?.totalCount as number | undefined
+                const outsideCount = (u as any)?.outsideCount as number | undefined
                 return (
                     <div
                         key={b.id}
                         className="card"
-                        style={{ padding: 10, cursor: 'pointer', borderTop: bg ? `4px solid ${bg}` : undefined }}
-                        onClick={() => { const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } }); window.dispatchEvent(ev) }}
-                        title={`Nach Zweckbindung ${b.code} filtern`}
+                        style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}
+                        title={`Zweckbindung ${b.code} – Klick auf Filter oder Buttons für Aktionen`}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                             <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-                            <span className="helper">{b.name}</span>
+                            <span className="helper" style={{ fontWeight: 600 }}>{b.name}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                             <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>
-                            <span className="badge out">OUT: {fmt.format(u?.released ?? 0)}</span>
+                            <span className="badge out">OUT: {fmt.format(released)}</span>
                             <span className="badge">Saldo: {fmt.format(u?.balance ?? 0)}</span>
-                            {((u?.budget ?? 0) > 0) && (
+                            {((budget) > 0) && (
                                 <>
-                                    <span className="badge" title="Anfangsbudget">Budget: {fmt.format(u?.budget ?? 0)}</span>
-                                    <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? 0)}</span>
+                                    <span className="badge" title="Anfangsbudget">Budget: {fmt.format(budget)}</span>
+                                    <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? (budget - released))}</span>
                                 </>
                             )}
+                        </div>
+                        {/* Date and counts row */}
+                        <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            {(startDate || endDate) && (
+                                <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
+                            )}
+                            {(totalCount != null) && (
+                                <span title="Zugeordnete Buchungen">📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
+                            )}
+                        </div>
+                        {budget > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                                <div className="helper">Fortschritt</div>
+                                <div style={{ height: 10, background: 'color-mix(in oklab, var(--accent) 15%, transparent)', borderRadius: 6, position: 'relative' }} aria-label={`Verbrauch ${pct}%`} title={`${pct}%`}>
+                                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: bg || 'var(--accent)', borderRadius: 6 }} />
+                                </div>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
+                            <button className="btn ghost" onClick={() => {
+                                const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } })
+                                window.dispatchEvent(ev)
+                            }}>Zu Buchungen</button>
+                            {onEdit && <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>}
                         </div>
                     </div>
                 )
@@ -5556,7 +5668,7 @@ function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ i
 }
 
 function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; amountPlanned: number; color?: string | null; startDate?: string | null; endDate?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number | null; projectId?: number | null; earmarkId?: number | null }>; eurFmt: Intl.NumberFormat; onEdit: (b: any) => void }) {
-    const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null }>>({})
+    const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
     useEffect(() => {
         let alive = true
         async function run() {
@@ -5580,8 +5692,7 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
     if (!budgets.length) return null
     return (
         <div style={{ marginTop: 12 }}>
-            <strong>Übersicht</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
                 {budgets.map((b) => {
                     const bg = b.color || undefined
                     const fg = contrastText(bg)
@@ -5589,42 +5700,43 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                     const spent = Math.max(0, usage[b.id]?.spent || 0)
                     const inflow = Math.max(0, usage[b.id]?.inflow || 0)
                     const remaining = plan - spent
+                    const saldo = inflow - spent
                     const pct = plan > 0 ? Math.min(100, Math.max(0, Math.round((spent / plan) * 100))) : 0
                     const title = (b.name && b.name.trim()) || b.categoryName || b.projectName || `Budget ${b.year}`
+                    const startDate = b.startDate ?? usage[b.id]?.startDate ?? null
+                    const endDate = b.endDate ?? usage[b.id]?.endDate ?? null
+                    const totalCount = (usage[b.id]?.countInside ?? 0) + (usage[b.id]?.countOutside ?? 0)
+                    const outsideCount = usage[b.id]?.countOutside ?? 0
                     return (
                         <div key={b.id} className="card" style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                                 <span className="badge" style={{ background: bg, color: fg }}>{b.year}</span>
                                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{title}</span>
                             </div>
-                            <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                                <div>
-                                    <div className="helper">Geplant</div>
-                                    <div>{eurFmt.format(plan)}</div>
-                                </div>
-                                <div>
-                                    <div className="helper">Ausgaben</div>
-                                    <div style={{ color: 'var(--danger)' }}>{eurFmt.format(spent)}</div>
-                                </div>
-                                <div>
-                                    <div className="helper">Rest</div>
-                                    <div style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eurFmt.format(remaining)}</div>
-                                </div>
-                                <div>
-                                    <div className="helper">Einnahmen (Budget)</div>
-                                    <div style={{ color: 'var(--success)' }}>{eurFmt.format(inflow)}</div>
-                                </div>
-                                <div>
-                                    <div className="helper">Buchungen</div>
-                                    <div>{usage[b.id]?.count ?? 0}{usage[b.id]?.lastDate ? ` · bis ${usage[b.id]?.lastDate}` : ''}</div>
-                                </div>
-                                <div>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                                <span className="badge in">IN: {eurFmt.format(inflow)}</span>
+                                <span className="badge out">OUT: {eurFmt.format(spent)}</span>
+                                <span className="badge">Budget: {eurFmt.format(plan)}</span>
+                                <span className="badge">Saldo: {eurFmt.format(saldo)}</span>
+                                <span className="badge" title="Verfügbar">Rest: {eurFmt.format(remaining)}</span>
+                            </div>
+                            {/* Date and counts row */}
+                            <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                                {(startDate || endDate) && (
+                                    <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
+                                )}
+                                {(totalCount > 0 || usage[b.id]?.count != null) && (
+                                    <span title="Zugeordnete Buchungen">📄 {totalCount || usage[b.id]?.count || 0}{outsideCount > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
+                                )}
+                            </div>
+                            {plan > 0 && (
+                                <div style={{ marginTop: 8 }}>
                                     <div className="helper">Fortschritt</div>
                                     <div style={{ height: 10, background: 'color-mix(in oklab, var(--accent) 15%, transparent)', borderRadius: 6, position: 'relative' }} aria-label={`Verbrauch ${pct}%`} title={`${pct}%`}>
                                         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: bg || 'var(--accent)', borderRadius: 6 }} />
                                     </div>
                                 </div>
-                            </div>
+                            )}
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
                                 <button className="btn ghost" onClick={() => {
                                     // Jump to Buchungen for this budget's year and apply a precise budget filter
@@ -6835,6 +6947,7 @@ function SettingsView({
     bumpDataVersion,
     openTagsManager,
     labelForCol,
+    openSetupWizard,
 }: {
     defaultCols: Record<string, boolean>
     defaultOrder: string[]
@@ -6864,6 +6977,7 @@ function SettingsView({
     bumpDataVersion: () => void
     openTagsManager?: () => void
     labelForCol: (k: string) => string
+    openSetupWizard?: () => void
 }) {
     type TileKey = 'general' | 'table' | 'import' | 'storage' | 'org' | 'tags' | 'yearEnd' | 'tutorial' | 'about'
     const [active, setActive] = useState<TileKey>('general')
@@ -6879,6 +6993,14 @@ function SettingsView({
         const [busyImport, setBusyImport] = useState(false)
         return (
             <div style={{ display: 'grid', gap: 12 }}>
+                {/* Setup (Erststart) – Reopen wizard */}
+                <div className="card" style={{ padding: 12 }}>
+                    <div className="settings-title"><span aria-hidden>✨</span> <strong>Setup (Erststart)</strong></div>
+                    <div className="settings-sub">Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.</div>
+                    <div style={{ marginTop: 8 }}>
+                        <button className="btn" onClick={() => openSetupWizard?.()}>Setup erneut öffnen…</button>
+                    </div>
+                </div>
                 {/* Cluster 1: Darstellung & Layout */}
                 <div className="card settings-card" style={{ padding: 12 }}>
                     <div className="settings-title"><span aria-hidden>🖼️</span> <strong>Aussehen & Navigation</strong></div>
@@ -7116,6 +7238,9 @@ function SettingsView({
     const [intervalDays, setIntervalDays] = useState<number>(7)
     const [lastAuto, setLastAuto] = useState<number | null>(null)
     const [backupDir, setBackupDir] = useState<string>('')
+    const [smartRestorePreview, setSmartRestorePreview] = useState<null | any>(null)
+    // Neuer Zustand: Vergleich zwischen aktueller DB und gewähltem Ordner (falls dort bereits eine DB liegt)
+    const [selectedCompare, setSelectedCompare] = useState<null | { sel: { root: string; dbPath: string; counts?: Record<string, number>; exists: boolean }; cur: { root: string; dbPath: string; counts?: Record<string, number> } }>(null)
 
         async function refresh() {
             setError('')
@@ -7175,8 +7300,20 @@ function SettingsView({
                     if (!sel) return
                     // If folder already contains a DB, ask user which action to take
                     if (sel.hasDb) {
-                        // Show custom modal to choose between using existing or migrating current DB
-                        setMigratePrompt({ kind: 'useOrMigrate', sel: { root: sel.root, dbPath: sel.dbPath } })
+                        // Vergleich laden (aktuell vs. gewählter Ordner)
+                        try {
+                            const [curInspect, selInspect] = await Promise.all([
+                                window.api?.backup?.inspectCurrent?.(),
+                                window.api?.backup?.inspect?.(sel.dbPath)
+                            ])
+                            setSelectedCompare({
+                                sel: { root: sel.root, dbPath: sel.dbPath, counts: selInspect?.counts || {}, exists: true },
+                                cur: { root: info?.root || '', dbPath: info?.dbPath || '', counts: curInspect?.counts || {} }
+                            })
+                        } catch {
+                            // Fallback: normales Migrate/Use Modal
+                            setMigratePrompt({ kind: 'useOrMigrate', sel: { root: sel.root, dbPath: sel.dbPath } })
+                        }
                         return
                     } else {
                         // No DB present → show custom confirm to migrate
@@ -7194,8 +7331,13 @@ function SettingsView({
                     if (!sel) return
                     if (!sel.hasDb) { notify('error', 'Im gewählten Ordner wurde keine database.sqlite gefunden.'); return }
                     res = await mod.useFolder(sel.root)
-                } else {
-                    res = await window.api?.db?.location?.resetDefault?.()
+                } else if (kind === 'reset') {
+                    // Show smart restore modal with preview
+                    const preview = await window.api?.db?.smartRestore?.preview?.()
+                    if (preview) {
+                        setSmartRestorePreview(preview)
+                        return
+                    }
                 }
                 if (res?.ok) {
                     notify('success', kind === 'reset' ? 'Datenbank auf Standard zurückgesetzt.' : 'Speicherort aktualisiert.')
@@ -7248,6 +7390,24 @@ function SettingsView({
             } finally { setBusyAction(false) }
         }
 
+        async function applySmartRestore(action: 'useDefault' | 'migrateToDefault') {
+            try {
+                setBusyAction(true)
+                const res = await window.api?.db?.smartRestore?.apply?.({ action })
+                if (res?.ok) {
+                    const msg = action === 'useDefault' ? 'Standard-Datenbank wird verwendet.' : 'Aktuelle Datenbank zu Standard migriert.'
+                    notify('success', msg)
+                    await refresh()
+                    window.dispatchEvent(new Event('data-changed'))
+                    bumpDataVersion()
+                }
+                setSmartRestorePreview(null)
+            } catch (e: any) {
+                const msg = e?.message || String(e)
+                setError(msg); notify('error', msg)
+            } finally { setBusyAction(false) }
+        }
+
         return (
             <div style={{ display: 'grid', gap: 12 }}>
                 <div>
@@ -7280,7 +7440,6 @@ function SettingsView({
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
                     <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
                 </div>
-        const [showBackupsAll, setShowBackupsAll] = useState(false)
                 {backupDir && (
                     <div className="helper" style={{ wordBreak: 'break-all' }}>Backup-Ordner: {backupDir}</div>
                 )}
@@ -7373,6 +7532,50 @@ function SettingsView({
                             onMigrate={() => applyMigrate(migratePrompt.sel.root)}
                         />
                     )
+                )}
+                {selectedCompare && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyAction && setSelectedCompare(null)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 720 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h2 style={{ margin: 0 }}>Vergleich Speicherort</h2>
+                                <button className="btn ghost" onClick={() => setSelectedCompare(null)} aria-label="Schließen">✕</button>
+                            </div>
+                            <div className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontWeight: 600 }}>
+                                    <div></div><div>Aktuell</div><div>Gewählter Ordner</div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                                    <div className="helper">Ordner</div>
+                                    <div style={{ wordBreak: 'break-all' }}>{selectedCompare.cur.root}</div>
+                                    <div style={{ wordBreak: 'break-all' }}>{selectedCompare.sel.root}</div>
+                                    <div className="helper">Datenbank</div>
+                                    <div style={{ wordBreak: 'break-all' }}>{selectedCompare.cur.dbPath}</div>
+                                    <div style={{ wordBreak: 'break-all' }}>{selectedCompare.sel.dbPath}</div>
+                                </div>
+                                <div style={{ height: 6 }} />
+                                <div className="helper">Tabellenstände</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                                    <div className="helper">Tabelle</div>
+                                    <div className="helper">Aktuell</div>
+                                    <div className="helper">Gewählt</div>
+                                    {Array.from(new Set([...(Object.keys(selectedCompare.cur.counts || {})), ...(Object.keys(selectedCompare.sel.counts || {}))])).map(k => (
+                                        <React.Fragment key={k}>
+                                            <div>{k}</div>
+                                            <div>{(selectedCompare.cur.counts || {})[k] ?? '—'}</div>
+                                            <div>{(selectedCompare.sel.counts || {})[k] ?? '—'}</div>
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <div className="helper">Aktion wählen: Bestehende DB verwenden oder aktuelle in den Ordner kopieren.</div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    <button className="btn" disabled={busyAction} onClick={() => { setSelectedCompare(null); applyUse(selectedCompare.sel.root) }}>Verwenden</button>
+                                    <button className="btn primary" disabled={busyAction} onClick={() => { setSelectedCompare(null); applyMigrate(selectedCompare.sel.root) }}>Aktuelle migrieren</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
                 <div className="card" style={{ padding: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -7477,6 +7680,14 @@ function SettingsView({
                             </div>
                         </div>
                     </div>
+                )}
+                {/* Single source of truth: DbMigrateModal is rendered above with explicit props. Remove duplicate to avoid wrong callbacks. */}
+                {smartRestorePreview && (
+                    <SmartRestoreModal
+                        preview={smartRestorePreview}
+                        onClose={() => setSmartRestorePreview(null)}
+                        onApply={applySmartRestore}
+                    />
                 )}
             </div>
         )

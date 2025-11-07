@@ -160,6 +160,14 @@ declare global {
                     migrateTo: (payload: { root: string }) => Promise<{ ok: true; root: string; dbPath: string; filesDir: string }>
                     useFolder: (payload: { root: string }) => Promise<{ ok: true; root: string; dbPath: string; filesDir: string }>
                 }
+                smartRestore: {
+                    preview: () => Promise<{
+                        current: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
+                        default: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
+                        recommendation?: 'useDefault' | 'migrateToDefault' | 'manual'
+                    }>
+                    apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) => Promise<{ ok: boolean }>
+                }
             }
             shell: {
                 showItemInFolder: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>

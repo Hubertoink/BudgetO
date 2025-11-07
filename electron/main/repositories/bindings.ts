@@ -64,9 +64,25 @@ export function bindingUsage(earmarkId: number, params?: { from?: string; to?: s
         if (r.type === 'IN') allocated += r.gross || 0
         if (r.type === 'OUT') released += r.gross || 0
     }
-    const budgetRow = d.prepare(`SELECT budget FROM earmarks WHERE id=?`).get(earmarkId) as any
-    const budget = Number(budgetRow?.budget ?? 0) || 0
+    const metaRow = d.prepare(`SELECT budget, start_date as startDate, end_date as endDate FROM earmarks WHERE id=?`).get(earmarkId) as any
+    const budget = Number(metaRow?.budget ?? 0) || 0
     const balance = Math.round((allocated - released) * 100) / 100
     const remaining = Math.round(((budget + allocated - released) * 100)) / 100
-    return { allocated: Math.round(allocated * 100) / 100, released: Math.round(released * 100) / 100, balance, budget, remaining }
+    // Counts: total, inside, and outside relative to earmark's own date range
+    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE earmark_id=?`).get(earmarkId) as any
+    const totalCount = Number(totalCountRow?.c || 0)
+    const startDate = metaRow?.startDate || null
+    const endDate = metaRow?.endDate || null
+    let insideCount = totalCount
+    let outsideCount = 0
+    if (startDate || endDate) {
+        const wh2: string[] = ['earmark_id = ?']
+        const vals2: any[] = [earmarkId]
+        if (startDate) { wh2.push('date >= ?'); vals2.push(startDate) }
+        if (endDate) { wh2.push('date <= ?'); vals2.push(endDate) }
+        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
+        insideCount = Number(insideRow?.c || 0)
+        outsideCount = Math.max(0, totalCount - insideCount)
+    }
+    return { allocated: Math.round(allocated * 100) / 100, released: Math.round(released * 100) / 100, balance, budget, remaining, totalCount, insideCount, outsideCount, startDate, endDate }
 }

@@ -1320,3 +1320,15 @@ textarea:focus {
     border-radius: 3px;
     display: inline-block;
 }
+
+/* Required field asterisk marker */
+.req-asterisk {
+    color: var(--danger);
+    font-weight: 700;
+    margin-left: 4px;
+    font-size: 0.9em;
+    line-height: 1;
+}
+label .req-asterisk {
+    vertical-align: middle;
+}

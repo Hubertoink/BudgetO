@@ -488,7 +488,19 @@ export const BindingListOutput = z.object({
 export const BindingDeleteInput = z.object({ id: z.number() })
 export const BindingDeleteOutput = z.object({ id: z.number() })
 export const BindingUsageInput = z.object({ earmarkId: z.number(), from: z.string().optional(), to: z.string().optional(), sphere: Sphere.optional() })
-export const BindingUsageOutput = z.object({ allocated: z.number(), released: z.number(), balance: z.number(), budget: z.number(), remaining: z.number() })
+export const BindingUsageOutput = z.object({
+    allocated: z.number(),
+    released: z.number(),
+    balance: z.number(),
+    budget: z.number(),
+    remaining: z.number(),
+    // Optional extras for tiles
+    totalCount: z.number().optional(),
+    insideCount: z.number().optional(),
+    outsideCount: z.number().optional(),
+    startDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional()
+})
 
 export type TBindingUpsertInput = z.infer<typeof BindingUpsertInput>
 export type TBindingListInput = z.infer<typeof BindingListInput>
@@ -515,7 +527,17 @@ export const BudgetUpsertOutput = z.object({ id: z.number() })
 export const BudgetListInput = z.object({ year: z.number().optional(), sphere: Sphere.optional(), earmarkId: z.number().nullable().optional() }).optional()
 export const BudgetListOutput = z.object({ rows: z.array(z.object({ id: z.number(), year: z.number(), sphere: Sphere, categoryId: z.number().nullable(), projectId: z.number().nullable(), earmarkId: z.number().nullable(), amountPlanned: z.number(), name: z.string().nullable().optional(), categoryName: z.string().nullable().optional(), projectName: z.string().nullable().optional(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(), color: z.string().nullable().optional() })) })
 export const BudgetUsageInput = z.object({ budgetId: z.number(), from: z.string().optional(), to: z.string().optional() })
-export const BudgetUsageOutput = z.object({ spent: z.number(), inflow: z.number(), count: z.number(), lastDate: z.string().nullable() })
+export const BudgetUsageOutput = z.object({
+    spent: z.number(),
+    inflow: z.number(),
+    count: z.number(),
+    lastDate: z.string().nullable(),
+    // Optional extras for tiles
+    countInside: z.number().optional(),
+    countOutside: z.number().optional(),
+    startDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional()
+})
 export const BudgetDeleteInput = z.object({ id: z.number() })
 export const BudgetDeleteOutput = z.object({ id: z.number() })
 

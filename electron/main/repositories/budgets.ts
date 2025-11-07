@@ -93,5 +93,22 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
           MAX(date) as lastDate
         FROM vouchers${whereSql}
     `).get(...vals) as any
-    return { spent: row.spent || 0, inflow: row.inflow || 0, count: row.count || 0, lastDate: row.lastDate || null }
+    // Counts inside/outside relative to budget's own date range
+    const meta = d.prepare(`SELECT start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
+    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE budget_id=?`).get(input.budgetId) as any
+    const totalCount = Number(totalCountRow?.c || 0)
+    const startDate = meta?.startDate || null
+    const endDate = meta?.endDate || null
+    let countInside = totalCount
+    let countOutside = 0
+    if (startDate || endDate) {
+        const wh2: string[] = ['budget_id = ?']
+        const vals2: any[] = [input.budgetId]
+        if (startDate) { wh2.push('date >= ?'); vals2.push(startDate) }
+        if (endDate) { wh2.push('date <= ?'); vals2.push(endDate) }
+        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
+        countInside = Number(insideRow?.c || 0)
+        countOutside = Math.max(0, totalCount - countInside)
+    }
+    return { spent: row.spent || 0, inflow: row.inflow || 0, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
 }
