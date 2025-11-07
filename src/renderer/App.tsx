@@ -2,17 +2,19 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
+import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import DbInitFailedModal from './components/modals/DbInitFailedModal'
 import TimeFilterModal from './components/modals/TimeFilterModal'
 import MetaFilterModal from './components/modals/MetaFilterModal'
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
+import TopHeaderOrg from './components/layout/TopHeaderOrg'
+import WindowControls from './components/layout/WindowControls'
+import SidebarNav from './components/layout/SidebarNav'
 import Toasts from './components/common/Toasts'
 import useToasts from './hooks/useToasts'
 import { useAutoBackupPrompt } from './app/useAppInit'
 import DashboardView from './views/Dashboard/DashboardView'
-// Resolve app icon for titlebar (works with Vite bundling)
-const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
 // Safe ArrayBuffer -> base64 converter (chunked to avoid "Maximum call stack size exceeded")
 function bufferToBase64Safe(buf: ArrayBuffer) {
@@ -40,36 +42,7 @@ function contrastText(bg?: string | null) {
 }
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-function TopHeaderOrg() {
-    const [org, setOrg] = useState<string>('')
-    const [cashier, setCashier] = useState<string>('')
-    useEffect(() => {
-        let cancelled = false
-        async function load() {
-            try {
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-                const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
-                if (!cancelled) {
-                    setOrg((on?.value as any) || '')
-                    setCashier((cn?.value as any) || '')
-                }
-            } catch { }
-        }
-        load()
-        const onChanged = () => load()
-        window.addEventListener('data-changed', onChanged)
-        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-    }, [])
-    const text = [org || null, cashier || null].filter(Boolean).join(' | ')
-    return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
-            {text ? (
-                <div className="helper" title={text} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{text}</div>
-            ) : null}
-        </div>
-    )
-}
+// TopHeaderOrg moved to components/layout/TopHeaderOrg
 
 export default function App() {
     // DB init failure handling
@@ -683,6 +656,12 @@ export default function App() {
         'Einstellungen': '#9C27B0'
     }
     const isTopNav = navLayout === 'top'
+    // Smart restore preview state
+    const [smartRestore, setSmartRestore] = useState<null | {
+        current: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
+        default: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
+        recommendation?: 'useDefault' | 'migrateToDefault' | 'manual'
+    }>(null)
     return (
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : `${sidebarCollapsed ? '64px' : '240px'} 1fr`, gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
@@ -714,13 +693,16 @@ export default function App() {
                 </div>
                 {isTopNav ? (
                     <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
-                        {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
+                        {/* Groups: Dashboard | Buchungen | Rechnungen+Mitglieder | Budgets+Zweckbindungen | Belege/Reports | Einstellungen */}
                         {[
                             [
                                 { key: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
                             ],
+                            // Middle cluster split into sub-groups with light separators
                             [
-                                { key: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
+                                { key: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) }
+                            ],
+                            [
                                 { key: 'Rechnungen', icon: (
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
                                         <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
@@ -732,6 +714,8 @@ export default function App() {
                                         <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
                                     </svg>
                                 ) },
+                            ],
+                            [
                                 { key: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
                                 { key: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
                             ],
@@ -767,77 +751,16 @@ export default function App() {
                 ) : null}
                 {isTopNav && <div />}
                 {/* Window controls */}
-                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
-                    <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
-                    </button>
-                    <button className="btn ghost" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
-                    </button>
-                    <button className="btn danger" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
-                    </button>
-                </div>
+                <WindowControls />
             </header>
             {!isTopNav && (
                 <aside aria-label="Seitenleiste" style={{ gridArea: 'side', display: 'flex', flexDirection: 'column', padding: 8, borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {/* Group 1: Dashboard */}
-                                {[
-                                    { key: 'Dashboard', label: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center' }}>{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
-                                {/* Group 2: Buchungen, Rechnungen, Budgets, Zweckbindungen */}
-                                {[
-                                    { key: 'Buchungen', label: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
-                                    { key: 'Rechnungen', label: 'Rechnungen', icon: (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
-                                            <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
-                                            <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
-                                        </svg>
-                                    ) },
-                                    { key: 'Mitglieder', label: 'Mitglieder', icon: (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
-                                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
-                                        </svg>
-                                    ) },
-                                    { key: 'Budgets', label: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
-                                    { key: 'Zweckbindungen', label: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
-                                {/* Group 3: Belege, Reports */}
-                                {[
-                                    { key: 'Belege', label: 'Belege', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8l-6-6zM8 12h8v2H8v-2zm0-4h5v2H8V8z" /></svg>) },
-                                    { key: 'Reports', label: 'Reports', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
-                                <button
-                                    className="btn ghost"
-                                    onClick={() => setActivePage('Einstellungen')}
-                                    style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === 'Einstellungen' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-                                    title="Einstellungen"
-                                >
-                                    <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette['Einstellungen'] : undefined }}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94a7.97 7.97 0 0 0 .06-1l2.03-1.58-1.92-3.32-2.39.5a7.97 7.97 0 0 0-1.73-1l-.36-2.43h-3.84l-.36 2.43a7.97 7.97 0 0 0-1.73 1l-2.39-.5-1.92 3.32L4.8 11.94c0 .34.02.67.06 1L2.83 14.5l1.92 3.32 2.39-.5c.53.4 1.12.74 1.73 1l.36 2.43h3.84l.36-2.43c.61-.26 1.2-.6 1.73-1l2.39.5 1.92-3.32-2.03-1.56zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" /></svg>
-                                    </span>
-                                    {!sidebarCollapsed && <span>Einstellungen</span>}
-                                </button>
-                                </div>
+                    <SidebarNav
+                        activePage={activePage as any}
+                        sidebarCollapsed={sidebarCollapsed}
+                        navIconColorMode={navIconColorMode}
+                        onSelect={(k) => setActivePage(k as any)}
+                    />
                 </aside>
             )}
 
@@ -926,7 +849,7 @@ export default function App() {
                                 </svg>
                             </button>
 
-                            <button className="btn" onClick={() => loadRecent()}>Aktualisieren</button>
+                            {/* Refresh button removed – data reloads on filter changes and actions */}
                             <button
                                 className="btn ghost"
                                 title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
@@ -1130,7 +1053,7 @@ export default function App() {
                             {/* Edit Modal */}
                             {editRow && (
                                 <div className="modal-overlay" onClick={() => setEditRow(null)}>
-                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
+                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 16 }}>
                                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                             <h2 style={{ margin: 0 }}>
                                                 {(() => {
@@ -1195,18 +1118,18 @@ export default function App() {
                                             {/* Blocks A+B in a side-by-side grid on wide screens */}
                                             <div className="block-grid" style={{ marginBottom: 8 }}>
                                                 {/* Block A – Basisinfos */}
-                                                <div className="card" style={{ padding: 12 }}>
-                                                    <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                                                <section className="booking-section booking-section--basis">
+                                                    <div className="helper title">Basis</div>
                                                     <div className="row">
                                                         <div className="field">
                                                             <label>Datum</label>
                                                             <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
                                                         </div>
-                                                        <div className="field">
+                                                        <div className="field booking-type-row">
                                                             <label>Art</label>
-                                                            <div className="btn-group" role="group" aria-label="Art wählen">
+                                                            <div className="segment-group" role="group" aria-label="Art wählen">
                                                                 {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                                    <button key={t} type="button" className="btn" onClick={() => setEditRow({ ...editRow, type: t })} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                                    <button key={t} type="button" className={`seg-btn${editRow.type === t ? ' active' : ''}`} data-type={t} onClick={() => setEditRow({ ...editRow, type: t })}>{t}</button>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -1236,27 +1159,27 @@ export default function App() {
                                                                 </select>
                                                             </div>
                                                         ) : (
-                                                            <div className="field">
+                                                            <div className="field booking-pay-row">
                                                                 <label>Zahlweg</label>
-                                                                <div className="btn-group" role="group" aria-label="Zahlweg wählen">
+                                                                <div className="segment-group" role="group" aria-label="Zahlweg wählen">
                                                                     {(['BAR','BANK'] as const).map(pm => (
-                                                                        <button key={pm} type="button" className="btn" onClick={() => setEditRow({ ...editRow, paymentMethod: pm })} style={{ background: (editRow as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                                        <button key={pm} type="button" className={`seg-btn${(editRow as any).paymentMethod === pm ? ' active' : ''}`} onClick={() => setEditRow({ ...editRow, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                                                     ))}
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
+                                                </section>
 
                                                 {/* Block B – Finanzdetails */}
-                                                <div className="card" style={{ padding: 12 }}>
-                                                    <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
+                                                <section className="booking-section booking-section--finances">
+                                                    <div className="helper title">Finanzen</div>
                                                     <div className="row">
                                                         {editRow.type === 'TRANSFER' ? (
                                                             <div className="field" style={{ gridColumn: '1 / -1' }}>
                                                                 <label>Betrag (Transfer)</label>
                                                                 <span className="adorn-wrap">
-                                                                    <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
+                                                                    <input className="input amount-input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
                                                                         onChange={(e) => {
                                                                             const v = Number(e.target.value)
                                                                             setEditRow({ ...(editRow as any), grossAmount: v } as any)
@@ -1274,8 +1197,8 @@ export default function App() {
                                                                             <option value="NET">Netto</option>
                                                                             <option value="GROSS">Brutto</option>
                                                                         </select>
-                                                                        <span className="adorn-wrap" style={{ flex: 1 }}>
-                                                                            <input className="input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
+                                                                        <span className="adorn-wrap">
+                                                                            <input className="input amount-input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
                                                                                 onChange={(e) => {
                                                                                     const v = Number(e.target.value)
                                                                                     if ((editRow as any).mode === 'GROSS') setEditRow({ ...(editRow as any), grossAmount: v } as any)
@@ -1315,13 +1238,14 @@ export default function App() {
                                                             </select>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </section>
                                             </div>
 
-                                            {/* Block C – Beschreibung & Tags */}
-                                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
-                                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                                <div className="row">
+                                            {/* Block C + D side by side: Meta + Attachments */}
+                                            <div className="booking-meta-grid" style={{ marginBottom: 8 }}>
+                                                <section className="booking-section booking-section--meta">
+                                                    <div className="helper title">Beschreibung & Tags</div>
+                                                    <div className="row" style={{ gridTemplateColumns: '1fr' }}>
                                                     <div className="field" style={{ gridColumn: '1 / -1' }}>
                                                         <label>Beschreibung</label>
                                                         <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
@@ -1332,13 +1256,10 @@ export default function App() {
                                                         onChange={(tags) => setEditRow({ ...editRow, tags })}
                                                         tagDefs={tagDefs}
                                                     />
-                                                </div>
-                                            </div>
-
-                                            {/* Block D – Anhänge */}
-                                            <div
-                                                className="card"
-                                                style={{ marginTop: 0, padding: 12 }}
+                                                    </div>
+                                                </section>
+                                                <section
+                                                    className="booking-section booking-section--attachments"
                                                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                                                 onDrop={async (e) => {
                                                     e.preventDefault(); e.stopPropagation();
@@ -1356,11 +1277,11 @@ export default function App() {
                                                         notify('error', 'Upload fehlgeschlagen: ' + (err?.message || String(err)))
                                                     }
                                                 }}
-                                            >
+                                                >
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                                                         <strong>Anhänge</strong>
-                                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                                        <div className="helper">Dateien ziehen oder per Button/Ctrl+U hinzufügen</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 8 }}>
                                                         <input ref={editFileInputRef} type="file" multiple hidden onChange={async (e) => {
@@ -1407,6 +1328,7 @@ export default function App() {
                                                         <div className="helper">Keine Dateien vorhanden</div>
                                                     )
                                                 )}
+                                                </section>
                                             </div>
                                             {confirmDeleteAttachment && (
                                                 <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
@@ -1534,6 +1456,7 @@ export default function App() {
                             openTagsManager={() => setShowTagsManager(true)}
                             openSetupWizard={() => setShowSetupWizard(true)}
                             labelForCol={labelForCol}
+                            onOpenSmartRestore={(prev) => setSmartRestore(prev)}
                         />
                     )}
 
@@ -1547,7 +1470,7 @@ export default function App() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div className="helper">Zweckbindungen verwalten</div>
                                     <div style={{ display: 'flex', gap: 8 }}>
-                                        <button className="btn" onClick={loadBindings}>Aktualisieren</button>
+                                            {/* Refresh button removed – use actions/filters to reload */}
                                         <button
                                             className="btn primary"
                                             onClick={() => setEditBinding({ code: '', name: '', description: null, startDate: null, endDate: null, isActive: true, color: null } as any)}
@@ -1606,6 +1529,7 @@ export default function App() {
                                 from={from || undefined}
                                 to={to || undefined}
                                 sphere={filterSphere || undefined}
+                                onEdit={(b) => setEditBinding({ id: b.id, code: b.code, name: b.name, description: (bindings.find(x => x.id === b.id) as any)?.description ?? null, startDate: (bindings.find(x => x.id === b.id) as any)?.startDate ?? null, endDate: (bindings.find(x => x.id === b.id) as any)?.endDate ?? null, isActive: (bindings.find(x => x.id === b.id) as any)?.isActive ?? true, color: b.color ?? null, budget: (bindings.find(x => x.id === b.id) as any)?.budget ?? null })}
                             />
                         </>
                     )}
@@ -1615,9 +1539,6 @@ export default function App() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
                                 <button className="btn primary" onClick={() => setEditBudget({ year: new Date().getFullYear(), sphere: 'IDEELL', amountPlanned: 0, categoryId: null, projectId: null, earmarkId: null })}>+ Neu</button>
-                            </div>
-                            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                                <button className="btn" onClick={loadBudgets}>Aktualisieren</button>
                             </div>
                             {/* Simple table for now (legacy), will be replaced by tiles below */}
                             <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
@@ -1655,17 +1576,20 @@ export default function App() {
                                     )}
                                 </tbody>
                             </table>
-                            {/* Tiles UI */}
-                            <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
-                            {editBudget && (
-                                <BudgetModal
-                                    value={editBudget as any}
-                                    onClose={() => setEditBudget(null)}
-                                    onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
-                                />
-                            )}
                             {/* Delete-Dialog für Budgets wird nun im Bearbeiten-Modal gehandhabt */}
                         </div>
+                    )}
+
+                    {activePage === 'Budgets' && (
+                        <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
+                    )}
+
+                    {activePage === 'Budgets' && editBudget && (
+                        <BudgetModal
+                            value={editBudget as any}
+                            onClose={() => setEditBudget(null)}
+                            onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
+                        />
                     )}
 
                     {activePage === 'Mitglieder' && (
@@ -1709,18 +1633,18 @@ export default function App() {
                             {/* Blocks A+B in a side-by-side grid on wide screens */}
                             <div className="block-grid" style={{ marginBottom: 8 }}>
                             {/* Block A – Basisinfos */}
-                            <div className="card" style={{ padding: 12 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                            <section className="booking-section booking-section--basis">
+                                <div className="helper title">Basis</div>
                                 <div className="row">
                                     <div className="field">
                                         <label>Datum</label>
                                         <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
                                     </div>
-                                    <div className="field">
+                                    <div className="field booking-type-row">
                                         <label>Art</label>
-                                        <div className="btn-group" role="group" aria-label="Art wählen">
+                                        <div className="segment-group" role="group" aria-label="Art wählen">
                                             {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                <button key={t} type="button" className="btn" onClick={() => setQa({ ...qa, type: t })} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                <button key={t} type="button" className={`seg-btn${qa.type === t ? ' active' : ''}`} data-type={t} onClick={() => setQa({ ...qa, type: t })}>{t}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -1749,21 +1673,21 @@ export default function App() {
                                             </select>
                                         </div>
                                     ) : (
-                                        <div className="field">
+                                        <div className="field booking-pay-row">
                                             <label>Zahlweg</label>
-                                            <div className="btn-group" role="group" aria-label="Zahlweg wählen">
+                                            <div className="segment-group" role="group" aria-label="Zahlweg wählen">
                                                 {(['BAR','BANK'] as const).map(pm => (
-                                                    <button key={pm} type="button" className="btn" onClick={() => setQa({ ...qa, paymentMethod: pm })} style={{ background: (qa as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                    <button key={pm} type="button" className={`seg-btn${(qa as any).paymentMethod === pm ? ' active' : ''}`} onClick={() => setQa({ ...qa, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </section>
 
                             {/* Block B – Finanzdetails */}
-                            <div className="card" style={{ padding: 12 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
+                            <section className="booking-section booking-section--finances">
+                                <div className="helper title">Finanzen</div>
                                 <div className="row">
                                     {qa.type === 'TRANSFER' ? (
                                         <div className="field" style={{ gridColumn: '1 / -1' }}>
@@ -1828,59 +1752,56 @@ export default function App() {
                                         </select>
                                     </div>
                                 </div>
+                            </section>
                             </div>
-                            </div>
-
-                            {/* Block C – Beschreibung & Tags */}
-                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                <div className="row">
-                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                        <label>Beschreibung</label>
-                                        <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
-                                        <datalist id="desc-suggestions">
-                                            {descSuggest.map((d, i) => (<option key={i} value={d} />))}
-                                        </datalist>
+                            {/* Block C + D side-by-side */}
+                            <div className="booking-meta-grid" style={{ marginBottom: 8 }}>
+                                <section className="booking-section booking-section--meta">
+                                    <div className="helper title">Beschreibung & Tags</div>
+                                    <div className="row" style={{ gridTemplateColumns: '1fr' }}>
+                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Beschreibung</label>
+                                            <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                            <datalist id="desc-suggestions">
+                                                {descSuggest.map((d, i) => (<option key={i} value={d} />))}
+                                            </datalist>
+                                        </div>
+                                        <TagsEditor
+                                            label="Tags"
+                                            value={(qa as any).tags || []}
+                                            onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
+                                            tagDefs={tagDefs}
+                                        />
                                     </div>
-                                    <TagsEditor
-                                        label="Tags"
-                                        value={(qa as any).tags || []}
-                                        onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
-                                        tagDefs={tagDefs}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Block D – Anhänge */}
-                            <div
-                                className="card"
-                                style={{ marginTop: 0, padding: 12 }}
-                                onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
-                                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                        <strong>Anhänge</strong>
-                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                </section>
+                                <section className="booking-section booking-section--attachments"
+                                    onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
+                                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                            <strong>Anhänge</strong>
+                                            <div className="helper">Dateien ziehen oder per Button/Ctrl+U auswählen</div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
+                                            <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
+                                            {files.length > 0 && (
+                                                <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
-                                        <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
-                                        {files.length > 0 && (
-                                            <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
-                                        )}
-                                    </div>
-                                </div>
-                                {files.length > 0 && (
-                                    <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                                        {files.map((f, i) => (
-                                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                                    {files.length > 0 && (
+                                        <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                                            {files.map((f, i) => (
+                                                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                                    <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </section>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
                                 <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
@@ -2058,6 +1979,27 @@ export default function App() {
                     setJournalRowDensity={setJournalRowDensity}
                     existingTags={(tagDefs || []).map(t => ({ name: t.name, color: t.color || undefined }))}
                     notify={notify}
+                />
+            )}
+            {smartRestore && (
+                <SmartRestoreModal
+                    preview={smartRestore}
+                    onClose={() => setSmartRestore(null)}
+                    onApply={async (action) => {
+                        try {
+                            const res = await window.api?.db?.smartRestore?.apply?.({ action })
+                            if (res?.ok) {
+                                notify('success', action === 'useDefault' ? 'Standard-Datenbank verwendet.' : 'Aktuelle Datenbank in Standardordner migriert.')
+                                setSmartRestore(null)
+                                window.dispatchEvent(new Event('data-changed'))
+                                bumpDataVersion()
+                            } else {
+                                notify('error', 'Aktion fehlgeschlagen')
+                            }
+                        } catch (e: any) {
+                            notify('error', e?.message || String(e))
+                        }
+                    }}
                 />
             )}
         </div>
@@ -2277,9 +2219,8 @@ function MembersView() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
-                        style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
-                    <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn ghost" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
+                    <button className="btn primary" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
@@ -4343,7 +4284,7 @@ function InvoicesView() {
                             </span>
                         </div>
                     )}
-                    <table cellPadding={6} style={{ width: '100%' }}>
+                    <table className="invoices-table" cellPadding={6} style={{ width: '100%' }}>
                         <thead>
                             <tr>
                                 <th align="center" title="Typ">Typ</th>
@@ -5098,7 +5039,7 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
     )
 }
 
-function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
+function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; onEdit?: (b: any) => void }) {
     const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number }>>({})
     useEffect(() => {
         let alive = true
@@ -5121,28 +5062,38 @@ function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ i
                 const u = usage[b.id]
                 const bg = b.color || undefined
                 const fg = contrastText(bg)
+                const planned = Math.max(0, u?.budget ?? 0)
+                const expenses = Math.max(0, u?.released ?? 0)
+                const income = Math.max(0, u?.allocated ?? 0)
+                const rest = planned - expenses + income
+                const title = `${b.code} – ${b.name}`
                 return (
-                    <div
-                        key={b.id}
-                        className="card"
-                        style={{ padding: 10, cursor: 'pointer', borderTop: bg ? `4px solid ${bg}` : undefined }}
-                        onClick={() => { const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } }); window.dispatchEvent(ev) }}
-                        title={`Nach Zweckbindung ${b.code} filtern`}
-                    >
+                    <div key={b.id} className="card" style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                             <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-                            <span className="helper">{b.name}</span>
+                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{b.name}</span>
                         </div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                            <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>
-                            <span className="badge out">OUT: {fmt.format(u?.released ?? 0)}</span>
-                            <span className="badge">Saldo: {fmt.format(u?.balance ?? 0)}</span>
-                            {((u?.budget ?? 0) > 0) && (
-                                <>
-                                    <span className="badge" title="Anfangsbudget">Budget: {fmt.format(u?.budget ?? 0)}</span>
-                                    <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? 0)}</span>
-                                </>
-                            )}
+                        <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                            <div>
+                                <div className="helper">Geplant</div>
+                                <div>{fmt.format(planned)}</div>
+                            </div>
+                            <div>
+                                <div className="helper">Ausgaben</div>
+                                <div style={{ color: 'var(--danger)' }}>{fmt.format(expenses)}</div>
+                            </div>
+                            <div>
+                                <div className="helper">Einnahmen</div>
+                                <div style={{ color: 'var(--success)' }}>{fmt.format(income)}</div>
+                            </div>
+                            <div>
+                                <div className="helper">Rest</div>
+                                <div style={{ color: rest >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt.format(rest)}</div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
+                            <button className="btn ghost" onClick={() => { const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } }); window.dispatchEvent(ev) }}>Zu Buchungen</button>
+                            <button className="btn" onClick={() => onEdit?.(b)}>✎ Bearbeiten</button>
                         </div>
                     </div>
                 )
@@ -5175,10 +5126,8 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
 
     if (!budgets.length) return null
     return (
-        <div style={{ marginTop: 12 }}>
-            <strong>Übersicht</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 8 }}>
-                {budgets.map((b) => {
+        <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            {budgets.map((b) => {
                     const bg = b.color || undefined
                     const fg = contrastText(bg)
                     const plan = b.amountPlanned || 0
@@ -5203,12 +5152,12 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                                     <div style={{ color: 'var(--danger)' }}>{eurFmt.format(spent)}</div>
                                 </div>
                                 <div>
-                                    <div className="helper">Rest</div>
-                                    <div style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eurFmt.format(remaining)}</div>
-                                </div>
-                                <div>
                                     <div className="helper">Einnahmen (Budget)</div>
                                     <div style={{ color: 'var(--success)' }}>{eurFmt.format(inflow)}</div>
+                                </div>
+                                <div>
+                                    <div className="helper">Rest</div>
+                                    <div style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eurFmt.format(remaining)}</div>
                                 </div>
                                 <div>
                                     <div className="helper">Buchungen</div>
@@ -5234,8 +5183,7 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                             </div>
                         </div>
                     )
-                })}
-            </div>
+            })}
         </div>
     )
 }
@@ -5552,15 +5500,9 @@ function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number;
                                         const color = saldoMonth >= 0 ? '#2e7d32' : '#c62828'
                                         return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill={color} rx={2} opacity={0.7} />
                                     })()}
-                                    {hoverIdx === i && (
-                                        <g>
-                                            <text x={gx + barW} y={Math.min(yIn, yOut) - 6} textAnchor="middle" fontSize="10">
-                                                {`${monthLabel(s.month, true)}: IN ${eurFmt.format(s.inGross)}, OUT ${eurFmt.format(s.outGross)}, Saldo ${eurFmt.format(saldoMonth)}`}
-                                            </text>
-                                        </g>
-                                    )}
+                                    {/* Hover text tooltip removed to avoid duplication with the overlay; keep only month label below */}
                                     <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
-                                    <title>{`${monthLabel(s.month, true)}\nIN: ${eurFmt.format(s.inGross)}\nOUT: ${eurFmt.format(Math.abs(s.outGross))}\nNetto: ${eurFmt.format(saldoMonth)}\nKlick für Drilldown`}</title>
+                                    {/* Remove native browser tooltip (<title>) to prevent redundant hover popups */}
                                     </g>
                                 </g>
                             )
@@ -6432,6 +6374,7 @@ function SettingsView({
     openTagsManager,
     openSetupWizard,
     labelForCol,
+    onOpenSmartRestore,
 }: {
     defaultCols: Record<string, boolean>
     defaultOrder: string[]
@@ -6462,6 +6405,7 @@ function SettingsView({
     openTagsManager?: () => void
     openSetupWizard?: () => void
     labelForCol: (k: string) => string
+    onOpenSmartRestore?: (preview: any) => void
 }) {
     type TileKey = 'general' | 'table' | 'import' | 'storage' | 'org' | 'tags' | 'yearEnd' | 'tutorial' | 'about'
     const [active, setActive] = useState<TileKey>('general')
@@ -6882,7 +6826,18 @@ function SettingsView({
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
-                    <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
+                    <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={async () => {
+                        if (!info?.configuredRoot) return
+                        try {
+                            setBusy(true)
+                            const prev = await window.api?.db?.smartRestore?.preview?.()
+                            onOpenSmartRestore && onOpenSmartRestore(prev)
+                        } catch (e: any) {
+                            notify('error', e?.message || String(e))
+                        } finally {
+                            setBusy(false)
+                        }
+                    }}>Standard wiederherstellen (Smart)</button>
                 </div>
                 {/* state hook must not be rendered; moved to top of component – leftover text removed */}
                 {backupDir && (

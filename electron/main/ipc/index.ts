@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
+import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
@@ -17,7 +18,7 @@ import { previewFile, executeFile, generateImportTemplate, generateImportTestDat
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
-import { AuditRecentInput, AuditRecentOutput } from './schemas'
+import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
@@ -752,6 +753,90 @@ export function registerIpcHandlers() {
         const d = getDb()
         try { applyMigrations(d as any) } catch { }
         return { ok: true, ...info }
+    })
+
+    // Smart restore preview: compare current configured DB vs default userData DB
+    ipcMain.handle('db.smartRestore.preview', async () => {
+        const currentInfo = getCurrentDbInfo()
+        const defaultInfo = getDefaultDbInfo()
+        function statOrNull(p: string) {
+            try { return fs.statSync(p) } catch { return null }
+        }
+        const curStat = statOrNull(currentInfo.dbPath)
+        const defStat = statOrNull(defaultInfo.dbPath)
+        const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
+        const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
+        // Recommendation heuristic:
+        // 1) If default exists and current does NOT -> useDefault
+        // 2) If both exist: compare last voucher date then mtime fallback
+        // 3) If default missing -> migrateToDefault
+        let recommendation: 'useDefault' | 'migrateToDefault' | 'manual' = 'manual'
+        if (defStat && !curStat) recommendation = 'useDefault'
+        else if (!defStat && curStat) recommendation = 'migrateToDefault'
+        else if (defStat && curStat) {
+            const lvCur = curInspect.last?.voucher || curInspect.last?.audit || null
+            const lvDef = defInspect.last?.voucher || defInspect.last?.audit || null
+            if (lvCur && lvDef) recommendation = lvCur > lvDef ? 'migrateToDefault' : 'useDefault'
+            else if (lvCur && !lvDef) recommendation = 'migrateToDefault'
+            else if (!lvCur && lvDef) recommendation = 'useDefault'
+            else {
+                // Fallback to mtime
+                const mCur = curStat?.mtimeMs || 0
+                const mDef = defStat?.mtimeMs || 0
+                recommendation = mCur > mDef ? 'migrateToDefault' : 'useDefault'
+            }
+        }
+        return DbSmartRestorePreviewOutput.parse({
+            current: { root: currentInfo.root, dbPath: currentInfo.dbPath, exists: !!curStat, mtime: curStat?.mtimeMs ?? null, counts: curInspect.counts, last: curInspect.last },
+            default: { root: defaultInfo.root, dbPath: defaultInfo.dbPath, exists: !!defStat, mtime: defStat?.mtimeMs ?? null, counts: defInspect.counts, last: defInspect.last },
+            recommendation
+        })
+    })
+
+    // Smart restore apply
+    ipcMain.handle('db.smartRestore.apply', async (_e, payload) => {
+        const parsed = DbSmartRestoreApplyInput.parse(payload)
+        const { action } = parsed
+        const currentInfo = getCurrentDbInfo()
+        const defaultInfo = getDefaultDbInfo()
+        if (action === 'useDefault') {
+            // Point config to default, do not copy current over
+            writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+            // Close any open DB and reopen default
+            try { closeDb() } catch { }
+            const d = getDb()
+            try { applyMigrations(d as any) } catch { }
+            return DbSmartRestoreApplyOutput.parse({ ok: true })
+        } else if (action === 'migrateToDefault') {
+            // Copy current DB + attachments to default, then reset config
+            try {
+                // Close current DB first
+                try { closeDb() } catch { }
+                // Ensure default dirs exist
+                if (!fs.existsSync(defaultInfo.root)) fs.mkdirSync(defaultInfo.root, { recursive: true })
+                if (!fs.existsSync(defaultInfo.filesDir)) fs.mkdirSync(defaultInfo.filesDir, { recursive: true })
+                // Copy DB file
+                fs.copyFileSync(currentInfo.dbPath, defaultInfo.dbPath)
+                // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
+                try {
+                    const files = fs.readdirSync(path.join(currentInfo.root, 'files'))
+                    for (const f of files) {
+                        const src = path.join(currentInfo.root, 'files', f)
+                        const dst = path.join(defaultInfo.filesDir, f)
+                        try { if (!fs.existsSync(dst)) fs.copyFileSync(src, dst) } catch { }
+                    }
+                } catch { /* ignore */ }
+                // Point config to default
+                writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+                // Reopen DB
+                const d = getDb()
+                try { applyMigrations(d as any) } catch { }
+                return DbSmartRestoreApplyOutput.parse({ ok: true })
+            } catch (e: any) {
+                throw new Error('Migration zum Standard fehlgeschlagen: ' + (e?.message || String(e)))
+            }
+        }
+        return DbSmartRestoreApplyOutput.parse({ ok: false })
     })
 
     // Tags CRUD

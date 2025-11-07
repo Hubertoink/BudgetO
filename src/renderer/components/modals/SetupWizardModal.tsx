@@ -177,25 +177,27 @@ export default function SetupWizardModal({
             { a: '12 Sep 2025', b: 'Material', g: '− 12,90 €' },
         ]
         const density = journalRowDensity === 'compact' ? 4 : 8
-        const zebra = journalRowStyle === 'zebra'
+        // Preview should mirror the real table behavior:
+        // 'both' means zebra background AND separator lines
+        const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
         const lines = journalRowStyle === 'lines' || journalRowStyle === 'both'
         return (
             <div className="card" style={{ padding: 10 }}>
                 <div className="helper">Vorschau Buchungen</div>
-                <table cellPadding={6} style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                <table cellPadding={6} style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0 }}>
                     <thead>
                         <tr>
-                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : undefined, padding: `${density}px 8px` }}>Datum</th>
-                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : undefined, padding: `${density}px 8px` }}>Beschreibung</th>
-                            <th align="right" style={{ borderBottom: lines ? '1px solid var(--border)' : undefined, padding: `${density}px 8px` }}>Brutto</th>
+                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Datum</th>
+                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Beschreibung</th>
+                            <th align="right" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Brutto</th>
                         </tr>
                     </thead>
                     <tbody>
                         {demoRows.map((r, i) => (
-                            <tr key={i} style={{ background: zebra && i % 2 === 1 ? 'color-mix(in oklab, var(--text)/6%, transparent)' : undefined }}>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : undefined }}>{r.a}</td>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : undefined }}>{r.b}</td>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : undefined }} align="right">{r.g}</td>
+                            <tr key={i} style={{ background: zebra && i % 2 === 1 ? 'var(--table-row-alt)' : undefined }}>
+                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }}>{r.a}</td>
+                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }}>{r.b}</td>
+                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }} align="right">{r.g}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -426,8 +428,10 @@ export default function SetupWizardModal({
                     ))}
                 </div>
                 {renderStep()}
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <button className="btn hover-highlight" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}>Zurück</button>
+                <div style={{ display: 'flex', justifyContent: step > 0 ? 'space-between' : 'flex-end', gap: 8 }}>
+                    {step > 0 && (
+                        <button className="btn hover-highlight" onClick={() => setStep(s => Math.max(0, s - 1))}>Zurück</button>
+                    )}
                     {step < LAST_STEP ? (
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button className="btn hover-highlight" onClick={() => setStep(s => Math.min(LAST_STEP, s + 1))}>Weiter</button>

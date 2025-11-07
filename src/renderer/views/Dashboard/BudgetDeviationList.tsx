@@ -40,8 +40,13 @@ export default function BudgetDeviationList({ from, to }: BudgetDeviationListPro
   const R = size / 2 - 6
   const r = R * 0.64
   let a0 = -Math.PI / 2
+  const single = data.filter(s => (s.value || 0) > 0).length === 1
   const paths = data.map((s, idx) => {
     const frac = total > 0 ? (s.value / total) : 0
+    if (single && frac > 0.9999) {
+      // Render a full ring using stroke for the single-slice case to avoid degenerate 360° arc
+      return <circle key={s.key + idx} cx={cx} cy={cy} r={(R + r) / 2} fill="none" stroke={colors[s.key]} strokeWidth={R - r} />
+    }
     const a1 = a0 + frac * Math.PI * 2
     const d = arcPath(cx, cy, R, r, a0, a1)
     const el = <path key={s.key + idx} d={d} fill={colors[s.key]} opacity={frac > 0 ? 1 : 0} />

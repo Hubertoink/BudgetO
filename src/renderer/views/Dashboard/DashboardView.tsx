@@ -37,7 +37,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
   }, [])
 
   const [period, setPeriod] = useState<'MONAT' | 'JAHR'>(() => {
-    try { return (localStorage.getItem('dashPeriod') as any) || 'MONAT' } catch { return 'MONAT' }
+    try { return (localStorage.getItem('dashPeriod') as any) || 'JAHR' } catch { return 'JAHR' }
   })
   useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
   const [yearSel, setYearSel] = useState<number | null>(null)
@@ -154,20 +154,20 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
             </select>
           )}
         </div>
-        <div className="card" style={{ padding: 12 }}>
+        <div className="card card--success" style={{ padding: 12 }}>
           <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
           <div style={{ fontWeight: 600 }}>{eur.format(sum?.inGross || 0)}</div>
         </div>
-        <div className="card" style={{ padding: 12 }}>
+        <div className="card card--danger" style={{ padding: 12 }}>
           <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
           <div style={{ fontWeight: 600 }}>{eur.format(sum?.outGross || 0)}</div>
         </div>
-        <div className="card" style={{ padding: 12 }}>
+        <div className="card card--accent" style={{ padding: 12 }}>
           <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
           <div style={{ fontWeight: 600, color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
         </div>
       </div>
-      <div className="card" style={{ padding: 12, overflow: 'hidden' }}>
+      <div className="card card--accent" style={{ padding: 12, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <strong>Offene Rechnungen</strong>
@@ -277,7 +277,8 @@ function DashboardRecentActivity() {
         const v = d.data || {}
         const amount = v.grossAmount ?? v.netAmount ?? 0
         const label = `${v.type || ''} ${v.paymentMethod || ''}`.trim()
-        return { title: `Beleg ${label} ${eur.format(amount)} erstellt`, details: (v.description || '').slice(0, 80) }
+          const desc = (v.description || '').trim()
+          return { title: `Beleg ${label} ${eur.format(amount)} erstellt${desc ? ' · '+desc.slice(0, 80) : ''}`, details: '' }
       }
       if (a === 'UPDATE') {
         const ch = d.changes || {}
@@ -290,8 +291,10 @@ function DashboardRecentActivity() {
           const nm = nameMap[k] || k
           changes.push(`${nm}: ${f} → ${t}`)
         }
-        add('date', d.before?.date, d.after?.date)
-        add('type', d.before?.type, d.after?.type)
+  // Prioritize description so it shows up in the first 1-3 details
+  add('description', d.before?.description, d.after?.description)
+  add('date', d.before?.date, d.after?.date)
+  add('type', d.before?.type, d.after?.type)
         add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod)
         add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
@@ -319,6 +322,43 @@ function DashboardRecentActivity() {
     return { title: `${a} ${e} #${row.entityId || ''}`.trim(), details: '' }
   }
 
+  const ActionIcon = ({ kind, color }: { kind: string; color: string }) => {
+    const a = String(kind || '').toUpperCase()
+    const common = { width: 16, height: 16, viewBox: '0 0 24 24' } as any
+    if (a === 'CREATE') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="erstellt">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      )
+    }
+    if (a === 'DELETE') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="gelöscht">
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M6 6l1 14h10l1-14" />
+          <path d="M10 10v8M14 10v8" />
+        </svg>
+      )
+    }
+    if (a === 'UPDATE') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="geändert">
+          <path d="M21 12a9 9 0 1 1-3-6.7" />
+          <path d="M21 3v6h-6" />
+        </svg>
+      )
+    }
+    // default dot
+    return (
+      <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="12" cy="12" r="2" />
+      </svg>
+    )
+  }
+
   return (
     <div className="card" style={{ padding: 12 }}>
       <div className="helper">Letzte Aktivitäten</div>
@@ -326,15 +366,25 @@ function DashboardRecentActivity() {
       <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
         {rows.map((r: any) => {
           const info = describe(r)
-          const ts = r.createdAt ? String(r.createdAt).replace('T', ' ').slice(0, 16) : '—'
+          const tsAct = r.createdAt ? String(r.createdAt).replace('T', ' ').slice(0, 16) : '—'
+          const recDateRaw = r.recordDate ? String(r.recordDate).slice(0, 10) : null
           const color = info.tone === 'err' ? 'var(--danger)' : info.tone === 'warn' ? '#f9a825' : 'var(--accent)'
           return (
             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'baseline' }}>
-              <div className="helper" style={{ whiteSpace: 'nowrap' }}>{ts}</div>
+              <div className="helper" style={{ whiteSpace: 'nowrap' }}>{tsAct}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <span className="chip" style={{ background: 'color-mix(in oklab, '+color+' 20%, transparent)', borderColor: color }}>{String(r.action).toUpperCase()}</span>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                    <span className="activity-icon" aria-hidden>
+                      <ActionIcon kind={String(r.action)} color={color} />
+                    </span>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.title}</div>
+                  </div>
+                  {recDateRaw ? (
+                    <div className="helper" style={{ whiteSpace: 'nowrap', marginLeft: 8 }}>
+                      Belegdatum: {recDateRaw}
+                    </div>
+                  ) : null}
                 </div>
                 {info.details ? <div className="helper" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.details}</div> : null}
               </div>

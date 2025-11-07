@@ -65,11 +65,42 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const barW = 10
   const gap = 6
 
+  // Y-axis ticks (nice numbers)
+  function niceStep(max: number) {
+    if (max <= 0) return 1
+    const exp = Math.floor(Math.log10(max))
+    const base = Math.pow(10, exp)
+    const m = max / base
+    let step = base
+    if (m <= 2) step = base / 5
+    else if (m <= 5) step = base / 2
+    // Aim for ~5-7 ticks
+    const target = Math.max(1, Math.round(max / step))
+    if (target > 8) step *= 2
+    return step
+  }
+  const yStep = niceStep(maxVal)
+  const yTicks: number[] = []
+  for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
+  const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
+
   const mouseMove = (ev: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current
     if (!svg || !labels.length) return
-    const rect = svg.getBoundingClientRect()
-    const x = ev.clientX - rect.left
+    // Robust coordinate mapping using SVGPoint + CTM (handles any scaling/padding)
+    const pt = (svg as any).createSVGPoint ? (svg as any).createSVGPoint() : null
+    let x = 0
+    if (pt && (svg as any).getScreenCTM) {
+      pt.x = ev.clientX; pt.y = ev.clientY
+      const ctm = (svg as any).getScreenCTM()
+      const inv = ctm && ctm.inverse ? ctm.inverse() : null
+      const loc = inv ? pt.matrixTransform(inv) : null
+      x = loc ? Number(loc.x) : 0
+    } else {
+      const rect = svg.getBoundingClientRect()
+      const scaleX = W / Math.max(1, rect.width)
+      x = (ev.clientX - rect.left) * scaleX
+    }
     let best = 0
     let bestDist = Math.abs(x - xs(0, labels.length))
     for (let i = 1; i < labels.length; i++) {
@@ -87,8 +118,16 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
       </header>
       <div style={{ position: 'relative' }}>
         <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Einnahmen vs Ausgaben">
-          {/* Axis */}
+          {/* Axes */}
           <line x1={P/2} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
+          <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
+          {/* Y grid + labels */}
+          {yTicks.map((v, i) => (
+            <g key={i}>
+              <line x1={P} x2={W-P/2} y1={yFor(v)} y2={yFor(v)} stroke="var(--border)" opacity={0.25} />
+              <text x={P-6} y={yFor(v)+4} fill="var(--text-dim)" fontSize={11} textAnchor="end">{eur.format(v)}</text>
+            </g>
+          ))}
           {/* Bars */}
           {labels.map((m, i) => {
             const xCenter = xs(i, labels.length)
