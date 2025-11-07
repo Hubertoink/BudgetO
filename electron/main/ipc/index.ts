@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
+import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
@@ -17,7 +18,7 @@ import { previewFile, executeFile, generateImportTemplate, generateImportTestDat
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
-import { AuditRecentInput, AuditRecentOutput } from './schemas'
+import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
@@ -596,7 +597,10 @@ export function registerIpcHandlers() {
         const parsed = AttachmentOpenInput.parse(payload)
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const res = await shell.openPath(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
+        const res = await shell.openPath(src)
         const ok = !res
         return AttachmentOpenOutput.parse({ ok })
     })
@@ -606,14 +610,28 @@ export function registerIpcHandlers() {
         if (!f) throw new Error('Datei nicht gefunden')
         const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
         if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        fs.copyFileSync(f.filePath, save.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        fs.copyFileSync(src, save.filePath)
         return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
     })
     ipcMain.handle('attachments.read', async (_e, payload) => {
         const parsed = AttachmentReadInput.parse(payload)
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const buff = fs.readFileSync(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        const buff = fs.readFileSync(src)
         const dataBase64 = Buffer.from(buff).toString('base64')
         return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
     })
@@ -737,6 +755,90 @@ export function registerIpcHandlers() {
         return { ok: true, ...info }
     })
 
+    // Smart restore preview: compare current configured DB vs default userData DB
+    ipcMain.handle('db.smartRestore.preview', async () => {
+        const currentInfo = getCurrentDbInfo()
+        const defaultInfo = getDefaultDbInfo()
+        function statOrNull(p: string) {
+            try { return fs.statSync(p) } catch { return null }
+        }
+        const curStat = statOrNull(currentInfo.dbPath)
+        const defStat = statOrNull(defaultInfo.dbPath)
+        const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
+        const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
+        // Recommendation heuristic:
+        // 1) If default exists and current does NOT -> useDefault
+        // 2) If both exist: compare last voucher date then mtime fallback
+        // 3) If default missing -> migrateToDefault
+        let recommendation: 'useDefault' | 'migrateToDefault' | 'manual' = 'manual'
+        if (defStat && !curStat) recommendation = 'useDefault'
+        else if (!defStat && curStat) recommendation = 'migrateToDefault'
+        else if (defStat && curStat) {
+            const lvCur = curInspect.last?.voucher || curInspect.last?.audit || null
+            const lvDef = defInspect.last?.voucher || defInspect.last?.audit || null
+            if (lvCur && lvDef) recommendation = lvCur > lvDef ? 'migrateToDefault' : 'useDefault'
+            else if (lvCur && !lvDef) recommendation = 'migrateToDefault'
+            else if (!lvCur && lvDef) recommendation = 'useDefault'
+            else {
+                // Fallback to mtime
+                const mCur = curStat?.mtimeMs || 0
+                const mDef = defStat?.mtimeMs || 0
+                recommendation = mCur > mDef ? 'migrateToDefault' : 'useDefault'
+            }
+        }
+        return DbSmartRestorePreviewOutput.parse({
+            current: { root: currentInfo.root, dbPath: currentInfo.dbPath, exists: !!curStat, mtime: curStat?.mtimeMs ?? null, counts: curInspect.counts, last: curInspect.last },
+            default: { root: defaultInfo.root, dbPath: defaultInfo.dbPath, exists: !!defStat, mtime: defStat?.mtimeMs ?? null, counts: defInspect.counts, last: defInspect.last },
+            recommendation
+        })
+    })
+
+    // Smart restore apply
+    ipcMain.handle('db.smartRestore.apply', async (_e, payload) => {
+        const parsed = DbSmartRestoreApplyInput.parse(payload)
+        const { action } = parsed
+        const currentInfo = getCurrentDbInfo()
+        const defaultInfo = getDefaultDbInfo()
+        if (action === 'useDefault') {
+            // Point config to default, do not copy current over
+            writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+            // Close any open DB and reopen default
+            try { closeDb() } catch { }
+            const d = getDb()
+            try { applyMigrations(d as any) } catch { }
+            return DbSmartRestoreApplyOutput.parse({ ok: true })
+        } else if (action === 'migrateToDefault') {
+            // Copy current DB + attachments to default, then reset config
+            try {
+                // Close current DB first
+                try { closeDb() } catch { }
+                // Ensure default dirs exist
+                if (!fs.existsSync(defaultInfo.root)) fs.mkdirSync(defaultInfo.root, { recursive: true })
+                if (!fs.existsSync(defaultInfo.filesDir)) fs.mkdirSync(defaultInfo.filesDir, { recursive: true })
+                // Copy DB file
+                fs.copyFileSync(currentInfo.dbPath, defaultInfo.dbPath)
+                // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
+                try {
+                    const files = fs.readdirSync(path.join(currentInfo.root, 'files'))
+                    for (const f of files) {
+                        const src = path.join(currentInfo.root, 'files', f)
+                        const dst = path.join(defaultInfo.filesDir, f)
+                        try { if (!fs.existsSync(dst)) fs.copyFileSync(src, dst) } catch { }
+                    }
+                } catch { /* ignore */ }
+                // Point config to default
+                writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+                // Reopen DB
+                const d = getDb()
+                try { applyMigrations(d as any) } catch { }
+                return DbSmartRestoreApplyOutput.parse({ ok: true })
+            } catch (e: any) {
+                throw new Error('Migration zum Standard fehlgeschlagen: ' + (e?.message || String(e)))
+            }
+        }
+        return DbSmartRestoreApplyOutput.parse({ ok: false })
+    })
+
     // Tags CRUD
     ipcMain.handle('tags.list', async (_e, payload) => {
         const parsed = TagsListInput.parse(payload)
@@ -846,6 +948,24 @@ export function registerIpcHandlers() {
         return YearEndStatusOutput.parse(res as any)
     })
 
+    // Work queue (dashboard): lightweight summary counts
+    ipcMain.handle('workQueue.summary', async () => {
+        try {
+            const d = getDb()
+            const rowA = d.prepare("SELECT COUNT(1) as c FROM vouchers v WHERE (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) = 0").get() as any
+            const unlinkedReceiptsCount = Number(rowA?.c || 0)
+            const st = yearEnd.status()
+            let lockedEntriesCount = 0
+            if (st?.closedUntil) {
+                const r = d.prepare('SELECT COUNT(1) as c FROM vouchers WHERE date <= ?').get(st.closedUntil) as any
+                lockedEntriesCount = Number(r?.c || 0)
+            }
+            return { ok: true, unlinkedReceiptsCount, lockedEntriesCount }
+        } catch (e: any) {
+            return { ok: false, error: e?.message || String(e) }
+        }
+    })
+
     // Invoices
     ipcMain.handle('invoices.create', async (_e, payload) => {
         const parsed = InvoiceCreateInput.parse(payload)
@@ -893,7 +1013,10 @@ export function registerIpcHandlers() {
         const parsed = AttachmentOpenInput.parse(payload)
         const f = getInvoiceFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const res = await shell.openPath(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
+        const res = await shell.openPath(src)
         const ok = !res
         return AttachmentOpenOutput.parse({ ok })
     })
@@ -903,14 +1026,28 @@ export function registerIpcHandlers() {
         if (!f) throw new Error('Datei nicht gefunden')
         const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
         if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        fs.copyFileSync(f.filePath, save.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        fs.copyFileSync(src, save.filePath)
         return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
     })
     ipcMain.handle('invoiceFiles.read', async (_e, payload) => {
         const parsed = AttachmentReadInput.parse(payload)
         const f = getInvoiceFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
-        const buff = fs.readFileSync(f.filePath)
+        const pathBase = path.basename(f.filePath || '')
+        let src = f.filePath
+        if (!src || !fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, pathBase)
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+        const buff = fs.readFileSync(src)
         const dataBase64 = Buffer.from(buff).toString('base64')
         return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
     })

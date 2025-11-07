@@ -1,11 +1,19 @@
+import React, { Suspense, lazy } from 'react'
+
+// Lazy-load the heavy renderer App to keep the root lightweight
+const RendererApp = lazy(() => import('./renderer/App'))
+
 export default function App() {
-    return (
-        <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif' }}>
-            <h1>Verein Finanzplaner</h1>
-            <p>Electron + React + TypeScript scaffold bereit.</p>
-            <p>
-                API ping: <code>{(window as any).api?.ping?.()}</code>
-            </p>
-        </div>
-    )
+	return (
+		<Suspense fallback={
+			<div className="suspense-fallback">
+				<div className="suspense-box" role="status" aria-live="polite" aria-label="Lädt">
+					<div className="spinner" aria-hidden="true" />
+					<div className="suspense-text">Lädt…</div>
+				</div>
+			</div>
+		}>
+			<RendererApp />
+		</Suspense>
+	)
 }

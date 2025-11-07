@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { shell } from 'electron'
+import { app, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
 import { getAppDataDir, getCurrentDbInfo, getDb, closeDb } from '../db/database'
 import { applyMigrations } from '../db/migrations'
@@ -180,6 +180,31 @@ export function inspectCurrent(): { ok: boolean; counts?: Record<string, number>
     try {
         const { dbPath } = getCurrentDbInfo()
         return inspectBackup(dbPath)
+    } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+}
+
+export function getDefaultDbInfo() {
+    const root = app.getPath('userData')
+    const filesDir = path.join(root, 'files')
+    const dbPath = path.join(root, 'database.sqlite')
+    return { root, filesDir, dbPath }
+}
+
+export function inspectBackupDetailed(filePath: string): { ok: boolean; counts?: Record<string, number>; last?: { voucher?: string | null; invoice?: string | null; member?: string | null; audit?: string | null }; error?: string } {
+    try {
+        const d = openDbAt(filePath)
+        const counts: Record<string, number> = {}
+        const tables = ['vouchers', 'invoice_files', 'invoices', 'voucher_files', 'members', 'tags']
+        for (const t of tables) {
+            try { counts[t] = Number(d.prepare(`SELECT COUNT(1) AS n FROM ${t}`).get().n || 0) } catch { /* ignore */ }
+        }
+        const last: { voucher?: string | null; invoice?: string | null; member?: string | null; audit?: string | null } = {}
+        try { last.voucher = (d.prepare('SELECT MAX(date) AS v FROM vouchers').get() as any)?.v ?? null } catch { last.voucher = null }
+        try { last.invoice = (d.prepare('SELECT MAX(date) AS v FROM invoices').get() as any)?.v ?? null } catch { last.invoice = null }
+        try { last.member = (d.prepare('SELECT MAX(created_at) AS v FROM members').get() as any)?.v ?? null } catch { last.member = null }
+        try { last.audit = (d.prepare('SELECT MAX(created_at) AS v FROM audit_log').get() as any)?.v ?? null } catch { last.audit = null }
+        try { d.close() } catch { }
+        return { ok: true, counts, last }
     } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
 }
 

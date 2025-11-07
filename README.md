@@ -40,10 +40,10 @@ npm run package
 ### VS Code Tasks & Debugging
 
 - Tasks (Terminal → Run Task):
-	- Build project (quick check): npm run build
-	- Start Dev (Electron): npm run dev (background)
-	- Package App: npm run package
-	- Rebuild Native Modules: npm run rebuild:native
+  - Build project (quick check): npm run build
+  - Start Dev (Electron): npm run dev (background)
+  - Package App: npm run package
+  - Rebuild Native Modules: npm run rebuild:native
 
 - Debug: Attach to Electron Main or Renderer via Run and Debug using the provided launch configurations. Ensure Electron is started with inspect flags if needed.
 
@@ -64,6 +64,13 @@ Unter `Einstellungen → Allgemein → Gefährliche Aktion` kann man alle Buchun
 - `shared` – gemeinsame Typen
 
 Weitere Module (DB, IPC, Services, Reports, Import/Export) folgen iterativ.
+
+### Entry-Setup (vereinheitlicht)
+
+- Der Renderer-Einstiegspunkt `src/renderer/main.tsx` importiert `../App`.
+- `src/App.tsx` ist der schlanke Root-Orchestrator und lädt die eigentliche App lazy:
+  - Vorteil: kleiner Root, schnelle Initialisierung, klarer zentraler Einstieg.
+  - Die „schwere“ UI liegt in `src/renderer/App.tsx` und wird per `React.lazy` geladen.
 
 ## Lizenz
 

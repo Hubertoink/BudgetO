@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
-async function createWindow() {
+async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -84,6 +84,8 @@ async function createWindow() {
         shell.openExternal(url)
         return { action: 'deny' }
     })
+
+    return win
 }
 
 function createMenu() {
@@ -103,22 +105,34 @@ function createMenu() {
     }
 }
 
-app.whenReady().then(() => {
-    // DB init + migrations
+app.whenReady().then(async () => {
+    // Try DB init + migrations, but don't exit on failure – let renderer handle recovery
+    let dbInitError: any = null
     try {
         const db = getDb()
-            ; (global as any).singletonDb = db
+        ; (global as any).singletonDb = db
         applyMigrations(db)
     } catch (err: any) {
         console.error('DB init/migrations failed', err)
-        dialog.showErrorBox('Datenbank-Fehler', String(err?.message || err))
-        // In einem unrecoverable Zustand beenden
-        app.exit(1)
-        return
+        dbInitError = err
+        // Do NOT block startup. We'll inform the renderer via an event so it can present recovery options.
     }
+    // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers()
     createMenu()
-    createWindow()
+    const win = await createWindow()
+
+    // After window finished load, inform renderer if DB init failed
+    if (dbInitError && win) {
+        const send = () => {
+            try { win.webContents.send('db:initFailed', { message: String(dbInitError?.message || dbInitError) }) } catch { /* ignore */ }
+        }
+        if (win.webContents.isLoading()) {
+            win.webContents.once('did-finish-load', () => send())
+        } else {
+            send()
+        }
+    }
 
     // Auto-backup on startup (configurable)
     ;(async () => {
