@@ -33,9 +33,10 @@ export interface EarmarkUsageCardsProps {
   to?: string
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   onEdit?: (b: EarmarkUsageCardBinding) => void
+  onGoToBookings?: (earmarkId: number) => void
 }
 
-export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: EarmarkUsageCardsProps) {
+export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, onGoToBookings }: EarmarkUsageCardsProps) {
   const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
   useEffect(() => {
     let alive = true
@@ -104,10 +105,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-              <button className="btn ghost" onClick={() => {
-                const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } })
-                window.dispatchEvent(ev)
-              }}>Zu Buchungen</button>
+              <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Zu Buchungen</button>
               {onEdit && <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>}
             </div>
           </div>

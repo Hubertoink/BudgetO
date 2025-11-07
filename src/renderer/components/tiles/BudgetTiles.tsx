@@ -32,7 +32,7 @@ export interface BudgetTileBudget {
   earmarkId?: number | null
 }
 
-export default function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void }) {
+export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
   useEffect(() => {
     let alive = true
@@ -102,13 +102,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Budg
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-                <button className="btn ghost" onClick={() => {
-                  const y = b.year
-                  const from = new Date(Date.UTC(y,0,1)).toISOString().slice(0,10)
-                  const to = new Date(Date.UTC(y,11,31)).toISOString().slice(0,10)
-                  const ev = new CustomEvent('apply-budget-jump', { detail: { from, to, budgetId: b.id } })
-                  window.dispatchEvent(ev)
-                }}>Zu Buchungen</button>
+                <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Zu Buchungen</button>
                 <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>
               </div>
             </div>

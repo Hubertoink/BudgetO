@@ -1,0 +1,192 @@
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+function contrastText(bg?: string | null) {
+  if (!bg) return '#000'
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
+  if (!m) return '#000'
+  const hex = m[1]
+  const r = parseInt(hex.slice(0, 2), 16)
+  const g = parseInt(hex.slice(2, 4), 16)
+  const b = parseInt(hex.slice(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6 ? '#000' : '#fff'
+}
+
+const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
+
+export type BudgetModalValue = {
+  id?: number
+  year: number
+  sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  amountPlanned: number
+  name?: string | null
+  categoryName?: string | null
+  projectName?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  color?: string | null
+  categoryId?: number | null
+  projectId?: number | null
+  earmarkId?: number | null
+}
+
+export default function BudgetModal({ value, onClose, onSaved }: { value: BudgetModalValue; onClose: () => void; onSaved: () => void }) {
+  const [v, setV] = useState(value)
+  const [nameError, setNameError] = useState<string>('')
+  const nameRef = useRef<HTMLInputElement | null>(null)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
+  const [draftError, setDraftError] = useState<string>('')
+  const [askDelete, setAskDelete] = useState(false)
+  useEffect(() => { setV(value); setNameError(''); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>{v.id ? 'Budget bearbeiten' : 'Budget anlegen'}</h2>
+          <button className="btn danger" onClick={onClose}>Schließen</button>
+        </header>
+        <div className="row">
+          <div className="field">
+            <label>Jahr</label>
+            <input className="input" type="number" value={v.year} onChange={(e) => setV({ ...v, year: Number(e.target.value) })} />
+          </div>
+          <div className="field">
+            <label>Budget (€)</label>
+            <input className="input" type="number" step="0.01" value={v.amountPlanned} onChange={(e) => setV({ ...v, amountPlanned: Number(e.target.value) })} />
+          </div>
+          <div className="field">
+            <label>Name</label>
+            <input
+              ref={nameRef}
+              className="input"
+              value={v.name ?? ''}
+              onChange={(e) => { const nv = e.target.value; setV({ ...v, name: nv }); if (nameError && nv.trim()) setNameError('') }}
+              placeholder="z. B. Jugendfreizeit"
+              style={nameError ? { borderColor: 'var(--danger)' } : undefined}
+            />
+            {nameError && (
+              <div className="helper" style={{ color: 'var(--danger)' }}>{nameError}</div>
+            )}
+          </div>
+          <div className="field">
+            <label>Kategorie</label>
+            <input className="input" value={v.categoryName ?? ''} onChange={(e) => setV({ ...v, categoryName: e.target.value || null })} placeholder="z. B. Material" />
+          </div>
+          <div className="field">
+            <label>Projekt</label>
+            <input className="input" value={v.projectName ?? ''} onChange={(e) => setV({ ...v, projectName: e.target.value || null })} placeholder="z. B. Projekt X" />
+          </div>
+          <div className="field" style={{ gridColumn: '1 / span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="field">
+              <label>Von</label>
+              <input className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+            </div>
+            <div className="field">
+              <label>Bis</label>
+              <input className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+            </div>
+          </div>
+          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <label>Farbe</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {PALETTE.map((c) => (
+                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
+                  <span aria-hidden="true" />
+                </button>
+              ))}
+              <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
+                Eigene…
+              </button>
+              <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+          <div>
+            {!!v.id && (
+              <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={onClose}>Abbrechen</button>
+            <button className="btn primary" onClick={async () => {
+              const name = (v.name || '').trim()
+              if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
+              await (window as any).api?.budgets.upsert?.({
+                id: v.id as any,
+                year: v.year,
+                sphere: v.sphere,
+                amountPlanned: v.amountPlanned,
+                name,
+                categoryName: v.categoryName ?? null,
+                projectName: v.projectName ?? null,
+                startDate: v.startDate ?? null,
+                endDate: v.endDate ?? null,
+                color: v.color ?? null,
+                categoryId: v.categoryId ?? null,
+                projectId: v.projectId ?? null,
+                earmarkId: v.earmarkId ?? null
+              } as any)
+              onSaved(); onClose()
+            }}>Speichern</button>
+          </div>
+        </div>
+      </div>
+      {askDelete && v.id && (
+        <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Budget löschen</h3>
+              <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
+            </div>
+            <div>Möchtest du das Budget <strong>{(v.name || '').trim() || ('#' + v.id)}</strong> wirklich löschen?</div>
+            <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
+              <button className="btn danger" onClick={async () => { await (window as any).api?.budgets.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showColorPicker && (
+        <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
+              <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>Picker</label>
+                <input type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} />
+              </div>
+              <div className="field">
+                <label>HEX</label>
+                <input className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
+                {draftError && <div className="helper" style={{ color: 'var(--danger)' }}>{draftError}</div>}
+              </div>
+            </div>
+            <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} />
+              <div className="helper">Kontrast: <span style={{ background: draftColor, color: contrastText(draftColor), padding: '2px 6px', borderRadius: 6 }}>{contrastText(draftColor)}</span></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
+              <button className="btn primary" onClick={() => {
+                const hex = draftColor.trim()
+                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
+                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return }
+                setV({ ...v, color: hex })
+                setShowColorPicker(false)
+              }}>Übernehmen</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  )
+}

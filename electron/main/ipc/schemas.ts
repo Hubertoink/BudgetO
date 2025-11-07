@@ -383,12 +383,20 @@ export const VouchersRecentOutput = z.object({
             type: VoucherType,
             sphere: Sphere,
             paymentMethod: PaymentMethod.nullable().optional(),
+            transferFrom: PaymentMethod.nullable().optional(),
+            transferTo: PaymentMethod.nullable().optional(),
             description: z.string().nullable().optional(),
             netAmount: z.number(),
             vatRate: z.number(),
             vatAmount: z.number(),
             grossAmount: z.number(),
-            fileCount: z.number().optional()
+            fileCount: z.number().optional(),
+            earmarkId: z.number().nullable().optional(),
+            earmarkCode: z.string().nullable().optional(),
+            budgetId: z.number().nullable().optional(),
+            budgetLabel: z.string().nullable().optional(),
+            budgetColor: z.string().nullable().optional(),
+            tags: z.array(z.string()).optional()
         })
     )
 })

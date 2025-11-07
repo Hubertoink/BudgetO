@@ -1,5 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import BindingModal from './components/modals/BindingModal'
+import BudgetModal from './components/modals/BudgetModal'
+import TagModal from './components/modals/TagModal'
+import TagsManagerModal from './components/modals/TagsManagerModal'
+import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
+import MetaFilterModal from './components/modals/MetaFilterModal'
+import TimeFilterModal from './components/modals/TimeFilterModal'
+import ExportOptionsModal from './components/modals/ExportOptionsModal'
+import AttachmentsModal from './components/modals/AttachmentsModal'
+import PaymentsAssignModal from './components/modals/PaymentsAssignModal'
+import BatchEarmarkModal from './components/modals/BatchEarmarkModal'
 import DbMigrateModal from './DbMigrateModal'
 import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
@@ -200,6 +211,8 @@ export default function App() {
     // Time filter modal state
     const [showTimeFilter, setShowTimeFilter] = useState<boolean>(false)
     const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
+    // Setup Wizard modal state
+    const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
     useEffect(() => {
         try { localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0') } catch { }
     }, [sidebarCollapsed])
@@ -370,259 +383,208 @@ export default function App() {
     const [page, setPage] = useState<number>(() => { try { return Number(localStorage.getItem('journal.page') || '1') } catch { return 1 } })
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return (localStorage.getItem('journal.sort') as any) || 'DESC' } catch { return 'DESC' } })
     const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net'>(() => { try { return (localStorage.getItem('journal.sortBy') as any) || 'date' } catch { return 'date' } })
-    // Column settings for Buchungen table (visibility + order)
-    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
-    const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
-    const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    // Human-readable (German) labels for column keys, consistent with table headers elsewhere in the app
-    const colLabels: Record<ColKey, string> = {
-        actions: 'Aktionen',
-        date: 'Datum',
-        voucherNo: 'Nr.',
-        type: 'Typ',
-        sphere: 'Sphäre',
-        description: 'Beschreibung',
-        earmark: 'Zweckbindung',
-        budget: 'Budget',
-        paymentMethod: 'Zahlweg',
-        attachments: 'Anhänge',
-        net: 'Netto',
-        vat: 'MwSt',
-        gross: 'Brutto',
-    }
-    // Safe lookup for UI where type may be string
-    function labelForCol(k: string): string { return (colLabels as any)[k] || k }
-    function sanitizeOrder(raw: any): ColKey[] {
-        const arr = Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : []
-        const known = new Set<ColKey>(['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross'])
-        const cleaned = arr.filter((k) => known.has(k as ColKey)) as ColKey[]
-        // ensure all keys appear exactly once; append any missing in default order
-        const missing = defaultOrder.filter((k) => !cleaned.includes(k))
-        return [...cleaned, ...missing]
-    }
-    const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
-        try { const raw = localStorage.getItem('journal.cols'); if (raw) return { ...defaultCols, ...JSON.parse(raw) } } catch { }
-        return defaultCols
-    })
-    const [order, setOrder] = useState<ColKey[]>(() => {
-        try { const raw = localStorage.getItem('journal.order'); if (raw) return sanitizeOrder(JSON.parse(raw)) } catch { }
-        return defaultOrder
-    })
-    useEffect(() => { try { localStorage.setItem('journal.cols', JSON.stringify(cols)) } catch { } }, [cols])
-    useEffect(() => { try { localStorage.setItem('journal.order', JSON.stringify(order)) } catch { } }, [order])
-
-    // Preference: journal row limit
-    const [journalLimit, setJournalLimit] = useState<number>(() => {
-        try { return Number(localStorage.getItem('journal.limit') || '20') } catch { return 20 }
-    })
-    useEffect(() => { try { localStorage.setItem('journal.limit', String(journalLimit)) } catch { } }, [journalLimit])
-    useEffect(() => { try { localStorage.setItem('journal.page', String(page)) } catch { } }, [page])
-    useEffect(() => { try { localStorage.setItem('journal.sort', sortDir) } catch { } }, [sortDir])
-    useEffect(() => { try { localStorage.setItem('journal.sortBy', sortBy) } catch { } }, [sortBy])
-    const [editRow, setEditRow] = useState<null | { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }>(null)
-    // Attachments for edit modal
-    const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string; mimeType?: string | null }>>([])
-    const [editRowFilesLoading, setEditRowFilesLoading] = useState(false)
-    const editFileInputRef = useRef<HTMLInputElement | null>(null)
-    const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
-    useEffect(() => {
-        let alive = true
-        async function load() {
-            if (!editRow) { setEditRowFiles([]); return }
-            try {
-                setEditRowFilesLoading(true)
-                const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                if (alive) setEditRowFiles(res?.files || [])
-            } catch { /* ignore for now */ }
-            finally { if (alive) setEditRowFilesLoading(false) }
-        }
-        load()
-        return () => { alive = false }
-    }, [editRow?.id])
-    const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string; description?: string | null; fromEdit?: boolean }>(null)
-
-    const searchInputRef = useRef<HTMLInputElement | null>(null)
-    const [q, setQ] = useState<string>('')
-    async function loadRecent() {
-        const offset = Math.max(0, (page - 1)) * journalLimit
-        const res = await window.api?.vouchers.list?.({
-            limit: journalLimit,
-            offset,
-            sort: sortDir,
-            sortBy: sortBy,
-            paymentMethod: filterPM || undefined,
-            sphere: filterSphere || undefined,
-            type: filterType || undefined,
-            from: from || undefined,
-            to: to || undefined,
-            earmarkId: filterEarmark || undefined,
-            budgetId: filterBudgetId || undefined,
-            q: q || undefined,
-            tag: filterTag || undefined
-        })
-        if (res) {
-            let rows = res.rows
-            if (filterTag) {
-                rows = rows.filter(r => (r.tags || []).some((t: string) => t.toLowerCase() === filterTag.toLowerCase()))
-            }
-            setRows(rows)
-            setTotalRows(res.total ?? 0)
-        }
-    }
-
-    useEffect(() => { loadRecent() }, [])
-    // Reload when page/limit/sort change
-    useEffect(() => { loadRecent() }, [page, journalLimit, sortDir, sortBy])
-
-    // Global listener to react to data changes from nested components (e.g., import)
-    useEffect(() => {
-        function onDataChanged() { setRefreshKey((k) => k + 1); if (activePage === 'Buchungen') loadRecent() }
-        window.addEventListener('data-changed', onDataChanged)
-        return () => window.removeEventListener('data-changed', onDataChanged)
-        // Intentionally only depend on activePage; loadRecent reads latest state when invoked
-    }, [activePage])
-
-    // Ensure Buchungen refreshes once user navigates there after a data change (e.g., auto-post from Invoices)
-    useEffect(() => {
-        if (activePage === 'Buchungen') {
-            // Reload list to reflect any background changes since last visit
-            loadRecent()
-        }
-    }, [activePage, refreshKey])
-
-    // Allow child components to trigger applying an earmark filter and jump to Buchungen
-    useEffect(() => {
-        function onApplyEarmark(e: Event) {
-            const de = e as CustomEvent<{ earmarkId?: number }>
-            setFilterEarmark(de.detail.earmarkId ?? null)
-            setActivePage('Buchungen')
-        }
-        window.addEventListener('apply-earmark-filter', onApplyEarmark as any)
-        return () => window.removeEventListener('apply-earmark-filter', onApplyEarmark as any)
-    }, [])
-
-    // Allow budget tiles to jump to Buchungen and apply a time range (year or custom range) and optionally a budget filter
-    useEffect(() => {
-        function onBudgetJump(e: Event) {
-            const de = e as CustomEvent<{ from?: string; to?: string; q?: string; budgetId?: number }>
-            if (de.detail.from) setFrom(de.detail.from)
-            if (de.detail.to) setTo(de.detail.to)
-            if (de.detail.q != null) setQ(de.detail.q)
-            // If a specific budgetId is applied, clear free-text search to avoid mixed filters
-            if (de.detail.budgetId != null) setQ('')
-            if (de.detail.budgetId != null) setFilterBudgetId(de.detail.budgetId)
-            setActivePage('Buchungen')
-        }
-        window.addEventListener('apply-budget-jump', onBudgetJump as any)
-        return () => window.removeEventListener('apply-budget-jump', onBudgetJump as any)
-    }, [])
-
-    // Allow other views (e.g., Invoices) to jump to Buchungen by voucher-id or search query
-    useEffect(() => {
-        function onVoucherJump(e: Event) {
-            const de = e as CustomEvent<{ voucherId?: number; q?: string }>
-            if (de.detail.q != null) setQ(de.detail.q)
-            if (de.detail.voucherId != null) setQ('#' + de.detail.voucherId)
-            setActivePage('Buchungen')
-        }
-        window.addEventListener('apply-voucher-jump', onVoucherJump as any)
-        return () => window.removeEventListener('apply-voucher-jump', onVoucherJump as any)
-    }, [])
-
-    // Filters
-    const [filterPM, setFilterPM] = useState<null | 'BAR' | 'BANK'>(null)
-    const [filterSphere, setFilterSphere] = useState<null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>(null)
-    const [filterType, setFilterType] = useState<null | 'IN' | 'OUT' | 'TRANSFER'>(null)
+    // PaymentsAssignModal extracted to components/modals/PaymentsAssignModal.tsx
+    // Restored journal/report filter states (were removed during modal extraction)
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
+    const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
+    const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
+    const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
-    // Batch earmark assignment modal state
-    const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
-    // Debounced auto-apply filters
-    useEffect(() => {
-        const t = setTimeout(() => { setPage(1); loadRecent() }, 350)
-        return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, filterTag, sortDir, sortBy, q])
-
-    // Active earmarks for selection in forms (used in filters and forms)
+    const [q, setQ] = useState<string>('')
+    // Global Zweckbindungen (earmarks) for filters/tables
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
-    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
-    // First-start setup wizard visibility
-    const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
-    useEffect(() => {
-        let alive = true
-        ;(async () => {
-            try {
-                const r = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
-                if (!alive) return
-                if (!r || !r.value) setShowSetupWizard(true)
-            } catch {
-                if (alive) setShowSetupWizard(true)
-            }
-        })()
-        return () => { alive = false }
-    }, [])
     async function loadEarmarks() {
-        const res = await window.api?.bindings.list?.({ activeOnly: true })
-        if (res) setEarmarks(res.rows.map(r => ({ id: r.id, code: r.code, name: r.name, color: (r as any).color })))
+        try {
+            const res = await window.api?.bindings?.list?.({ activeOnly: true })
+            const rows = (res as any)?.rows || []
+            setEarmarks(rows)
+        } catch { /* ignore */ }
     }
-    // Load active earmarks once for forms and filters
     useEffect(() => { loadEarmarks() }, [])
-    useEffect(() => {
-        let cancelled = false
-        async function load() {
-            const res = await window.api?.tags?.list?.({})
-            if (!cancelled && res?.rows) setTagDefs(res.rows)
-        }
-        load()
-        const onTagsChanged = () => load()
-        window.addEventListener('tags-changed', onTagsChanged)
-        return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
-    }, [])
-
-    // Lightweight lookup for budget names (for chips), decoupled from budgets state order
-    const [budgetNames, setBudgetNames] = useState<Record<number, string>>({})
-    useEffect(() => {
-        let alive = true
-        async function loadNames() {
-            try {
-                const res = await window.api?.budgets?.list?.({})
-                const map: Record<number, string> = {}
-                for (const b of (res?.rows || []) as any[]) {
-                    const nm = (b.name && String(b.name).trim()) || b.categoryName || b.projectName || String(b.year)
-                    map[b.id] = nm
-                }
-                if (alive) setBudgetNames(map)
-            } catch { /* ignore */ }
-        }
-        loadNames()
-        const onChanged = () => loadNames()
-        window.addEventListener('data-changed', onChanged)
-        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-    }, [])
-
-    const activeChips = useMemo(() => {
-        const chips: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from) chips.push({ key: 'from', label: `von ${fmtDate(from)}`, clear: () => setFrom('') })
-        if (to) chips.push({ key: 'to', label: `bis ${fmtDate(to)}`, clear: () => setTo('') })
-        if (filterSphere) chips.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
-        if (filterType) chips.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
-        if (filterPM) chips.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
-        if (filterEarmark) {
+    // Map of budget id -> friendly label for filter chips
+    const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
+    const chips = useMemo(() => {
+        const list: Array<{ key: string; label: string; clear: () => void }> = []
+        if (from || to) list.push({ key: 'range', label: `${from || '…'} – ${to || '…'}`, clear: () => { setFrom(''); setTo('') } })
+        if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
+        if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
+        if (filterEarmark != null) {
             const em = earmarks.find(e => e.id === filterEarmark)
-            chips.push({ key: 'earmark', label: `Zweckbindung: ${em?.code ?? '#' + filterEarmark}`, clear: () => setFilterEarmark(null) })
+            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + filterEarmark}` , clear: () => setFilterEarmark(null) })
         }
-        if (filterTag) chips.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-        if (filterBudgetId) {
-            const label = budgetNames[filterBudgetId] || `#${filterBudgetId}`
-            chips.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
+        if (filterBudgetId != null) {
+            const label = budgetNames.get(filterBudgetId) || `#${filterBudgetId}`
+            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
         }
-        if (q) chips.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
-        return chips
-    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, fmtDate])
+        if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
+        if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
+        return list
+    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
+    // Legacy alias: older render sections still refer to activeChips; keep in sync
+    const activeChips = chips
+
+    // Global Tags state (for filters, table colorization, and tag manager)
+    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    async function loadTags() {
+        try {
+            const res = await window.api?.tags?.list?.({})
+            if (res) setTagDefs(res.rows || [])
+        } catch { /* ignore */ }
+    }
+    useEffect(() => {
+        loadTags()
+        const onChanged = () => loadTags()
+        window.addEventListener('data-changed', onChanged)
+        return () => window.removeEventListener('data-changed', onChanged)
+    }, [])
+
+    // Journal table UI: column visibility and order (Buchungen view)
+    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+    const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
+    const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+    // Human‑readable labels for columns (used in Einstellungen > Tabelle)
+    const labelForCol = (k: string): string => {
+        switch (k) {
+            case 'actions': return 'Aktionen'
+            case 'date': return 'Datum'
+            case 'voucherNo': return 'Nr.'
+            case 'type': return 'Art'
+            case 'sphere': return 'Sphäre'
+            case 'description': return 'Beschreibung'
+            case 'earmark': return 'Zweckbindung'
+            case 'budget': return 'Budget'
+            case 'paymentMethod': return 'Zahlweg'
+            case 'attachments': return 'Anhänge'
+            case 'net': return 'Netto'
+            case 'vat': return 'USt'
+            case 'gross': return 'Brutto'
+            default: return k
+        }
+    }
+    const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
+        try {
+            const s = localStorage.getItem('journalCols')
+            return s ? JSON.parse(s) : defaultCols
+        } catch { return defaultCols }
+    })
+    const [order, setOrder] = useState<ColKey[]>(() => {
+        try {
+            const s = localStorage.getItem('journalColsOrder')
+            return s ? JSON.parse(s) : defaultOrder
+        } catch { return defaultOrder }
+    })
+    // Try to hydrate from persisted settings (server) once on mount if present
+    useEffect(() => {
+        (async () => {
+            try {
+                const c = await window.api?.settings?.get?.({ key: 'journal.cols' })
+                if (c?.value) {
+                    const parsed = JSON.parse(String(c.value))
+                    if (parsed && typeof parsed === 'object') setCols(parsed)
+                }
+                const o = await window.api?.settings?.get?.({ key: 'journal.order' })
+                if (o?.value) {
+                    const parsedO = JSON.parse(String(o.value))
+                    if (Array.isArray(parsedO)) setOrder(parsedO as ColKey[])
+                }
+            } catch { /* ignore */ }
+        })()
+    }, [])
+    useEffect(() => {
+        try { localStorage.setItem('journalCols', JSON.stringify(cols)) } catch { }
+        try { window.api?.settings?.set?.({ key: 'journal.cols', value: JSON.stringify(cols) }) } catch { }
+    }, [cols])
+    useEffect(() => {
+        try { localStorage.setItem('journalColsOrder', JSON.stringify(order)) } catch { }
+        try { window.api?.settings?.set?.({ key: 'journal.order', value: JSON.stringify(order) }) } catch { }
+    }, [order])
+
+    // Journal pagination limit
+    const journalLimit = 50
+
+    // Load recent vouchers (journal/buchungen data loader)
+    const loadRecent = useCallback(async () => {
+        try {
+            const offset = (page - 1) * journalLimit
+            const res = await window.api?.vouchers?.list?.({
+                limit: journalLimit,
+                offset,
+                sort: sortDir,
+                sortBy,
+                paymentMethod: filterPM || undefined,
+                sphere: filterSphere || undefined,
+                type: filterType || undefined,
+                from: from || undefined,
+                to: to || undefined,
+                earmarkId: filterEarmark || undefined,
+                budgetId: filterBudgetId || undefined,
+                q: q.trim() || undefined,
+                tag: filterTag || undefined
+            })
+            if (res) {
+                setRows(res.rows || [])
+                setTotalRows(res.total || 0)
+            }
+        } catch (e: any) {
+            notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
+        }
+    }, [journalLimit, page, sortDir, sortBy, filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag])
+
+    // Load vouchers whenever filters or page change
+    useEffect(() => {
+        if (activePage === 'Buchungen') loadRecent()
+    }, [activePage, loadRecent])
+
+    // States for edit + batch modals (previously removed inadvertently)
+    type VoucherRow = {
+        id: number
+        voucherNo: string
+        date: string
+        type: 'IN' | 'OUT' | 'TRANSFER'
+        sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+        description?: string | null
+        paymentMethod?: 'BAR' | 'BANK' | null
+        transferFrom?: 'BAR' | 'BANK' | null
+        transferTo?: 'BAR' | 'BANK' | null
+        netAmount: number
+        vatRate: number
+        vatAmount: number
+        grossAmount: number
+        hasFiles?: boolean
+        earmarkId?: number | null
+        earmarkCode?: string | null
+        budgetId?: number | null
+        budgetLabel?: string | null
+        fileCount?: number
+        tags?: string[]
+    }
+    const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
+    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
+    const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
+    const editFileInputRef = useRef<HTMLInputElement | null>(null)
+    const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
+    const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
+    const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
+    // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten Öffnen)
+    useEffect(() => {
+        if (editRow?.id) {
+            setEditRowFilesLoading(true)
+            ;(async () => {
+                try {
+                    const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
+                    // API may return either files[] or rows[] depending on implementation; support both
+                    const list = (res as any)?.files || (res as any)?.rows || []
+                    setEditRowFiles(list)
+                } catch { setEditRowFiles([]) } finally { setEditRowFilesLoading(false) }
+            })()
+        } else {
+            setEditRowFiles([])
+        }
+    }, [editRow?.id])
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
@@ -656,7 +618,26 @@ export default function App() {
     const [deleteBudget, setDeleteBudget] = useState<null | { id: number; name?: string | null }>(null)
     async function loadBudgets() {
         const res = await window.api?.budgets.list?.({})
-        if (res) setBudgets(res.rows)
+        if (res) {
+            setBudgets(res.rows)
+            try {
+                const map = new Map<number, string>()
+                const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
+                for (const b of res.rows) {
+                    let label = ''
+                    if (b.name && String(b.name).trim()) label = String(b.name).trim()
+                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} · ${b.categoryName}`
+                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} · ${b.projectName}`
+                    else if (b.earmarkId) {
+                        const em: any = byIdEarmark.get(b.earmarkId)
+                        if (em) label = `${b.year} · 🎯 ${em.code}`
+                    }
+                    if (!label) label = String(b.year)
+                    map.set(b.id, label)
+                }
+                setBudgetNames(map)
+            } catch { /* ignore label map errors */ }
+        }
     }
 
     useEffect(() => {
@@ -851,38 +832,6 @@ export default function App() {
 
             {/* Main content */}
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
-                            {/* Compact badge kept only for Tag (earmark/budget badges removed to avoid redundancy) */}
-                            {filterTag && (() => {
-                                const td = (tagDefs || []).find(t => (t.name || '').toLowerCase() === (filterTag || '').toLowerCase())
-                                const bg = td?.color || undefined
-                                const fg = contrastText(bg)
-                                return (
-                                    <span
-                                        key="badge-tag"
-                                        className="badge"
-                                        title={`Tag: ${filterTag}`}
-                                        onClick={async () => { setFilterTag(null); setPage(1); await loadRecent() }}
-                                        style={{ cursor: 'pointer', background: bg, color: bg ? fg : undefined }}
-                                    >
-                                        # {filterTag}
-                                    </span>
-                                )
-                            })()}
-                            {/* Active filter indicator: clears all filters on click */}
-                            {activeChips.length > 0 && (
-                                <button
-                                    className="btn"
-                                    title="Filter zurücksetzen"
-                                    onClick={async () => {
-                                        setFrom(''); setTo(''); setFilterSphere(null); setFilterType(null); setFilterPM(null); setFilterEarmark(null); setFilterBudgetId(null); setFilterTag(null); setQ(''); setPage(1);
-                                        await loadRecent()
-                                    }}
-                                    style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', borderColor: 'var(--accent)', padding: '6px 10px' }}
-                                >
-                                    Filter zurücksetzen
-                                </button>
-                            )}
-                        
                     
                     {activePage === 'Reports' && <h1>Reports</h1>}
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
@@ -1040,13 +989,38 @@ export default function App() {
                     )}
 
                     {activePage === 'Buchungen' && activeChips.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
                             {activeChips.map((c) => (
                                 <span key={c.key} className="chip">
                                     {c.label}
                                     <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
                                 </span>
                             ))}
+                            {/* X-Button: Alle Filter zurücksetzen */}
+                            {(filterType || filterPM || filterTag || filterSphere || filterEarmark || filterBudgetId || from || to || q.trim()) && (
+                                <button
+                                    className="btn ghost"
+                                    title="Alle Filter zurücksetzen"
+                                    onClick={() => { 
+                                        setFilterType(null);
+                                        setFilterPM(null);
+                                        setFilterTag(null);
+                                        setFilterSphere(null);
+                                        setFilterEarmark(null);
+                                        setFilterBudgetId(null);
+                                        setFrom('');
+                                        setTo('');
+                                        setQ('');
+                                        setPage(1);
+                                    }}
+                                    style={{ padding: '4px 8px', color: 'var(--accent)' }}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -1572,13 +1546,10 @@ export default function App() {
                             <div className="card" style={{ padding: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div className="helper">Zweckbindungen verwalten</div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <button className="btn" onClick={loadBindings}>Aktualisieren</button>
-                                        <button
-                                            className="btn primary"
-                                            onClick={() => setEditBinding({ code: '', name: '', description: null, startDate: null, endDate: null, isActive: true, color: null } as any)}
-                                        >+ Neu</button>
-                                    </div>
+                                    <button
+                                        className="btn primary"
+                                        onClick={() => setEditBinding({ code: '', name: '', description: null, startDate: null, endDate: null, isActive: true, color: null } as any)}
+                                    >+ Neu</button>
                                 </div>
                                 <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
                                     <thead>
@@ -1634,6 +1605,11 @@ export default function App() {
                                 to={to || undefined}
                                 sphere={filterSphere || undefined}
                                 onEdit={(b: any) => setEditBinding({ id: b.id, code: b.code, name: b.name, description: b.description ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, isActive: !!b.isActive, color: b.color ?? null, budget: (b as any).budget ?? null })}
+                                onGoToBookings={(earmarkId) => {
+                                    setFilterEarmark(earmarkId)
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                }}
                             />
                         </>
                     )}
@@ -1684,7 +1660,16 @@ export default function App() {
                             </table>
                             </div>
                             {/* Übersicht ohne Rahmen gemäß Vorgabe */}
-                            <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
+                            <BudgetTiles 
+                                budgets={budgets as any} 
+                                eurFmt={eurFmt} 
+                                onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} 
+                                onGoToBookings={(budgetId) => {
+                                    setFilterBudgetId(budgetId)
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                }}
+                            />
                             {editBudget && (
                                 <BudgetModal
                                     value={editBudget as any}
@@ -2062,213 +2047,13 @@ export default function App() {
     )
 }
 // Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
-function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, earmarkId, budgetId, onApply }: {
-    open: boolean
-    onClose: () => void
-    budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
-    earmarks: Array<{ id: number; code: string; name?: string | null }>
-    sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    earmarkId: number | null
-    budgetId: number | null
-    onApply: (v: { sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId: number | null; budgetId: number | null }) => void
-}) {
-    const [s, setS] = useState<null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>(sphere)
-    const [e, setE] = useState<number | null>(earmarkId)
-    const [b, setB] = useState<number | null>(budgetId)
-    useEffect(() => { setS(sphere); setE(earmarkId); setB(budgetId) }, [sphere, earmarkId, budgetId, open])
-    const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
-        (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
-    return open ? (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Filter wählen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Sphäre</label>
-                        <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
-                            <option value="">Alle</option>
-                            <option value="IDEELL">IDEELL</option>
-                            <option value="ZWECK">ZWECK</option>
-                            <option value="VERMOEGEN">VERMOEGEN</option>
-                            <option value="WGB">WGB</option>
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Zweckbindung</label>
-                        <select className="input" value={e ?? ''} onChange={(ev) => setE(ev.target.value ? Number(ev.target.value) : null)}>
-                            <option value="">Alle</option>
-                            {earmarks.map(em => (
-                                <option key={em.id} value={em.id}>{em.code} – {em.name || ''}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Budget</label>
-                        <select className="input" value={b ?? ''} onChange={(ev) => setB(ev.target.value ? Number(ev.target.value) : null)}>
-                            <option value="">Alle</option>
-                            {budgets.map(bu => (
-                                <option key={bu.id} value={bu.id}>{labelForBudget(bu)}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                    <button className="btn" onClick={() => { setS(null); setE(null); setB(null) }}>Zurücksetzen</button>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={() => { onApply({ sphere: s, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-}
+// MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
 
 // Time Filter Modal: controls date range and quick year selection
-function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
-    open: boolean
-    onClose: () => void
-    yearsAvail: number[]
-    from: string
-    to: string
-    onApply: (v: { from: string; to: string }) => void
-}) {
-    const [f, setF] = useState<string>(from)
-    const [t, setT] = useState<string>(to)
-    useEffect(() => { setF(from); setT(to) }, [from, to, open])
-    return open ? (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Zeitraum wählen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Von</label>
-                        <input className="input" type="date" value={f} onChange={(e) => setF(e.target.value)} />
-                    </div>
-                    <div className="field">
-                        <label>Bis</label>
-                        <input className="input" type="date" value={t} onChange={(e) => setT(e.target.value)} />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Schnellauswahl Jahr</label>
-                        <select className="input" value={(() => {
-                            if (!f || !t) return ''
-                            const fy = f.slice(0, 4)
-                            const ty = t.slice(0, 4)
-                            // full-year only when matching boundaries
-                            if (f === `${fy}-01-01` && t === `${fy}-12-31` && fy === ty) return fy
-                            return ''
-                        })()} onChange={(e) => {
-                            const y = e.target.value
-                            if (!y) { setF(''); setT(''); return }
-                            const yr = Number(y)
-                            const nf = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-                            const nt = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-                            setF(nf); setT(nt)
-                        }}>
-                            <option value="">—</option>
-                            {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                    <button className="btn" onClick={() => { setF(''); setT('') }}>Zurücksetzen</button>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={() => { onApply({ from: f, to: t }); onClose() }}>Übernehmen</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-}
+// TimeFilterModal extracted to components/modals/TimeFilterModal.tsx
 
 // Export Options Modal for Reports
-function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport }: {
-    open: boolean
-    onClose: () => void
-    fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
-    setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
-    orgName: string
-    setOrgName: (v: string) => void
-    amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
-    setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
-    sortDir: 'ASC' | 'DESC'
-    setSortDir: (v: 'ASC' | 'DESC') => void
-    onExport: (fmt: 'CSV' | 'XLSX' | 'PDF') => Promise<void>
-}) {
-    const all: Array<{ key: any; label: string }> = [
-        { key: 'date', label: 'Datum' },
-        { key: 'voucherNo', label: 'Nr.' },
-        { key: 'type', label: 'Typ' },
-        { key: 'sphere', label: 'Sphäre' },
-        { key: 'description', label: 'Beschreibung' },
-        { key: 'paymentMethod', label: 'Zahlweg' },
-        { key: 'netAmount', label: 'Netto' },
-        { key: 'vatAmount', label: 'MwSt' },
-        { key: 'grossAmount', label: 'Brutto' },
-        { key: 'tags', label: 'Tags' }
-    ]
-    const toggle = (k: any) => {
-        const set = new Set(fields)
-        if (set.has(k)) set.delete(k)
-        else set.add(k)
-        setFields(Array.from(set) as any)
-    }
-    return open ? createPortal(
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Export Optionen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Felder</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {all.map(f => (
-                                <label key={f.key} className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                    <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggle(f.key)} style={{ marginRight: 6 }} />
-                                    {f.label}
-                                </label>
-                            ))}
-                        </div>
-                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags“ gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Organisationsname (optional)</label>
-                        <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Betragsdarstellung</label>
-                        <div className="btn-group" role="group">
-                            <button className="btn" onClick={() => setAmountMode('POSITIVE_BOTH')} style={{ background: amountMode === 'POSITIVE_BOTH' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Beide positiv</button>
-                            <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
-                        </div>
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Sortierung (Datum)</label>
-                        <div className="btn-group" role="group">
-                            <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
-                            <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={() => onExport('CSV')}>CSV</button>
-                    <button className="btn" onClick={() => onExport('PDF')}>PDF</button>
-                    <button className="btn primary" onClick={() => onExport('XLSX')}>XLSX</button>
-                </div>
-            </div>
-        </div>, document.body
-    ) : null
-}
+// ExportOptionsModal extracted to components/modals/ExportOptionsModal.tsx
 
 // duplicate AutoBackupPromptModal removed; see single definition below
 function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
@@ -2525,32 +2310,16 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
     )
 }
 
-function AutoBackupPromptModal({ intervalDays, onClose, onBackupNow }: { intervalDays: number; onClose: () => void; onBackupNow: () => Promise<void> }) {
-    return (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-            <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
-                    <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
-                </div>
-                <div className="card" style={{ padding: 12 }}>
-                    Seit der letzten Sicherung sind mehr als {intervalDays} Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn" onClick={onClose}>Später</button>
-                    <button className="btn primary" onClick={onBackupNow}>Jetzt sichern</button>
-                </div>
-            </div>
-        </div>
-    )
-}
+// AutoBackupPromptModal extracted to components/modals/AutoBackupPromptModal.tsx
 
 // Basic Members UI: list with search and add/edit modal (Phase 1)
 function MembersView() {
-    const [q, setQ] = useState('')
-    const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
+    const [q, setQ] = useState(() => { try { return localStorage.getItem('members.q') || '' } catch { return '' } })
+    const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>(() => { try { return (localStorage.getItem('members.status') as any) || 'ALL' } catch { return 'ALL' } })
     const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })
     const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
+    useEffect(() => { try { localStorage.setItem('members.q', q) } catch { } }, [q])
+    useEffect(() => { try { localStorage.setItem('members.status', status) } catch { } }, [status])
     useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
     useEffect(() => { try { localStorage.setItem('members.sort', sort) } catch { } }, [sort])
     const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
@@ -2740,7 +2509,17 @@ function MembersView() {
                     </select>
                     <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>Spalten</button>
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
-                        <button className="btn ghost" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}>Zurücksetzen</button>
+                        <button 
+                            className="btn ghost" 
+                            title="Alle Filter zurücksetzen"
+                            onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}
+                            style={{ padding: '4px 8px', color: 'var(--accent)' }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
                     ) : null })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -3542,250 +3321,7 @@ function MemberTimeline({ status, history }: { status: any; history: Array<{ per
     )
 }
 
-function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
-    const [interval, setInterval] = useState<'MONTHLY'|'QUARTERLY'|'YEARLY'>('MONTHLY')
-    const [mode, setMode] = useState<'PERIOD'|'RANGE'>('PERIOD')
-    const [periodKey, setPeriodKey] = useState<string>(() => {
-        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-    })
-    const [from, setFrom] = useState<string>('')
-    const [to, setTo] = useState<string>('')
-    const [q, setQ] = useState('')
-    const [rows, setRows] = useState<Array<{ memberId: number; name: string; memberNo?: string|null; status: string; periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
-    const [busy, setBusy] = useState(false)
-
-    async function load() {
-        setBusy(true)
-        try {
-            const payload = mode === 'PERIOD' ? { interval, periodKey, q } : { interval, from, to, q }
-            const res = await (window as any).api?.payments?.listDue?.(payload)
-            setRows(res?.rows || [])
-        } finally { setBusy(false) }
-    }
-    useEffect(() => { load() }, [interval, mode, periodKey, from, to, q])
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal booking-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <h2 style={{ margin: 0 }}>Mitgliedsbeiträge zuordnen</h2>
-                    <button className="btn" onClick={onClose}>×</button>
-                </header>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <select className="input" value={interval} onChange={e => {
-                        const v = e.target.value as any; setInterval(v)
-                        // auto-adjust example periodKey
-                        const d = new Date()
-                        setPeriodKey(v==='MONTHLY' ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : v==='QUARTERLY' ? `${d.getFullYear()}-Q${Math.floor(d.getMonth()/3)+1}` : String(d.getFullYear()))
-                    }} title="Intervall">
-                        <option value="MONTHLY">Monat</option>
-                        <option value="QUARTERLY">Quartal</option>
-                        <option value="YEARLY">Jahr</option>
-                    </select>
-                    <select className="input" value={mode} onChange={e => setMode(e.target.value as any)} title="Modus">
-                        <option value="PERIOD">Periode</option>
-                        <option value="RANGE">Zeitraum</option>
-                    </select>
-                    {mode === 'PERIOD' ? (
-                        <input className="input" value={periodKey} onChange={e => setPeriodKey(sanitizePeriodKey(e.target.value, interval))} title="Periode: YYYY-MM | YYYY-Q1..Q4 | YYYY" />
-                    ) : (
-                        <>
-                            <input className="input" type="date" value={from} onChange={e => setFrom(e.target.value)} />
-                            <input className="input" type="date" value={to} onChange={e => setTo(e.target.value)} />
-                        </>
-                    )}
-                    <input className="input" placeholder="Mitglied suchen…" value={q} onChange={e => setQ(e.target.value)} />
-                    <div className="helper">{busy ? 'Lade…' : `${rows.length} Einträge`}</div>
-                </div>
-                <table style={{ width: '100%' }} cellPadding={6}>
-                    <thead>
-                        <tr>
-                            <th align="left">Mitglied</th>
-                            <th>Periode</th>
-                            <th>Intervall</th>
-                            <th align="right">Betrag</th>
-                            <th>Vorschläge</th>
-                            <th>Status</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.map(r => (
-                            <PaymentsRow key={`${r.memberId}-${r.periodKey}`} row={r} onChanged={load} />
-                        ))}
-                        {rows.length === 0 && <tr><td colSpan={7}><div className="helper">Keine fälligen Beiträge</div></td></tr>}
-                    </tbody>
-                </table>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn" onClick={onClose}>Schließen</button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string; memberNo?: string|null; status: string; periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }; onChanged: () => void }) {
-    const [suggestions, setSuggestions] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
-    const [selVoucher, setSelVoucher] = useState<number | null>(row.voucherId ?? null)
-    const [busy, setBusy] = useState(false)
-    const [search, setSearch] = useState('')
-    const [manualList, setManualList] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
-    // Status & history modal
-    const [showStatus, setShowStatus] = useState(false)
-    const [statusData, setStatusData] = useState<any>(null)
-    const [historyRows, setHistoryRows] = useState<any[]>([])
-    // Preload status so the inline indicator is colored without opening the modal
-    useEffect(() => {
-        let alive = true
-        async function loadStatus() {
-            try { const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId }); if (alive) setStatusData(s || null) } catch { }
-        }
-        loadStatus()
-        const onChanged = () => loadStatus()
-        try { window.addEventListener('data-changed', onChanged) } catch {}
-        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
-    }, [row.memberId])
-
-    useEffect(() => {
-        if (!showStatus) return
-        let alive = true
-        ;(async () => {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId })
-                const h = await (window as any).api?.payments?.history?.({ memberId: row.memberId, limit: 20 })
-                if (alive) { setStatusData(s || null); setHistoryRows(h?.rows || []) }
-            } catch { /* ignore */ }
-        })()
-        return () => { alive = false }
-    }, [showStatus, row.memberId])
-
-    useEffect(() => {
-        let active = true
-        ;(async () => {
-            try {
-                const res = await (window as any).api?.payments?.suggestVouchers?.({ name: row.name, amount: row.amount, periodKey: row.periodKey })
-                if (active) setSuggestions(res?.rows || [])
-            } catch { /* ignore */ }
-        })()
-        return () => { active = false }
-    }, [row.memberId, row.periodKey, row.amount])
-
-    const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
-    return (
-        <tr>
-            <td title={row.memberNo || undefined}>
-                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
-                <button
-                    className="btn ghost"
-                    title="Beitragsstatus & Historie"
-                    aria-label="Beitragsstatus & Historie"
-                    onClick={() => setShowStatus(true)}
-                    style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)') }}
-                >
-                    {/* history icon */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
-                </button>
-                {showStatus && (
-                    <div className="modal-overlay" onClick={() => setShowStatus(false)}>
-                        <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', maxWidth: 1100, display: 'grid', gap: 10 }}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
-                                <button className="btn" onClick={()=>setShowStatus(false)}>×</button>
-                            </header>
-                            <div className="helper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
-                                <span className="badge" style={{ background: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--muted)'), color: '#fff' }}>
-                                    {statusData?.state === 'OVERDUE' ? `Überfällig (${statusData?.overdue})` : statusData?.state === 'OK' ? 'OK' : '—'}
-                                </span>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                <div className="card" style={{ padding: 10 }}>
-                                    <strong>Überblick</strong>
-                                    <ul style={{ margin: '6px 0 0 16px' }}>
-                                        <li>Eintritt: {statusData?.joinDate || '—'}</li>
-                                        <li>Letzte Zahlung: {statusData?.lastPeriod ? `${statusData.lastPeriod} (${statusData?.lastDate||''})` : '—'}</li>
-                                        <li>Initiale Fälligkeit: {statusData?.nextDue || '—'}</li>
-                                    </ul>
-                                </div>
-                                <div className="card" style={{ padding: 10 }}>
-                                    <strong>Historie</strong>
-                                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                                        <thead>
-                                            <tr>
-                                                <th align="left">Periode</th>
-                                                <th align="left">Datum</th>
-                                                <th align="right">Betrag</th>
-                                                <th align="left">Beleg</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {historyRows.map((r,i)=> (
-                                                <tr key={i}>
-                                                    <td>{r.periodKey}</td>
-                                                    <td>{r.datePaid}</td>
-                                                    <td align="right">{eur.format(r.amount)}</td>
-                                                    <td>
-                                                        {r.voucherNo ? (
-                                                            <a href="#" onClick={(e)=>{ e.preventDefault(); if (r.voucherId) { const ev = new CustomEvent('apply-voucher-jump', { detail: { voucherId: r.voucherId } }); window.dispatchEvent(ev) } }}>{`#${r.voucherNo}`}</a>
-                                                        ) : '—'}
-                                                        {r.description ? ` · ${r.description}` : ''}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {historyRows.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                                <button className="btn" onClick={()=>setShowStatus(false)}>Schließen</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </td>
-            <td>{row.periodKey}</td>
-            <td>{row.interval}</td>
-            <td align="right">{eur.format(row.amount)}</td>
-            <td>
-                <div style={{ display: 'grid', gap: 6 }}>
-                    <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucher(e.target.value ? Number(e.target.value) : null)} title="Passende Buchung verknüpfen">
-                        <option value="">— ohne Verknüpfung —</option>
-                        {suggestions.map(s => (
-                            <option key={s.id} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
-                        ))}
-                        {manualList.map(s => (
-                            <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
-                        ))}
-                    </select>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                        <input className="input" placeholder="Buchung suchen…" value={search} onChange={e => setSearch(e.target.value)} title="Suche in Buchungen (Betrag/Datum/Text)" />
-                        <button className="btn" onClick={async () => {
-                            try {
-                                // widen range: search from period start - 90 days up to today to catch late postings
-                                const { start } = periodRangeLocal(row.periodKey)
-                                const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
-                                const todayISO = new Date().toISOString().slice(0,10)
-                                const fromISO = s.toISOString().slice(0,10)
-                                const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 50 })
-                                const list = (res?.rows || []).map((v: any) => ({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }))
-                                setManualList(list)
-                            } catch {}
-                        }}>Suchen</button>
-                    </div>
-                </div>
-            </td>
-            <td>{row.paid ? (row.verified ? 'bezahlt ✔︎ (verifiziert)' : 'bezahlt') : 'offen'}</td>
-            <td style={{ whiteSpace: 'nowrap' }}>
-                {row.paid ? (
-                    <button className="btn" onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.unmark?.({ memberId: row.memberId, periodKey: row.periodKey }); onChanged() } finally { setBusy(false) } }}>Rückgängig</button>
-                ) : (
-                    <button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.markPaid?.({ memberId: row.memberId, periodKey: row.periodKey, interval: row.interval, amount: row.amount, voucherId: selVoucher || null }); onChanged() } finally { setBusy(false) } }}>Als bezahlt markieren</button>
-                )}
-            </td>
-        </tr>
-    )
-}
+/* INLINE PaymentsAssignModal content removed */
 
 function sanitizePeriodKey(s: string, interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'): string {
     const t = s.trim().toUpperCase()
@@ -4032,312 +3568,21 @@ function DashboardRecentActivity() {
 }
 
 // Binding Modal
-function BindingModal({ value, onClose, onSaved }: { value: { id?: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive?: boolean; color?: string | null; budget?: number | null }; onClose: () => void; onSaved: () => void }) {
-    const [v, setV] = useState(value)
-    const [showColorPicker, setShowColorPicker] = useState(false)
-    const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
-    const [draftError, setDraftError] = useState<string>('')
-    const [askDelete, setAskDelete] = useState(false)
-    useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
-    return createPortal(
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>{v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Code</label>
-                        <input className="input" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} />
-                    </div>
-                    <div className="field">
-                        <label>Name</label>
-                        <input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Beschreibung</label>
-                        <input className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} />
-                    </div>
-                    <div className="field">
-                        <label>Von</label>
-                        <input className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
-                    </div>
-                    <div className="field">
-                        <label>Bis</label>
-                        <input className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
-                    </div>
-                    <div className="field">
-                        <label>Status</label>
-                        <select className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>
-                            <option value="1">aktiv</option>
-                            <option value="0">inaktiv</option>
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Budget (€)</label>
-                        <input className="input" type="number" step="0.01" value={(v.budget ?? '') as any}
-                            onChange={(e) => {
-                                const val = e.target.value
-                                setV({ ...v, budget: val === '' ? null : Number(val) })
-                            }} />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Farbe</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {EARMARK_PALETTE.map((c) => (
-                                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
-                                    <span aria-hidden="true" />
-                                </button>
-                            ))}
-                            <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
-                                Eigene…
-                            </button>
-                            <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                    <div>
-                        {!!v.id && (
-                            <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
-                        )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={async () => { await window.api?.bindings.upsert?.(v as any); onSaved(); onClose() }}>Speichern</button>
-                    </div>
-                </div>
-            </div>
-            {askDelete && v.id && (
-                <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Zweckbindung löschen</h3>
-                            <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
-                        </div>
-                        <div>Möchtest du die Zweckbindung <strong>{v.code}</strong> – {v.name} wirklich löschen?</div>
-                        <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt erhalten; es wird nur die Zweckbindung entfernt.</div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
-                            <button className="btn danger" onClick={async () => { await window.api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showColorPicker && (
-                <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
-                            <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
-                        </div>
-                        <div className="row">
-                            <div className="field">
-                                <label>Picker</label>
-                                <input type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} />
-                            </div>
-                            <div className="field">
-                                <label>HEX</label>
-                                <input className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
-                                {draftError && <div className="helper" style={{ color: 'var(--danger)' }}>{draftError}</div>}
-                            </div>
-                        </div>
-                        <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} />
-                            <div className="helper">Kontrast: <span style={{ background: draftColor, color: contrastText(draftColor), padding: '2px 6px', borderRadius: 6 }}>{contrastText(draftColor)}</span></div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
-                            <button className="btn primary" onClick={() => {
-                                const hex = draftColor.trim()
-                                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
-                                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return }
-                                setV({ ...v, color: hex })
-                                setShowColorPicker(false)
-                            }}>Übernehmen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>,
-        document.body
-    )
-}
+// BindingModal extracted to components/modals/BindingModal.tsx
 
 // Budget Modal
-function BudgetModal({ value, onClose, onSaved }: { value: { id?: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; categoryId?: number | null; projectId?: number | null; earmarkId?: number | null }; onClose: () => void; onSaved: () => void }) {
-    const [v, setV] = useState(value)
-    const [nameError, setNameError] = useState<string>('')
-    const nameRef = useRef<HTMLInputElement | null>(null)
-    const [showColorPicker, setShowColorPicker] = useState(false)
-    const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
-    const [draftError, setDraftError] = useState<string>('')
-    const [askDelete, setAskDelete] = useState(false)
-    // Keep modal state in sync when opening with an existing budget so fields are prefilled
-    useEffect(() => { setV(value); setNameError(''); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
-    const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>{v.id ? 'Budget bearbeiten' : 'Budget anlegen'}</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Jahr</label>
-                        <input className="input" type="number" value={v.year} onChange={(e) => setV({ ...v, year: Number(e.target.value) })} />
-                    </div>
-                    <div className="field">
-                        <label>Budget (€)</label>
-                        <input className="input" type="number" step="0.01" value={v.amountPlanned} onChange={(e) => setV({ ...v, amountPlanned: Number(e.target.value) })} />
-                    </div>
-                    <div className="field">
-                        <label>Name</label>
-                        <input
-                            ref={nameRef}
-                            className="input"
-                            value={v.name ?? ''}
-                            onChange={(e) => { const nv = e.target.value; setV({ ...v, name: nv }); if (nameError && nv.trim()) setNameError('') }}
-                            placeholder="z. B. Jugendfreizeit"
-                            style={nameError ? { borderColor: 'var(--danger)' } : undefined}
-                        />
-                        {nameError && (
-                            <div className="helper" style={{ color: 'var(--danger)' }}>{nameError}</div>
-                        )}
-                    </div>
-                    <div className="field">
-                        <label>Kategorie</label>
-                        <input className="input" value={v.categoryName ?? ''} onChange={(e) => setV({ ...v, categoryName: e.target.value || null })} placeholder="z. B. Material" />
-                    </div>
-                    <div className="field">
-                        <label>Projekt</label>
-                        <input className="input" value={v.projectName ?? ''} onChange={(e) => setV({ ...v, projectName: e.target.value || null })} placeholder="z. B. Projekt X" />
-                    </div>
-                    {/* Dates row */}
-                    <div className="field" style={{ gridColumn: '1 / span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <div className="field">
-                            <label>Von</label>
-                            <input className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
-                        </div>
-                        <div className="field">
-                            <label>Bis</label>
-                            <input className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
-                        </div>
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Farbe</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {PALETTE.map((c) => (
-                                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
-                                    <span aria-hidden="true" />
-                                </button>
-                            ))}
-                            <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
-                                Eigene…
-                            </button>
-                            <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                    <div>
-                        {!!v.id && (
-                            <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
-                        )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={async () => {
-                        const name = (v.name || '').trim()
-                        if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
-                        // Persist start/end dates and other fields
-                        await window.api?.budgets.upsert?.({
-                            id: v.id as any,
-                            year: v.year,
-                            sphere: v.sphere,
-                            amountPlanned: v.amountPlanned,
-                            name,
-                            categoryName: v.categoryName ?? null,
-                            projectName: v.projectName ?? null,
-                            startDate: v.startDate ?? null,
-                            endDate: v.endDate ?? null,
-                            color: v.color ?? null,
-                            categoryId: v.categoryId ?? null,
-                            projectId: v.projectId ?? null,
-                            earmarkId: v.earmarkId ?? null
-                        } as any)
-                        onSaved(); onClose()
-                    }}>Speichern</button>
-                    </div>
-                </div>
-            </div>
-            {askDelete && v.id && (
-                <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Budget löschen</h3>
-                            <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
-                        </div>
-                        <div>Möchtest du das Budget <strong>{(v.name || '').trim() || ('#' + v.id)}</strong> wirklich löschen?</div>
-                        <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
-                            <button className="btn danger" onClick={async () => { await window.api?.budgets.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showColorPicker && (
-                <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
-                            <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
-                        </div>
-                        <div className="row">
-                            <div className="field">
-                                <label>Picker</label>
-                                <input type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} />
-                            </div>
-                            <div className="field">
-                                <label>HEX</label>
-                                <input className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
-                                {draftError && <div className="helper" style={{ color: 'var(--danger)' }}>{draftError}</div>}
-                            </div>
-                        </div>
-                        <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} />
-                            <div className="helper">Kontrast: <span style={{ background: draftColor, color: contrastText(draftColor), padding: '2px 6px', borderRadius: 6 }}>{contrastText(draftColor)}</span></div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
-                            <button className="btn primary" onClick={() => {
-                                const hex = draftColor.trim()
-                                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
-                                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return }
-                                setV({ ...v, color: hex })
-                                setShowColorPicker(false)
-                            }}>Übernehmen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
+// BudgetModal extracted to components/modals/BudgetModal.tsx
 
 // Invoices list with filters, pagination, and basic actions (add payment / mark paid / delete)
 function InvoicesView() {
     // Filters and pagination
-    const [q, setQ] = useState<string>('')
-    const [status, setStatus] = useState<'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'>('ALL')
-    const [sphere, setSphere] = useState<'' | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>('')
-    const [dueFrom, setDueFrom] = useState<string>('')
-    const [dueTo, setDueTo] = useState<string>('')
-    const [budgetId, setBudgetId] = useState<number | ''>('')
-    const [tag, setTag] = useState<string>('')
+    const [q, setQ] = useState<string>(() => { try { return localStorage.getItem('invoices.q') || '' } catch { return '' } })
+    const [status, setStatus] = useState<'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'>(() => { try { return (localStorage.getItem('invoices.status') as any) || 'ALL' } catch { return 'ALL' } })
+    const [sphere, setSphere] = useState<'' | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>(() => { try { return (localStorage.getItem('invoices.sphere') as any) || '' } catch { return '' } })
+    const [dueFrom, setDueFrom] = useState<string>(() => { try { return localStorage.getItem('invoices.dueFrom') || '' } catch { return '' } })
+    const [dueTo, setDueTo] = useState<string>(() => { try { return localStorage.getItem('invoices.dueTo') || '' } catch { return '' } })
+    const [budgetId, setBudgetId] = useState<number | ''>(() => { try { const v = localStorage.getItem('invoices.budgetId'); return v && v !== '' ? Number(v) : '' } catch { return '' } })
+    const [tag, setTag] = useState<string>(() => { try { return localStorage.getItem('invoices.tag') || '' } catch { return '' } })
     const [limit, setLimit] = useState<number>(20)
     const [offset, setOffset] = useState<number>(0)
     const [total, setTotal] = useState<number>(0)
@@ -4345,6 +3590,14 @@ function InvoicesView() {
     // Sorting (persist to localStorage)
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
     const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount') || 'due') } catch { return 'due' } })
+    // Persist filter states
+    useEffect(() => { try { localStorage.setItem('invoices.q', q) } catch {} }, [q])
+    useEffect(() => { try { localStorage.setItem('invoices.status', status) } catch {} }, [status])
+    useEffect(() => { try { localStorage.setItem('invoices.sphere', sphere) } catch {} }, [sphere])
+    useEffect(() => { try { localStorage.setItem('invoices.dueFrom', dueFrom) } catch {} }, [dueFrom])
+    useEffect(() => { try { localStorage.setItem('invoices.dueTo', dueTo) } catch {} }, [dueTo])
+    useEffect(() => { try { localStorage.setItem('invoices.budgetId', budgetId === '' ? '' : String(budgetId)) } catch {} }, [budgetId])
+    useEffect(() => { try { localStorage.setItem('invoices.tag', tag) } catch {} }, [tag])
     // Due date modal state and available years
     const [showDueFilter, setShowDueFilter] = useState<boolean>(false)
     const [yearsAvail, setYearsAvail] = useState<number[]>([])
@@ -4809,9 +4062,6 @@ function InvoicesView() {
                     {(dueFrom || dueTo) && (
                         <span className="helper">{dueFrom || '—'} – {dueTo || '—'}</span>
                     )}
-                    {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (
-                        <button className="btn ghost" onClick={clearFilters} title="Alle Filter löschen">Filter zurücksetzen</button>
-                    ) : null })()}
                     <div style={{ width: 12 }} />
                     <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
                 </div>
@@ -4822,11 +4072,27 @@ function InvoicesView() {
             ) : (
                 <>
                     {summary && (
-                        <div className="helper" style={{ marginBottom: 6 }}>
-                            Offen gesamt: <strong>{eurFmt.format(Math.max(0, Math.round((summary.remaining || 0) * 100) / 100))}</strong>
-                            <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>
-                                ({summary.count} Rechnungen; Brutto {eurFmt.format(summary.gross || 0)}, Bezahlt {eurFmt.format(summary.paid || 0)})
+                        <div className="helper" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span>
+                                Offen gesamt: <strong>{eurFmt.format(Math.max(0, Math.round((summary.remaining || 0) * 100) / 100))}</strong>
+                                <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>
+                                    ({summary.count} Rechnungen; Brutto {eurFmt.format(summary.gross || 0)}, Bezahlt {eurFmt.format(summary.paid || 0)})
+                                </span>
                             </span>
+                            {/* X-Button: Alle Filter zurücksetzen */}
+                            {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (
+                                <button 
+                                    className="btn ghost" 
+                                    title="Alle Filter zurücksetzen"
+                                    onClick={clearFilters}
+                                    style={{ padding: '4px 8px', color: 'var(--accent)' }}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            ) : null })()}
                         </div>
                     )}
                     <table cellPadding={6} style={{ width: '100%' }}>
@@ -8047,192 +7313,10 @@ function SettingsView({
     )
 }
 
-function TagModal({ value, onClose, onSaved, notify }: { value: { id?: number; name: string; color?: string | null }; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
-    const [v, setV] = useState(value)
-    const [showColorPicker, setShowColorPicker] = useState(false)
-    const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
-    const [draftError, setDraftError] = useState<string>('')
-    useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError('') }, [value])
-    const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-    const canSave = (v.name || '').trim().length > 0
-    return createPortal(
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>{v.id ? 'Tag bearbeiten' : 'Tag anlegen'}</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Name</label>
-                        <input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Farbe</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {PALETTE.map((c) => (
-                                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
-                                    <span aria-hidden="true" />
-                                </button>
-                            ))}
-                            <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
-                                Eigene…
-                            </button>
-                            <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" disabled={!canSave} onClick={async () => {
-                        try {
-                            const payload = { ...v, name: (v.name || '').trim() }
-                            if (!payload.name) { notify?.('error', 'Bitte einen Namen eingeben'); return }
-                            await window.api?.tags?.upsert?.(payload as any)
-                            window.dispatchEvent(new Event('tags-changed'))
-                            onSaved()
-                        } catch (e: any) {
-                            const msg = e?.message || String(e)
-                            if (notify) notify('error', msg)
-                            else alert(msg)
-                        }
-                    }}>Speichern</button>
-                </div>
-            </div>
-            {showColorPicker && (
-                <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
-                            <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
-                        </div>
-                        <div className="row">
-                            <div className="field">
-                                <label>Picker</label>
-                                <input type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} />
-                            </div>
-                            <div className="field">
-                                <label>HEX</label>
-                                <input className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
-                                {draftError && <div className="helper" style={{ color: 'var(--danger)' }}>{draftError}</div>}
-                            </div>
-                        </div>
-                        <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} />
-                            <div className="helper">Kontrast: <span style={{ background: draftColor, color: contrastText(draftColor), padding: '2px 6px', borderRadius: 6 }}>{contrastText(draftColor)}</span></div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
-                            <button className="btn primary" onClick={() => {
-                                const hex = draftColor.trim()
-                                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
-                                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return }
-                                setV({ ...v, color: hex })
-                                setShowColorPicker(false)
-                            }}>Übernehmen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>,
-        document.body
-    )
-}
+// TagModal extracted to components/modals/TagModal.tsx
 
 // Global Tags Manager Modal
-function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void; notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; onChanged?: () => void }) {
-    const [tags, setTags] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
-    const [edit, setEdit] = useState<null | { id?: number; name: string; color?: string | null }>(null)
-    const [busy, setBusy] = useState(false)
-    const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; name: string }>(null)
-    async function refresh() {
-        try {
-            setBusy(true)
-            const res = await window.api?.tags?.list?.({ includeUsage: true })
-            if (res?.rows) setTags(res.rows)
-        } finally { setBusy(false) }
-    }
-    useEffect(() => { refresh() }, [])
-    const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-    const colorSwatch = (c?: string | null) => c ? (<span title={c} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: c, verticalAlign: 'middle' }} />) : '—'
-    return createPortal(
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Tags verwalten</h2>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
-                        <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
-                        <button className="btn danger" onClick={onClose}>Schließen</button>
-                    </div>
-                </header>
-                {busy && <div className="helper">Lade …</div>}
-                <table cellPadding={6} style={{ marginTop: 4, width: '100%' }}>
-                    <thead>
-                        <tr>
-                            <th align="left">Tag</th>
-                            <th align="left">Farbe</th>
-                            <th align="right">Nutzung</th>
-                            <th align="center">Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {tags.map(t => (
-                            <tr key={t.id}>
-                                <td>{t.name}</td>
-                                <td>{colorSwatch(t.color)}</td>
-                                <td align="right">{t.usage ?? '—'}</td>
-                                <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                    <button className="btn" onClick={() => setEdit({ id: t.id, name: t.name, color: t.color ?? null })}>✎</button>
-                                    <button className="btn danger" onClick={() => setDeleteConfirm({ id: t.id, name: t.name })}>🗑</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {tags.length === 0 && (
-                            <tr><td colSpan={4} style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Keine Tags vorhanden.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-                {edit && (
-                    <TagModal
-                        value={edit}
-                        onClose={() => setEdit(null)}
-                        onSaved={async () => { await refresh(); setEdit(null); notify('success', 'Tag gespeichert'); onChanged?.() }}
-                        notify={notify}
-                    />
-                )}
-                {deleteConfirm && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h2 style={{ margin: 0 }}>Tag löschen</h2>
-                                <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>✕</button>
-                            </div>
-                            <div>Den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
-                            <div className="helper">Hinweis: Der Tag wird aus allen Buchungen entfernt.</div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
-                                <button className="btn danger" onClick={async () => {
-                                    try {
-                                        await window.api?.tags?.delete?.({ id: deleteConfirm.id })
-                                        notify('success', `Tag "${deleteConfirm.name}" gelöscht`)
-                                        setDeleteConfirm(null)
-                                        await refresh()
-                                        window.dispatchEvent(new Event('tags-changed'))
-                                        onChanged?.()
-                                    } catch (e: any) {
-                                        notify('error', e?.message || String(e))
-                                    }
-                                }}>Ja, löschen</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>,
-        document.body
-    )
-}
+// TagsManagerModal extracted to components/modals/TagsManagerModal.tsx
 
 function ImportXlsxCard({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
     const [fileName, setFileName] = useState<string>('')
@@ -8731,178 +7815,13 @@ function ReceiptsView() {
     )
 }
 
-function AttachmentsModal({ voucher, onClose }: { voucher: { voucherId: number; voucherNo: string; date: string; description: string }; onClose: () => void }) {
-    const [files, setFiles] = useState<Array<{ id: number; fileName: string; mimeType?: string | null }>>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string>('')
-    const [selectedId, setSelectedId] = useState<number | null>(null)
-    const [confirmDelete, setConfirmDelete] = useState<null | { id: number; fileName: string }>(null)
-    const [previewUrl, setPreviewUrl] = useState<string>('')
-    const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-    useEffect(() => {
-        let alive = true
-        setLoading(true); setError('')
-        window.api?.attachments.list?.({ voucherId: voucher.voucherId })
-            .then(res => {
-                if (!alive) return
-                const rows = res?.files || []
-                setFiles(rows)
-                setSelectedId(rows[0]?.id ?? null)
-            })
-            .catch(e => setError(e?.message || String(e)))
-            .finally(() => { if (alive) setLoading(false) })
-        const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') onClose() }
-        window.addEventListener('keydown', onKey)
-        return () => { alive = false; window.removeEventListener('keydown', onKey) }
-    }, [voucher.voucherId])
-
-    async function refreshPreview(id: number | null) {
-        setPreviewUrl('')
-        if (id == null) return
-        const f = files.find(x => x.id === id)
-        if (!f) return
-        const name = f.fileName || ''
-        const mt = (f.mimeType || '').toLowerCase()
-        const isImg = mt.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(name)
-        if (!isImg) return
-        try {
-            const res = await window.api?.attachments.read?.({ fileId: id })
-            if (res) setPreviewUrl(`data:${res.mimeType || 'image/*'};base64,${res.dataBase64}`)
-        } catch (e: any) {
-            setError('Vorschau nicht möglich: ' + (e?.message || String(e)))
-        }
-    }
-
-    useEffect(() => { refreshPreview(selectedId) }, [selectedId])
-
-    const selected = files.find(f => f.id === selectedId) || null
-
-    return createPortal(
-        <div
-            className="modal-overlay"
-            onClick={onClose}
-            role="dialog"
-            aria-modal="true"
-            style={{
-                position: 'fixed', inset: 0,
-                display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-                background: 'color-mix(in oklab, var(--surface) 65%, transparent)',
-                padding: '24px 16px', zIndex: 9999, overflowY: 'auto'
-            }}
-        >
-            <div
-                className="modal"
-                onClick={(e) => e.stopPropagation()}
-                style={{ width: 'min(980px, 96vw)', maxHeight: '92vh', overflow: 'hidden', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.25)', background: 'var(--surface)' }}
-            >
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ overflow: 'hidden' }}>
-                        <h2 style={{ margin: 0, fontSize: 16 }}>Belege zu #{voucher.voucherNo} – {voucher.date}</h2>
-                        <div className="helper" title={voucher.description} style={{ maxWidth: '75ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{voucher.description || '—'}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn danger" onClick={onClose}>Schließen</button>
-                        <button className="btn" disabled={!selected} onClick={() => selected && window.api?.attachments.open?.({ fileId: selected.id })}>Extern öffnen</button>
-                        <button
-                            className="btn"
-                            disabled={!selected}
-                            onClick={async () => {
-                                if (!selected) return
-                                try {
-                                    const r = await window.api?.attachments.saveAs?.({ fileId: selected.id })
-                                    if (r) alert('Gespeichert: ' + r.filePath)
-                                } catch (e: any) {
-                                    const m = e?.message || String(e)
-                                    if (/Abbruch/i.test(m)) return
-                                    alert('Speichern fehlgeschlagen: ' + m)
-                                }
-                            }}
-                        >Herunterladen</button>
-                        <input ref={fileInputRef} type="file" multiple hidden onChange={async (e) => {
-                            const list = e.target.files
-                            if (!list || !list.length) return
-                            try {
-                                for (const f of Array.from(list)) {
-                                    const buf = await f.arrayBuffer()
-                                    const dataBase64 = bufferToBase64Safe(buf)
-                                    await window.api?.attachments.add?.({ voucherId: voucher.voucherId, fileName: f.name, dataBase64, mimeType: f.type || undefined })
-                                }
-                                const res = await window.api?.attachments.list?.({ voucherId: voucher.voucherId })
-                                setFiles(res?.files || [])
-                                setSelectedId((res?.files || [])[0]?.id ?? null)
-                            } catch (e: any) {
-                                alert('Upload fehlgeschlagen: ' + (e?.message || String(e)))
-                            } finally {
-                                if (fileInputRef.current) fileInputRef.current.value = ''
-                            }
-                        }} />
-                        <button className="btn" onClick={() => fileInputRef.current?.click?.()}>+ Datei(en)</button>
-                        <button className="btn danger" disabled={!selected} onClick={() => selected && setConfirmDelete({ id: selected.id, fileName: selected.fileName })}>🗑 Löschen</button>
-                    </div>
-                </header>
-                {error && <div style={{ color: 'var(--danger)', margin: '0 8px 8px' }}>{error}</div>}
-                {loading && <div style={{ margin: '0 8px 8px' }}>Lade …</div>}
-                {!loading && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 300px) 1fr', gap: 12, minHeight: 320, padding: 8, boxSizing: 'border-box' }}>
-                        <div className="card" style={{ padding: 8, overflow: 'auto', maxHeight: 'calc(92vh - 120px)' }}>
-                            {files.length === 0 && <div className="helper">Keine Dateien vorhanden</div>}
-                            {files.map(f => (
-                                <button key={f.id} className="btn" style={{ width: '100%', justifyContent: 'flex-start', marginBottom: 6, background: selectedId === f.id ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} onClick={() => setSelectedId(f.id)}>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="card" style={{ padding: 8, display: 'grid', placeItems: 'center', background: 'var(--muted)', maxHeight: 'calc(92vh - 120px)', overflow: 'auto' }}>
-                            {selected && previewUrl && (
-                                <img src={previewUrl} alt={selected.fileName} style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 6 }} />
-                            )}
-                            {selected && !previewUrl && (
-                                <div className="helper">Keine Vorschau verfügbar. Nutze „Extern öffnen“ oder „Herunterladen“.</div>
-                            )}
-                            {!selected && <div className="helper">Wähle eine Datei links aus.</div>}
-                        </div>
-                    </div>
-                )}
-                {confirmDelete && (
-                    <div className="modal-overlay" onClick={() => setConfirmDelete(null)} role="dialog" aria-modal="true">
-                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0 }}>Datei löschen</h3>
-                                <button className="btn ghost" onClick={() => setConfirmDelete(null)} aria-label="Schließen">✕</button>
-                            </div>
-                            <div>
-                                Möchtest du die Datei <strong>{confirmDelete.fileName}</strong> wirklich löschen?
-                            </div>
-                            <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                <button className="btn" onClick={() => setConfirmDelete(null)}>Abbrechen</button>
-                                <button className="btn danger" onClick={async () => {
-                                    try {
-                                        await window.api?.attachments.delete?.({ fileId: confirmDelete.id })
-                                        const res = await window.api?.attachments.list?.({ voucherId: voucher.voucherId })
-                                        setFiles(res?.files || [])
-                                        setSelectedId((res?.files || [])[0]?.id ?? null)
-                                        setPreviewUrl('')
-                                        setConfirmDelete(null)
-                                    } catch (e: any) {
-                                        alert('Löschen fehlgeschlagen: ' + (e?.message || String(e)))
-                                    }
-                                }}>Ja, löschen</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>,
-        document.body
-    )
-}
+// AttachmentsModal extracted to components/modals/AttachmentsModal.tsx
 
 // DomDebugger removed for release
 
 // Batch assignment modal (Zweckbindung, Tags, Budget)
-function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters, onApplied, notify }: {
+// BatchEarmarkModal extracted to components/modals/BatchEarmarkModal.tsx
+/* function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters, onApplied, notify }: {
     onClose: () => void
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
@@ -9061,4 +7980,4 @@ function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters
         </div>,
         document.body
     )
-}
+}*/

@@ -210,13 +210,31 @@ export function listRecentVouchers(limit = 20) {
     const d = getDb()
     const rows = (d
         .prepare(
-            `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount,
-                            vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount,
-                            (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = vouchers.id) as fileCount
-             FROM vouchers ORDER BY date DESC, id DESC LIMIT ?`
+            `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
+                            v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
+                            (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
+                            v.earmark_id as earmarkId,
+                            (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
+                            v.budget_id as budgetId,
+                            (
+                                SELECT CASE
+                                    WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
+                                    WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
+                                    WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
+                                    ELSE printf('%04d-%s-%s', b.year, b.sphere, COALESCE(b.category_id, COALESCE(b.project_id, COALESCE(b.earmark_id, ''))))
+                                END FROM budgets b WHERE b.id = v.budget_id
+                            ) as budgetLabel,
+                            (SELECT b.color FROM budgets b WHERE b.id = v.budget_id) as budgetColor,
+                            (
+                                SELECT GROUP_CONCAT(t.name, '\u0001')
+                                FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
+                                WHERE vt.voucher_id = v.id
+                            ) as tagsConcat
+             FROM vouchers v ORDER BY v.date DESC, v.id DESC LIMIT ?`
         )
         .all(limit)) as any[]
-    return rows
+    // Map concatenated tags to array
+    return rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
 }
 
 export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: number; paymentMethod?: 'BAR' | 'BANK' }) {
