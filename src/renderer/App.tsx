@@ -747,18 +747,22 @@ export default function App() {
                         ].map((group, gi, arr) => (
                             <React.Fragment key={`nav-group-${gi}`}>
                                 {group.map(({ key, icon }) => (
-                                    <button
-                                        key={key}
-                                        className="btn ghost"
-                                        onClick={() => setActivePage(key as any)}
-                                        title={key}
-                                        aria-label={key}
-                                        style={{ width: 36, height: 36, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-                                    >
-                                        <span style={{ color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>
-                                            {icon}
-                                        </span>
-                                    </button>
+                                    <React.Fragment key={key}>
+                                        <button
+                                            className="btn ghost"
+                                            onClick={() => setActivePage(key as any)}
+                                            title={key}
+                                            aria-label={key}
+                                            style={{ width: 36, height: 36, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+                                        >
+                                            <span style={{ color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>
+                                                {icon}
+                                            </span>
+                                        </button>
+                                        {(['Buchungen','Rechnungen','Mitglieder'] as const).includes(key as any) && (
+                                            <span aria-hidden style={{ display: 'inline-block', width: 1, height: 24, background: 'var(--border)', margin: '0 8px' }} />
+                                        )}
+                                    </React.Fragment>
                                 ))}
                                 {gi < arr.length - 1 && (
                                     <span aria-hidden style={{ display: 'inline-block', width: 1, height: 24, background: 'var(--border)', margin: '0 8px' }} />
@@ -944,7 +948,7 @@ export default function App() {
                                 </svg>
                             </button>
 
-                            <button className="btn" onClick={() => loadRecent()}>Aktualisieren</button>
+                            {/* Aktualisieren Button entfernt (Live-Filter aktualisiert automatisch) */}
                             <button
                                 className="btn ghost"
                                 title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
@@ -2739,9 +2743,8 @@ function MembersView() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
-                        style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
-                    <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn ghost" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
+                    <button className="btn primary" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
