@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import ReportsView from './views/Reports/ReportsView'
 import { createPortal } from 'react-dom'
 import BindingModal from './components/modals/BindingModal'
 import BudgetModal from './components/modals/BudgetModal'
@@ -917,75 +918,22 @@ export default function App() {
                         </div>
                     )}
                     {activePage === 'Reports' && (
-                        <div className="card" style={{ padding: 12 }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'center' }}>
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <span style={{ color: 'var(--text-dim)' }}>Zeitraum:</span>
-                                    <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-                                    <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-                                    <span style={{ color: 'var(--text-dim)' }}>Jahr:</span>
-                                    {/* dynamic years from vouchers */}
-                                    <select className="input" value={(() => {
-                                        if (!from || !to) return ''
-                                        const fy = from.slice(0, 4)
-                                        const ty = to.slice(0, 4)
-                                        // full-year only when matching boundaries
-                                        if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) return fy
-                                        return ''
-                                    })()} onChange={(e) => {
-                                        const y = e.target.value
-                                        if (!y) { setFrom(''); setTo(''); return }
-                                        const yr = Number(y)
-                                        const f = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-                                        const t = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-                                        setFrom(f); setTo(t)
-                                    }}>
-                                        <option value="">Alle</option>
-                                        {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-                                    </select>
-                                    <div className="inline-field">
-                                        <span style={{ color: 'var(--text-dim)' }}>Sphäre:</span>
-                                        <select className="input" value={filterSphere ?? ''} onChange={(e) => setFilterSphere((e.target.value as any) || null)}>
-                                            <option value="">Alle</option>
-                                            <option value="IDEELL">IDEELL</option>
-                                            <option value="ZWECK">ZWECK</option>
-                                            <option value="VERMOEGEN">VERMOEGEN</option>
-                                            <option value="WGB">WGB</option>
-                                        </select>
-                                    </div>
-                                    <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-                                    <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as any) || null)}>
-                                        <option value="">Alle</option>
-                                        <option value="IN">IN</option>
-                                        <option value="OUT">OUT</option>
-                                        <option value="TRANSFER">TRANSFER</option>
-                                    </select>
-                                    <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-                                    <select className="input" value={filterPM ?? ''} onChange={(e) => { const v = e.target.value as any; setFilterPM(v || null); }}>
-                                        <option value="">Alle</option>
-                                        <option value="BAR">Bar</option>
-                                        <option value="BANK">Bank</option>
-                                    </select>
-                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }}>Filter zurücksetzen</button>
-                                </div>
-                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <button className="btn" onClick={() => setShowExportOptions(true)}>Exportieren…</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {activePage === 'Reports' && (
-                        <>
-                            {/* Unified Reports view: KPIs + donuts/bars + monthly charts */}
-                            <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} />
-                                <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} />
-                            </div>
-                            <div style={{ height: 12 }} />
-                            <ReportsMonthlyChart activateKey={reportsActivateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
-                            <ReportsInOutLines activateKey={reportsActivateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} />
-                        </>
+                        <ReportsView
+                            from={from}
+                            to={to}
+                            setFrom={setFrom}
+                            setTo={setTo}
+                            yearsAvail={yearsAvail}
+                            filterSphere={filterSphere as any}
+                            setFilterSphere={setFilterSphere as any}
+                            filterType={filterType as any}
+                            setFilterType={setFilterType as any}
+                            filterPM={filterPM as any}
+                            setFilterPM={setFilterPM as any}
+                            onOpenExport={() => setShowExportOptions(true)}
+                            refreshKey={refreshKey}
+                            activateKey={reportsActivateKey}
+                        />
                     )}
 
                     {activePage === 'Buchungen' && activeChips.length > 0 && (
