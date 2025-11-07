@@ -1,20 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
-import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
-import SmartRestoreModal from './components/modals/SmartRestoreModal'
-import DbInitFailedModal from './components/modals/DbInitFailedModal'
-import TimeFilterModal from './components/modals/TimeFilterModal'
-import MetaFilterModal from './components/modals/MetaFilterModal'
-import ExportOptionsModal from './components/modals/ExportOptionsModal'
-import SetupWizardModal from './components/modals/SetupWizardModal'
-import TopHeaderOrg from './components/layout/TopHeaderOrg'
-import WindowControls from './components/layout/WindowControls'
-import SidebarNav from './components/layout/SidebarNav'
-import Toasts from './components/common/Toasts'
-import useToasts from './hooks/useToasts'
-import { useAutoBackupPrompt } from './app/useAppInit'
-import DashboardView from './views/Dashboard/DashboardView'
+// Resolve app icon for titlebar (works with Vite bundling)
+const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
 // Safe ArrayBuffer -> base64 converter (chunked to avoid "Maximum call stack size exceeded")
 function bufferToBase64Safe(buf: ArrayBuffer) {
@@ -36,9 +24,188 @@ function contrastText(bg?: string | null) {
     const r = parseInt(hex.slice(0, 2), 16)
     const g = parseInt(hex.slice(2, 4), 16)
     const b = parseInt(hex.slice(4, 6), 16)
-    const l = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return l > 0.55 ? '#000' : '#fff'
+    // Perceived luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.6 ? '#000' : '#fff'
 }
+
+const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
+function TopHeaderOrg() {
+    const [org, setOrg] = useState<string>('')
+    const [cashier, setCashier] = useState<string>('')
+    useEffect(() => {
+        let cancelled = false
+        async function load() {
+            try {
+                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
+                const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
+                if (!cancelled) {
+                    setOrg((on?.value as any) || '')
+                    setCashier((cn?.value as any) || '')
+                }
+            } catch { }
+        }
+        load()
+        const onChanged = () => load()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    const text = [org || null, cashier || null].filter(Boolean).join(' | ')
+    return (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
+            {text ? (
+                <div className="helper" title={text} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{text}</div>
+            ) : null}
+        </div>
+    )
+}
+
+export default function App() {
+    // Global data refresh key to trigger summary re-fetches across views
+    const [refreshKey, setRefreshKey] = useState(0)
+    const bumpDataVersion = () => setRefreshKey((k) => k + 1)
+    const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
+    const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
+    // Toast notifications
+    const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; text: string; action?: { label: string; onClick: () => void } }>>([])
+    const toastIdRef = useRef(1)
+    const notify = (type: 'success' | 'error' | 'info', text: string, ms = 3000, action?: { label: string; onClick: () => void }) => {
+        const id = toastIdRef.current++
+        setToasts(prev => [...prev, { id, type, text, action }])
+        window.setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ms)
+    }
+    // Map backend errors to friendlier messages (esp. earmark period issues)
+    const friendlyError = (e: any) => {
+        const msg = String(e?.message || e || '')
+        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
+        return 'Fehler: ' + msg
+    }
+    // Dynamic available years from vouchers
+    const [yearsAvail, setYearsAvail] = useState<number[]>([])
+    useEffect(() => {
+        let cancelled = false
+        async function loadYears() {
+            try {
+                const res = await window.api?.reports?.years?.()
+                if (!cancelled && res?.years) setYearsAvail(res.years)
+            } catch { }
+        }
+        loadYears()
+        const onChanged = () => loadYears()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen'>(() => {
+        try { return (localStorage.getItem('activePage') as any) || 'Buchungen' } catch { return 'Buchungen' }
+    })
+    // When switching to Reports, bump a key to trigger chart re-measures
+    const [reportsActivateKey, setReportsActivateKey] = useState(0)
+    useEffect(() => {
+        if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
+    }, [activePage])
+
+    // Auto-backup prompt (renderer-side modal)
+    const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
+    useEffect(() => {
+        // Decide locally if a prompt should be shown; mirrors logic from main but with modal UX
+        let disposed = false
+        ;(async () => {
+            try {
+                const mode = String((await window.api?.settings?.get?.({ key: 'backup.auto' }))?.value || 'PROMPT').toUpperCase()
+                if (mode !== 'PROMPT') return
+                const intervalDays = Number((await window.api?.settings?.get?.({ key: 'backup.intervalDays' }))?.value || 7)
+                const lastAuto = Number((await window.api?.settings?.get?.({ key: 'backup.lastAuto' }))?.value || 0)
+                const now = Date.now()
+                const due = !lastAuto || (now - lastAuto) > intervalDays * 24 * 60 * 60 * 1000
+                if (!due) return
+                if (!disposed) setAutoBackupPrompt({ intervalDays })
+            } catch { /* ignore */ }
+        })()
+        return () => { disposed = true }
+    }, [])
+
+    const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+    // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
+    type NavLayout = 'left' | 'top'
+    const [navLayout, setNavLayout] = useState<NavLayout>(() => {
+        try { return (localStorage.getItem('ui.navLayout') as NavLayout) || 'left' } catch { return 'left' }
+    })
+    const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+        try { return localStorage.getItem('sidebarCollapsed') === '1' } catch { return false }
+    })
+    // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
+    const [reportsTab, setReportsTab] = useState<string>(() => {
+        try { return 'overview' } catch { return 'overview' }
+    })
+
+    // UI preference: color theme palette
+    type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
+    const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+        try { return (localStorage.getItem('ui.colorTheme') as ColorTheme) || 'default' } catch { return 'default' }
+    })
+    useEffect(() => {
+        try { localStorage.setItem('ui.colorTheme', colorTheme) } catch { }
+        // apply on <html>
+        try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch { }
+    }, [colorTheme])
+    // UI preference: journal table row style and density (Buchungen)
+    type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
+    type JournalRowDensity = 'normal' | 'compact'
+    const [journalRowStyle, setJournalRowStyle] = useState<JournalRowStyle>(() => {
+        try { return (localStorage.getItem('ui.journalRowStyle') as JournalRowStyle) || 'both' } catch { return 'both' }
+    })
+    const [journalRowDensity, setJournalRowDensity] = useState<JournalRowDensity>(() => {
+        try { return (localStorage.getItem('ui.journalRowDensity') as JournalRowDensity) || 'normal' } catch { return 'normal' }
+    })
+    useEffect(() => {
+        try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch { }
+        try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch { }
+    }, [journalRowStyle])
+    useEffect(() => {
+        try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch { }
+        try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch { }
+    }, [journalRowDensity])
+    // Period lock (year-end) status for UI controls (e.g., lock edit)
+    const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
+    useEffect(() => {
+        let alive = true
+        async function load() {
+            try { const s = await (window as any).api?.yearEnd?.status?.(); if (alive) setPeriodLock(s || { closedUntil: null }) } catch {}
+        }
+        load()
+        const onChanged = () => load()
+        window.addEventListener('data-changed', onChanged)
+        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    // Export options modal state (Reports)
+    const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
+    type AmountMode = 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
+    const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
+    const [exportOrgName, setExportOrgName] = useState<string>('')
+    const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
+    const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
+
+    // DOM-Debug removed for release
+    // const [domDebug, setDomDebug] = useState<boolean>(false)
+    // Global Tags Manager modal state
+    const [showTagsManager, setShowTagsManager] = useState<boolean>(false)
+    // Time filter modal state
+    const [showTimeFilter, setShowTimeFilter] = useState<boolean>(false)
+    const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
+    useEffect(() => {
+        try { localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0') } catch { }
+    }, [sidebarCollapsed])
+    useEffect(() => { try { localStorage.setItem('ui.navLayout', navLayout) } catch { } }, [navLayout])
+
+    useEffect(() => {
+        try { localStorage.setItem('activePage', activePage) } catch { }
+    }, [activePage])
+    // No-op: unified reports page; keep effect to avoid removing too many deps
+    useEffect(() => { /* unified reports */ }, [reportsTab])
     // Open Export Options when requested from nested components
     useEffect(() => {
         function onOpenExport() { setShowExportOptions(true) }
@@ -501,12 +668,6 @@ function contrastText(bg?: string | null) {
         'Einstellungen': '#9C27B0'
     }
     const isTopNav = navLayout === 'top'
-    // Smart restore preview state
-    const [smartRestore, setSmartRestore] = useState<null | {
-        current: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
-        default: { root: string; dbPath: string; exists: boolean; mtime?: number | null; counts?: Record<string, number>; last?: Record<string, string | null> }
-        recommendation?: 'useDefault' | 'migrateToDefault' | 'manual'
-    }>(null)
     return (
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : `${sidebarCollapsed ? '64px' : '240px'} 1fr`, gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
@@ -538,16 +699,13 @@ function contrastText(bg?: string | null) {
                 </div>
                 {isTopNav ? (
                     <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
-                        {/* Groups: Dashboard | Buchungen | Rechnungen+Mitglieder | Budgets+Zweckbindungen | Belege/Reports | Einstellungen */}
+                        {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
                         {[
                             [
                                 { key: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
                             ],
-                            // Middle cluster split into sub-groups with light separators
                             [
-                                { key: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) }
-                            ],
-                            [
+                                { key: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
                                 { key: 'Rechnungen', icon: (
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
                                         <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
@@ -559,8 +717,6 @@ function contrastText(bg?: string | null) {
                                         <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
                                     </svg>
                                 ) },
-                            ],
-                            [
                                 { key: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
                                 { key: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
                             ],
@@ -596,24 +752,101 @@ function contrastText(bg?: string | null) {
                 ) : null}
                 {isTopNav && <div />}
                 {/* Window controls */}
-                <WindowControls />
+                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
+                    <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
+                    </button>
+                    <button className="btn ghost" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
+                    </button>
+                    <button className="btn danger" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
+                    </button>
+                </div>
             </header>
             {!isTopNav && (
                 <aside aria-label="Seitenleiste" style={{ gridArea: 'side', display: 'flex', flexDirection: 'column', padding: 8, borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
-                    <SidebarNav
-                        activePage={activePage as any}
-                        sidebarCollapsed={sidebarCollapsed}
-                        navIconColorMode={navIconColorMode}
-                        onSelect={(k) => setActivePage(k as any)}
-                    />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {/* Group 1: Dashboard */}
+                                {[
+                                    { key: 'Dashboard', label: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
+                                ].map(({ key, label, icon }) => (
+                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
+                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center' }}>{icon}</span>
+                                        {!sidebarCollapsed && <span>{label}</span>}
+                                    </button>
+                                ))}
+                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+                                {/* Group 2: Buchungen, Rechnungen, Budgets, Zweckbindungen */}
+                                {[
+                                    { key: 'Buchungen', label: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
+                                    { key: 'Rechnungen', label: 'Rechnungen', icon: (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
+                                            <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
+                                            <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
+                                        </svg>
+                                    ) },
+                                    { key: 'Mitglieder', label: 'Mitglieder', icon: (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
+                                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
+                                        </svg>
+                                    ) },
+                                    { key: 'Budgets', label: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
+                                    { key: 'Zweckbindungen', label: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
+                                ].map(({ key, label, icon }) => (
+                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
+                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
+                                        {!sidebarCollapsed && <span>{label}</span>}
+                                    </button>
+                                ))}
+                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+                                {/* Group 3: Belege, Reports */}
+                                {[
+                                    { key: 'Belege', label: 'Belege', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8l-6-6zM8 12h8v2H8v-2zm0-4h5v2H8V8z" /></svg>) },
+                                    { key: 'Reports', label: 'Reports', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7z" /></svg>) }
+                                ].map(({ key, label, icon }) => (
+                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
+                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
+                                        {!sidebarCollapsed && <span>{label}</span>}
+                                    </button>
+                                ))}
+                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
+                                <button
+                                    className="btn ghost"
+                                    onClick={() => setActivePage('Einstellungen')}
+                                    style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === 'Einstellungen' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+                                    title="Einstellungen"
+                                >
+                                    <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette['Einstellungen'] : undefined }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94a7.97 7.97 0 0 0 .06-1l2.03-1.58-1.92-3.32-2.39.5a7.97 7.97 0 0 0-1.73-1l-.36-2.43h-3.84l-.36 2.43a7.97 7.97 0 0 0-1.73 1l-2.39-.5-1.92 3.32L4.8 11.94c0 .34.02.67.06 1L2.83 14.5l1.92 3.32 2.39-.5c.53.4 1.12.74 1.73 1l.36 2.43h3.84l.36-2.43c.61-.26 1.2-.6 1.73-1l2.39.5 1.92-3.32-2.03-1.56zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" /></svg>
+                                    </span>
+                                    {!sidebarCollapsed && <span>Einstellungen</span>}
+                                </button>
+                                </div>
                 </aside>
             )}
 
             {/* Main content */}
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
-                            {/* Removed top-left Tag badge to avoid duplication with chips below */}
-                            {/* Active filter indicator (global). Hidden on Buchungen, where a local inline button is rendered next to badges. */}
-                            {activeChips.length > 0 && activePage !== 'Buchungen' && (
+                            {/* Compact badge kept only for Tag (earmark/budget badges removed to avoid redundancy) */}
+                            {filterTag && (() => {
+                                const td = (tagDefs || []).find(t => (t.name || '').toLowerCase() === (filterTag || '').toLowerCase())
+                                const bg = td?.color || undefined
+                                const fg = contrastText(bg)
+                                return (
+                                    <span
+                                        key="badge-tag"
+                                        className="badge"
+                                        title={`Tag: ${filterTag}`}
+                                        onClick={async () => { setFilterTag(null); setPage(1); await loadRecent() }}
+                                        style={{ cursor: 'pointer', background: bg, color: bg ? fg : undefined }}
+                                    >
+                                        # {filterTag}
+                                    </span>
+                                )
+                            })()}
+                            {/* Active filter indicator: clears all filters on click */}
+                            {activeChips.length > 0 && (
                                 <button
                                     className="btn"
                                     title="Filter zurücksetzen"
@@ -694,7 +927,7 @@ function contrastText(bg?: string | null) {
                                 </svg>
                             </button>
 
-                            {/* Refresh button removed – data reloads on filter changes and actions */}
+                            <button className="btn" onClick={() => loadRecent()}>Aktualisieren</button>
                             <button
                                 className="btn ghost"
                                 title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
@@ -761,7 +994,7 @@ function contrastText(bg?: string | null) {
                                         <option value="BAR">Bar</option>
                                         <option value="BANK">Bank</option>
                                     </select>
-                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }} style={{ padding: '6px 10px' }}>Filter zurücksetzen</button>
+                                    <button className="btn ghost" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }}>Filter zurücksetzen</button>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <button className="btn" onClick={() => setShowExportOptions(true)}>Exportieren…</button>
@@ -784,24 +1017,13 @@ function contrastText(bg?: string | null) {
                     )}
 
                     {activePage === 'Buchungen' && activeChips.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px' }}>
                             {activeChips.map((c) => (
                                 <span key={c.key} className="chip">
                                     {c.label}
                                     <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
                                 </span>
                             ))}
-                            <button
-                                className="btn"
-                                title="Filter zurücksetzen"
-                                onClick={async () => {
-                                    setFrom(''); setTo(''); setFilterSphere(null); setFilterType(null); setFilterPM(null); setFilterEarmark(null); setFilterBudgetId(null); setFilterTag(null); setQ(''); setPage(1);
-                                    await loadRecent()
-                                }}
-                                style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', borderColor: 'var(--accent)', padding: '6px 10px' }}
-                            >
-                                Filter zurücksetzen
-                            </button>
                         </div>
                     )}
 
@@ -812,7 +1034,18 @@ function contrastText(bg?: string | null) {
                         <FilterTotals refreshKey={refreshKey} from={from || undefined} to={to || undefined} paymentMethod={filterPM || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} q={q || undefined} tag={filterTag || undefined} />
                     )}
                     {activePage === 'Buchungen' && (
-                        <div className="card">
+                        <div>
+                            <div className="card">
+                                {/* Pagination controls */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                                    <div className="helper">Seite {page} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button className="btn" onClick={() => { setPage(1) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
+                                        <button className="btn" onClick={() => { setPage(p => Math.max(1, p - 1)) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
+                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
+                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
+                                    </div>
+                                </div>
                                 <JournalTable
                                     rows={rows}
                                     order={order}
@@ -887,7 +1120,7 @@ function contrastText(bg?: string | null) {
                             {/* Edit Modal */}
                             {editRow && (
                                 <div className="modal-overlay" onClick={() => setEditRow(null)}>
-                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 16 }}>
+                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
                                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                             <h2 style={{ margin: 0 }}>
                                                 {(() => {
@@ -952,23 +1185,23 @@ function contrastText(bg?: string | null) {
                                             {/* Blocks A+B in a side-by-side grid on wide screens */}
                                             <div className="block-grid" style={{ marginBottom: 8 }}>
                                                 {/* Block A – Basisinfos */}
-                                                <section className="booking-section booking-section--basis">
-                                                    <div className="helper title">Basis</div>
+                                                <div className="card" style={{ padding: 12 }}>
+                                                    <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                                                     <div className="row">
                                                         <div className="field">
-                                                            <label>Datum<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                                            <label>Datum</label>
                                                             <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
                                                         </div>
-                                                        <div className="field booking-type-row">
-                                                            <label>Art<span className="required-asterisk" aria-hidden="true">*</span></label>
-                                                            <div className="segment-group" role="group" aria-label="Art wählen">
+                                                        <div className="field">
+                                                            <label>Art</label>
+                                                            <div className="btn-group" role="group" aria-label="Art wählen">
                                                                 {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                                    <button key={t} type="button" className={`seg-btn${editRow.type === t ? ' active' : ''}`} data-type={t} onClick={() => setEditRow({ ...editRow, type: t })}>{t}</button>
+                                                                    <button key={t} type="button" className="btn" onClick={() => setEditRow({ ...editRow, type: t })} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
                                                                 ))}
                                                             </div>
                                                         </div>
                                                         <div className="field">
-                                                            <label>Sphäre<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                                            <label>Sphäre</label>
                                                             <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
                                                                 <option value="">—</option>
                                                                 <option value="IDEELL">IDEELL</option>
@@ -993,27 +1226,27 @@ function contrastText(bg?: string | null) {
                                                                 </select>
                                                             </div>
                                                         ) : (
-                                                            <div className="field booking-pay-row">
+                                                            <div className="field">
                                                                 <label>Zahlweg</label>
-                                                                <div className="segment-group" role="group" aria-label="Zahlweg wählen">
+                                                                <div className="btn-group" role="group" aria-label="Zahlweg wählen">
                                                                     {(['BAR','BANK'] as const).map(pm => (
-                                                                        <button key={pm} type="button" className={`seg-btn${(editRow as any).paymentMethod === pm ? ' active' : ''}`} onClick={() => setEditRow({ ...editRow, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                                        <button key={pm} type="button" className="btn" onClick={() => setEditRow({ ...editRow, paymentMethod: pm })} style={{ background: (editRow as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                                                     ))}
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </section>
+                                                </div>
 
-                                                {/* Block B – Finanzdetails (restored, without pagination) */}
-                                                <section className="booking-section booking-section--finances">
-                                                    <div className="helper title">Finanzen</div>
+                                                {/* Block B – Finanzdetails */}
+                                                <div className="card" style={{ padding: 12 }}>
+                                                    <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                                                     <div className="row">
                                                         {editRow.type === 'TRANSFER' ? (
                                                             <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                                <label>Betrag (Transfer)<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                                                <label>Betrag (Transfer)</label>
                                                                 <span className="adorn-wrap">
-                                                                    <input className="input amount-input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
+                                                                    <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
                                                                         onChange={(e) => {
                                                                             const v = Number(e.target.value)
                                                                             setEditRow({ ...(editRow as any), grossAmount: v } as any)
@@ -1024,15 +1257,15 @@ function contrastText(bg?: string | null) {
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                                                <div className="field">
+                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
                                                                     <div style={{ display: 'flex', gap: 8 }}>
                                                                         <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
                                                                             <option value="NET">Netto</option>
                                                                             <option value="GROSS">Brutto</option>
                                                                         </select>
-                                                                        <span className="adorn-wrap">
-                                                                            <input className="input amount-input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
+                                                                        <span className="adorn-wrap" style={{ flex: 1 }}>
+                                                                            <input className="input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
                                                                                 onChange={(e) => {
                                                                                     const v = Number(e.target.value)
                                                                                     if ((editRow as any).mode === 'GROSS') setEditRow({ ...(editRow as any), grossAmount: v } as any)
@@ -1072,14 +1305,13 @@ function contrastText(bg?: string | null) {
                                                             </select>
                                                         </div>
                                                     </div>
-                                                </section>
+                                                </div>
                                             </div>
 
-                                            {/* Block C + D side by side: Meta + Attachments */}
-                                            <div className="booking-meta-grid" style={{ marginBottom: 8 }}>
-                                                <section className="booking-section booking-section--meta">
-                                                    <div className="helper title">Beschreibung & Tags</div>
-                                                    <div className="row" style={{ gridTemplateColumns: '1fr' }}>
+                                            {/* Block C – Beschreibung & Tags */}
+                                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
+                                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                                                <div className="row">
                                                     <div className="field" style={{ gridColumn: '1 / -1' }}>
                                                         <label>Beschreibung</label>
                                                         <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
@@ -1090,10 +1322,13 @@ function contrastText(bg?: string | null) {
                                                         onChange={(tags) => setEditRow({ ...editRow, tags })}
                                                         tagDefs={tagDefs}
                                                     />
-                                                    </div>
-                                                </section>
-                                                <section
-                                                    className="booking-section booking-section--attachments"
+                                                </div>
+                                            </div>
+
+                                            {/* Block D – Anhänge */}
+                                            <div
+                                                className="card"
+                                                style={{ marginTop: 0, padding: 12 }}
                                                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                                                 onDrop={async (e) => {
                                                     e.preventDefault(); e.stopPropagation();
@@ -1111,11 +1346,11 @@ function contrastText(bg?: string | null) {
                                                         notify('error', 'Upload fehlgeschlagen: ' + (err?.message || String(err)))
                                                     }
                                                 }}
-                                                >
+                                            >
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                                                         <strong>Anhänge</strong>
-                                                        <div className="helper">Dateien ziehen oder per Button/Ctrl+U hinzufügen</div>
+                                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 8 }}>
                                                         <input ref={editFileInputRef} type="file" multiple hidden onChange={async (e) => {
@@ -1162,7 +1397,6 @@ function contrastText(bg?: string | null) {
                                                         <div className="helper">Keine Dateien vorhanden</div>
                                                     )
                                                 )}
-                                                </section>
                                             </div>
                                             {confirmDeleteAttachment && (
                                                 <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
@@ -1288,9 +1522,7 @@ function contrastText(bg?: string | null) {
                             notify={notify}
                             bumpDataVersion={bumpDataVersion}
                             openTagsManager={() => setShowTagsManager(true)}
-                            openSetupWizard={() => setShowSetupWizard(true)}
                             labelForCol={labelForCol}
-                            onOpenSmartRestore={(prev) => setSmartRestore(prev)}
                         />
                     )}
 
@@ -1304,7 +1536,7 @@ function contrastText(bg?: string | null) {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div className="helper">Zweckbindungen verwalten</div>
                                     <div style={{ display: 'flex', gap: 8 }}>
-                                            {/* Refresh button removed – use actions/filters to reload */}
+                                        <button className="btn" onClick={loadBindings}>Aktualisieren</button>
                                         <button
                                             className="btn primary"
                                             onClick={() => setEditBinding({ code: '', name: '', description: null, startDate: null, endDate: null, isActive: true, color: null } as any)}
@@ -1363,7 +1595,6 @@ function contrastText(bg?: string | null) {
                                 from={from || undefined}
                                 to={to || undefined}
                                 sphere={filterSphere || undefined}
-                                onEdit={(b) => setEditBinding({ id: b.id, code: b.code, name: b.name, description: (bindings.find(x => x.id === b.id) as any)?.description ?? null, startDate: (bindings.find(x => x.id === b.id) as any)?.startDate ?? null, endDate: (bindings.find(x => x.id === b.id) as any)?.endDate ?? null, isActive: (bindings.find(x => x.id === b.id) as any)?.isActive ?? true, color: b.color ?? null, budget: (bindings.find(x => x.id === b.id) as any)?.budget ?? null })}
                             />
                         </>
                     )}
@@ -1373,6 +1604,9 @@ function contrastText(bg?: string | null) {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
                                 <button className="btn primary" onClick={() => setEditBudget({ year: new Date().getFullYear(), sphere: 'IDEELL', amountPlanned: 0, categoryId: null, projectId: null, earmarkId: null })}>+ Neu</button>
+                            </div>
+                            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                                <button className="btn" onClick={loadBudgets}>Aktualisieren</button>
                             </div>
                             {/* Simple table for now (legacy), will be replaced by tiles below */}
                             <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
@@ -1410,20 +1644,17 @@ function contrastText(bg?: string | null) {
                                     )}
                                 </tbody>
                             </table>
+                            {/* Tiles UI */}
+                            <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
+                            {editBudget && (
+                                <BudgetModal
+                                    value={editBudget as any}
+                                    onClose={() => setEditBudget(null)}
+                                    onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
+                                />
+                            )}
                             {/* Delete-Dialog für Budgets wird nun im Bearbeiten-Modal gehandhabt */}
                         </div>
-                    )}
-
-                    {activePage === 'Budgets' && (
-                        <BudgetTiles budgets={budgets as any} eurFmt={eurFmt} onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} />
-                    )}
-
-                    {activePage === 'Budgets' && editBudget && (
-                        <BudgetModal
-                            value={editBudget as any}
-                            onClose={() => setEditBudget(null)}
-                            onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
-                        />
                     )}
 
                     {activePage === 'Mitglieder' && (
@@ -1467,23 +1698,23 @@ function contrastText(bg?: string | null) {
                             {/* Blocks A+B in a side-by-side grid on wide screens */}
                             <div className="block-grid" style={{ marginBottom: 8 }}>
                             {/* Block A – Basisinfos */}
-                            <section className="booking-section booking-section--basis">
-                                <div className="helper title">Basis</div>
+                            <div className="card" style={{ padding: 12 }}>
+                                <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                                 <div className="row">
                                     <div className="field">
-                                        <label>Datum<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                        <label>Datum</label>
                                         <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
                                     </div>
-                                    <div className="field booking-type-row">
-                                        <label>Art<span className="required-asterisk" aria-hidden="true">*</span></label>
-                                        <div className="segment-group" role="group" aria-label="Art wählen">
+                                    <div className="field">
+                                        <label>Art</label>
+                                        <div className="btn-group" role="group" aria-label="Art wählen">
                                             {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                <button key={t} type="button" className={`seg-btn${qa.type === t ? ' active' : ''}`} data-type={t} onClick={() => setQa({ ...qa, type: t })}>{t}</button>
+                                                <button key={t} type="button" className="btn" onClick={() => setQa({ ...qa, type: t })} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="field">
-                                        <label>Sphäre<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                        <label>Sphäre</label>
                                         <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })}>
                                             <option value="IDEELL">IDEELL</option>
                                             <option value="ZWECK">ZWECK</option>
@@ -1507,25 +1738,25 @@ function contrastText(bg?: string | null) {
                                             </select>
                                         </div>
                                     ) : (
-                                        <div className="field booking-pay-row">
+                                        <div className="field">
                                             <label>Zahlweg</label>
-                                            <div className="segment-group" role="group" aria-label="Zahlweg wählen">
+                                            <div className="btn-group" role="group" aria-label="Zahlweg wählen">
                                                 {(['BAR','BANK'] as const).map(pm => (
-                                                    <button key={pm} type="button" className={`seg-btn${(qa as any).paymentMethod === pm ? ' active' : ''}`} onClick={() => setQa({ ...qa, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                    <button key={pm} type="button" className="btn" onClick={() => setQa({ ...qa, paymentMethod: pm })} style={{ background: (qa as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            </section>
+                            </div>
 
                             {/* Block B – Finanzdetails */}
-                            <section className="booking-section booking-section--finances">
-                                <div className="helper title">Finanzen</div>
+                            <div className="card" style={{ padding: 12 }}>
+                                <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                                 <div className="row">
                                     {qa.type === 'TRANSFER' ? (
                                         <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Betrag (Transfer)<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                            <label>Betrag (Transfer)</label>
                                             <span className="adorn-wrap">
                                                 <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                     onChange={(e) => {
@@ -1539,7 +1770,7 @@ function contrastText(bg?: string | null) {
                                     ) : (
                                         <>
                                             <div className="field">
-                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
                                                 <div style={{ display: 'flex', gap: 8 }}>
                                                     <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
                                                         <option value="NET">Netto</option>
@@ -1586,56 +1817,59 @@ function contrastText(bg?: string | null) {
                                         </select>
                                     </div>
                                 </div>
-                            </section>
                             </div>
-                            {/* Block C + D side-by-side */}
-                            <div className="booking-meta-grid" style={{ marginBottom: 8 }}>
-                                <section className="booking-section booking-section--meta">
-                                    <div className="helper title">Beschreibung & Tags</div>
-                                    <div className="row" style={{ gridTemplateColumns: '1fr' }}>
-                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Beschreibung</label>
-                                            <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
-                                            <datalist id="desc-suggestions">
-                                                {descSuggest.map((d, i) => (<option key={i} value={d} />))}
-                                            </datalist>
-                                        </div>
-                                        <TagsEditor
-                                            label="Tags"
-                                            value={(qa as any).tags || []}
-                                            onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
-                                            tagDefs={tagDefs}
-                                        />
+                            </div>
+
+                            {/* Block C – Beschreibung & Tags */}
+                            <div className="card" style={{ padding: 12, marginBottom: 8 }}>
+                                <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                                <div className="row">
+                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                        <label>Beschreibung</label>
+                                        <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                        <datalist id="desc-suggestions">
+                                            {descSuggest.map((d, i) => (<option key={i} value={d} />))}
+                                        </datalist>
                                     </div>
-                                </section>
-                                <section className="booking-section booking-section--attachments"
-                                    onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
-                                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                            <strong>Anhänge</strong>
-                                            <div className="helper">Dateien ziehen oder per Button/Ctrl+U auswählen</div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
-                                            <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
-                                            {files.length > 0 && (
-                                                <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
-                                            )}
-                                        </div>
+                                    <TagsEditor
+                                        label="Tags"
+                                        value={(qa as any).tags || []}
+                                        onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
+                                        tagDefs={tagDefs}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Block D – Anhänge */}
+                            <div
+                                className="card"
+                                style={{ marginTop: 0, padding: 12 }}
+                                onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
+                                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                        <strong>Anhänge</strong>
+                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
                                     </div>
-                                    {files.length > 0 && (
-                                        <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                                            {files.map((f, i) => (
-                                                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                                    <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </section>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
+                                        <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
+                                        {files.length > 0 && (
+                                            <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
+                                        )}
+                                    </div>
+                                </div>
+                                {files.length > 0 && (
+                                    <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                                        {files.map((f, i) => (
+                                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
                                 <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
@@ -1650,7 +1884,17 @@ function contrastText(bg?: string | null) {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Toasts bottom-right */}
-            <Toasts items={toasts} />
+            <div className="toast-container" aria-live="polite" aria-atomic="true">
+                {toasts.map(t => (
+                    <div key={t.id} className={`toast ${t.type}`} role="status" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span className="title">{t.type === 'error' ? 'Fehler' : t.type === 'success' ? 'OK' : 'Info'}</span>
+                        <span style={{ flex: 1 }}>{t.text}</span>
+                        {t.action && (
+                            <button className="btn" onClick={() => t.action?.onClick?.()}>{t.action.label}</button>
+                        )}
+                    </div>
+                ))}
+            </div>
             {/* Global Floating Action Button: + Buchung (hidden in Einstellungen und Mitglieder) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
@@ -1674,53 +1918,6 @@ function contrastText(bg?: string | null) {
                             notify('error', e?.message || String(e))
                         } finally {
                             setAutoBackupPrompt(null)
-                        }
-                    }}
-                />
-            )}
-            {/* DB init failed modal */}
-            {dbInitError && (
-                <DbInitFailedModal
-                    message={dbInitError.message}
-                    busy={dbInitBusy}
-                    onUseExisting={async () => {
-                        try {
-                            setDbInitBusy(true)
-                            await (window as any).api?.db?.location?.useExisting?.()
-                            window.location.reload()
-                        } catch (e: any) {
-                            setDbInitBusy(false)
-                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
-                        }
-                    }}
-                    onChooseAndMigrate={async () => {
-                        try {
-                            setDbInitBusy(true)
-                            await (window as any).api?.db?.location?.chooseAndMigrate?.()
-                            window.location.reload()
-                        } catch (e: any) {
-                            setDbInitBusy(false)
-                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
-                        }
-                    }}
-                    onResetDefault={async () => {
-                        try {
-                            setDbInitBusy(true)
-                            await (window as any).api?.db?.location?.resetDefault?.()
-                            window.location.reload()
-                        } catch (e: any) {
-                            setDbInitBusy(false)
-                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
-                        }
-                    }}
-                    onImportFile={async () => {
-                        try {
-                            setDbInitBusy(true)
-                            await (window as any).api?.db?.import?.()
-                            window.location.reload()
-                        } catch (e: any) {
-                            setDbInitBusy(false)
-                            try { (window as any).alert?.('Fehler: ' + (e?.message || String(e))) } catch {}
                         }
                     }}
                 />
@@ -1797,61 +1994,492 @@ function contrastText(bg?: string | null) {
                     }}
                 />
             )}
-            {/* First-run Setup Wizard */}
-            {showSetupWizard && (
-                <SetupWizardModal
-                    onClose={() => setShowSetupWizard(false)}
-                    navLayout={navLayout}
-                    setNavLayout={setNavLayout}
-                    navIconColorMode={navIconColorMode}
-                    setNavIconColorMode={setNavIconColorMode}
-                    colorTheme={colorTheme as any}
-                    setColorTheme={setColorTheme as any}
-                    journalRowStyle={journalRowStyle}
-                    setJournalRowStyle={setJournalRowStyle}
-                    journalRowDensity={journalRowDensity}
-                    setJournalRowDensity={setJournalRowDensity}
-                    existingTags={(tagDefs || []).map(t => ({ name: t.name, color: t.color || undefined }))}
-                    notify={notify}
-                />
-            )}
-            {smartRestore && (
-                <SmartRestoreModal
-                    preview={smartRestore}
-                    onClose={() => setSmartRestore(null)}
-                    onApply={async (action) => {
-                        try {
-                            const res = await window.api?.db?.smartRestore?.apply?.({ action })
-                            if (res?.ok) {
-                                notify('success', action === 'useDefault' ? 'Standard-Datenbank verwendet.' : 'Aktuelle Datenbank in Standardordner migriert.')
-                                setSmartRestore(null)
-                                window.dispatchEvent(new Event('data-changed'))
-                                bumpDataVersion()
-                            } else {
-                                notify('error', 'Aktion fehlgeschlagen')
-                            }
-                        } catch (e: any) {
-                            notify('error', e?.message || String(e))
-                        }
-                    }}
-                />
-            )}
         </div>
     )
 }
 // Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
-// MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
+function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, earmarkId, budgetId, onApply }: {
+    open: boolean
+    onClose: () => void
+    budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
+    earmarks: Array<{ id: number; code: string; name?: string | null }>
+    sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    earmarkId: number | null
+    budgetId: number | null
+    onApply: (v: { sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId: number | null; budgetId: number | null }) => void
+}) {
+    const [s, setS] = useState<null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>(sphere)
+    const [e, setE] = useState<number | null>(earmarkId)
+    const [b, setB] = useState<number | null>(budgetId)
+    useEffect(() => { setS(sphere); setE(earmarkId); setB(budgetId) }, [sphere, earmarkId, budgetId, open])
+    const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
+        (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
+    return open ? (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h2 style={{ margin: 0 }}>Filter wählen</h2>
+                    <button className="btn danger" onClick={onClose}>Schließen</button>
+                </header>
+                <div className="row">
+                    <div className="field">
+                        <label>Sphäre</label>
+                        <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
+                            <option value="">Alle</option>
+                            <option value="IDEELL">IDEELL</option>
+                            <option value="ZWECK">ZWECK</option>
+                            <option value="VERMOEGEN">VERMOEGEN</option>
+                            <option value="WGB">WGB</option>
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Zweckbindung</label>
+                        <select className="input" value={e ?? ''} onChange={(ev) => setE(ev.target.value ? Number(ev.target.value) : null)}>
+                            <option value="">Alle</option>
+                            {earmarks.map(em => (
+                                <option key={em.id} value={em.id}>{em.code} – {em.name || ''}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Budget</label>
+                        <select className="input" value={b ?? ''} onChange={(ev) => setB(ev.target.value ? Number(ev.target.value) : null)}>
+                            <option value="">Alle</option>
+                            {budgets.map(bu => (
+                                <option key={bu.id} value={bu.id}>{labelForBudget(bu)}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                    <button className="btn" onClick={() => { setS(null); setE(null); setB(null) }}>Zurücksetzen</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={onClose}>Abbrechen</button>
+                        <button className="btn primary" onClick={() => { onApply({ sphere: s, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    ) : null
+}
 
 // Time Filter Modal: controls date range and quick year selection
-// TimeFilterModal extracted to components/modals/TimeFilterModal.tsx
+function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
+    open: boolean
+    onClose: () => void
+    yearsAvail: number[]
+    from: string
+    to: string
+    onApply: (v: { from: string; to: string }) => void
+}) {
+    const [f, setF] = useState<string>(from)
+    const [t, setT] = useState<string>(to)
+    useEffect(() => { setF(from); setT(to) }, [from, to, open])
+    return open ? (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h2 style={{ margin: 0 }}>Zeitraum wählen</h2>
+                    <button className="btn danger" onClick={onClose}>Schließen</button>
+                </header>
+                <div className="row">
+                    <div className="field">
+                        <label>Von</label>
+                        <input className="input" type="date" value={f} onChange={(e) => setF(e.target.value)} />
+                    </div>
+                    <div className="field">
+                        <label>Bis</label>
+                        <input className="input" type="date" value={t} onChange={(e) => setT(e.target.value)} />
+                    </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Schnellauswahl Jahr</label>
+                        <select className="input" value={(() => {
+                            if (!f || !t) return ''
+                            const fy = f.slice(0, 4)
+                            const ty = t.slice(0, 4)
+                            // full-year only when matching boundaries
+                            if (f === `${fy}-01-01` && t === `${fy}-12-31` && fy === ty) return fy
+                            return ''
+                        })()} onChange={(e) => {
+                            const y = e.target.value
+                            if (!y) { setF(''); setT(''); return }
+                            const yr = Number(y)
+                            const nf = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
+                            const nt = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
+                            setF(nf); setT(nt)
+                        }}>
+                            <option value="">—</option>
+                            {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                    <button className="btn" onClick={() => { setF(''); setT('') }}>Zurücksetzen</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={onClose}>Abbrechen</button>
+                        <button className="btn primary" onClick={() => { onApply({ from: f, to: t }); onClose() }}>Übernehmen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    ) : null
+}
 
 // Export Options Modal for Reports
-// ExportOptionsModal extracted to components/modals/ExportOptionsModal.tsx
+function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport }: {
+    open: boolean
+    onClose: () => void
+    fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
+    setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
+    orgName: string
+    setOrgName: (v: string) => void
+    amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
+    setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
+    sortDir: 'ASC' | 'DESC'
+    setSortDir: (v: 'ASC' | 'DESC') => void
+    onExport: (fmt: 'CSV' | 'XLSX' | 'PDF') => Promise<void>
+}) {
+    const all: Array<{ key: any; label: string }> = [
+        { key: 'date', label: 'Datum' },
+        { key: 'voucherNo', label: 'Nr.' },
+        { key: 'type', label: 'Typ' },
+        { key: 'sphere', label: 'Sphäre' },
+        { key: 'description', label: 'Beschreibung' },
+        { key: 'paymentMethod', label: 'Zahlweg' },
+        { key: 'netAmount', label: 'Netto' },
+        { key: 'vatAmount', label: 'MwSt' },
+        { key: 'grossAmount', label: 'Brutto' },
+        { key: 'tags', label: 'Tags' }
+    ]
+    const toggle = (k: any) => {
+        const set = new Set(fields)
+        if (set.has(k)) set.delete(k)
+        else set.add(k)
+        setFields(Array.from(set) as any)
+    }
+    return open ? createPortal(
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h2 style={{ margin: 0 }}>Export Optionen</h2>
+                    <button className="btn danger" onClick={onClose}>Schließen</button>
+                </header>
+                <div className="row">
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Felder</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {all.map(f => (
+                                <label key={f.key} className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                    <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggle(f.key)} style={{ marginRight: 6 }} />
+                                    {f.label}
+                                </label>
+                            ))}
+                        </div>
+                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags“ gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
+                    </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Organisationsname (optional)</label>
+                        <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
+                    </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Betragsdarstellung</label>
+                        <div className="btn-group" role="group">
+                            <button className="btn" onClick={() => setAmountMode('POSITIVE_BOTH')} style={{ background: amountMode === 'POSITIVE_BOTH' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Beide positiv</button>
+                            <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
+                        </div>
+                    </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Sortierung (Datum)</label>
+                        <div className="btn-group" role="group">
+                            <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
+                            <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                    <button className="btn" onClick={() => onExport('CSV')}>CSV</button>
+                    <button className="btn" onClick={() => onExport('PDF')}>PDF</button>
+                    <button className="btn primary" onClick={() => onExport('XLSX')}>XLSX</button>
+                </div>
+            </div>
+        </div>, document.body
+    ) : null
+}
 
 // duplicate AutoBackupPromptModal removed; see single definition below
-// DashboardView extracted
+function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
+    const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
+    const [loading, setLoading] = useState(false)
+    const [cashier, setCashier] = useState<string>('')
+    useEffect(() => {
+        let cancelled = false
+        setLoading(true)
+        window.api?.quotes.weekly?.({ date: today }).then((q) => { if (!cancelled) setQuote(q) }).finally(() => { if (!cancelled) setLoading(false) })
+        // Load cashier name for greeting
+        const load = async () => {
+            try {
+                const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
+                if (!cancelled) setCashier((cn?.value as any) || '')
+            } catch { }
+        }
+        load()
+        const onChanged = () => load()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [today])
 
-// AutoBackupPromptModal extracted to components/modals/AutoBackupPromptModal.tsx
+    // Load available years for optional selection
+    const [yearsAvail, setYearsAvail] = useState<number[]>([])
+    useEffect(() => {
+        let cancelled = false
+        window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) })
+        const onChanged = () => { window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) }) }
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    // KPIs with Month/Year toggle
+    const [period, setPeriod] = useState<'MONAT' | 'JAHR'>(() => {
+        try { return (localStorage.getItem('dashPeriod') as any) || 'MONAT' } catch { return 'MONAT' }
+    })
+    useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
+    const [yearSel, setYearSel] = useState<number | null>(null)
+    useEffect(() => {
+        if (period === 'JAHR' && yearsAvail.length > 0 && (yearSel == null || !yearsAvail.includes(yearSel))) {
+            setYearSel(yearsAvail[0])
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [yearsAvail, period])
+    const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
+    // React to global data changes (e.g., new voucher)
+    const [refreshKey, setRefreshKey] = useState(0)
+    useEffect(() => {
+        const onDataChanged = () => setRefreshKey((k) => k + 1)
+        window.addEventListener('data-changed', onDataChanged)
+        return () => window.removeEventListener('data-changed', onDataChanged)
+    }, [])
+    useEffect(() => {
+        let cancelled = false
+        const now = new Date()
+        const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+        const from = period === 'MONAT'
+            ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+            : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+        const to = period === 'MONAT'
+            ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+            : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+        window.api?.reports.summary?.({ from, to }).then(res => {
+            if (cancelled || !res) return
+            const inGross = res.byType.find(x => x.key === 'IN')?.gross || 0
+            const outGrossRaw = res.byType.find(x => x.key === 'OUT')?.gross || 0
+            const outGross = Math.abs(outGrossRaw)
+            const diff = Math.round((inGross - outGross) * 100) / 100
+            setSum({ inGross, outGross, diff })
+        })
+        return () => { cancelled = true }
+    }, [period, refreshKey])
+    const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+
+    // Offene Rechnungen: Kachel mit Fälligkeiten (Due Soon / Überfällig)
+    const [invOpenCount, setInvOpenCount] = useState<number>(0)
+    const [invOpenRemaining, setInvOpenRemaining] = useState<number>(0)
+    const [invDueSoonCount, setInvDueSoonCount] = useState<number>(0)
+    const [invDueSoonRemaining, setInvDueSoonRemaining] = useState<number>(0)
+    const [invOverdueCount, setInvOverdueCount] = useState<number>(0)
+    const [invOverdueRemaining, setInvOverdueRemaining] = useState<number>(0)
+    const [invTopDue, setInvTopDue] = useState<Array<{ id: number; party: string; dueDate?: string | null; remaining: number }>>([])
+
+    const loadInvoiceTiles = useCallback(async () => {
+        try {
+            // Helpers for ISO dates (UTC semantics)
+            const now = new Date()
+            const isoToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10)
+            const plus5 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 5)).toISOString().slice(0, 10)
+            const yday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)).toISOString().slice(0, 10)
+
+            // Helper to sum two summaries (OPEN + PARTIAL)
+            const sumTwo = (a: any, b: any) => ({ count: (a?.count || 0) + (b?.count || 0), remaining: (a?.remaining || 0) + (b?.remaining || 0) })
+
+            // Overall open (OPEN + PARTIAL)
+            const sOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN' })
+            const sPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL' })
+            const openTot = sumTwo(sOpen, sPart)
+            setInvOpenCount(openTot.count)
+            setInvOpenRemaining(openTot.remaining)
+
+            // Due soon: between today and +5 days
+            const sSoonOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
+            const sSoonPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
+            const soonTot = sumTwo(sSoonOpen, sSoonPart)
+            setInvDueSoonCount(soonTot.count)
+            setInvDueSoonRemaining(soonTot.remaining)
+
+            // Overdue: due date before today (<= yesterday)
+            const sOverOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueTo: yday })
+            const sOverPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueTo: yday })
+            const overTot = sumTwo(sOverOpen, sOverPart)
+            setInvOverdueCount(overTot.count)
+            setInvOverdueRemaining(overTot.remaining)
+
+            // Top due (next 5 days) preview list (merge OPEN + PARTIAL, sort ascending by due, take 3)
+            const listOpen = await (window as any).api?.invoices?.list?.({ limit: 5, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
+            const listPart = await (window as any).api?.invoices?.list?.({ limit: 5, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
+            const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
+                .filter((r: any) => !!r && !!r.dueDate)
+                .sort((a: any, b: any) => String(a.dueDate).localeCompare(String(b.dueDate)))
+            // Deduplicate by id and take top 5
+            const uniq: Map<number, any> = new Map()
+            for (const r of mergedRaw) { if (r && typeof r.id === 'number' && !uniq.has(r.id)) uniq.set(r.id, r) }
+            const merged = Array.from(uniq.values()).slice(0, 5)
+                .map((r: any) => ({ id: r.id, party: r.party, dueDate: r.dueDate, remaining: Math.max(0, Math.round(((Number(r.grossAmount || 0) - Number(r.paidSum || 0)) || 0) * 100) / 100) }))
+            setInvTopDue(merged)
+        } catch {
+            // Non-fatal; keep tile hidden or zeros
+        }
+    }, [])
+
+    useEffect(() => {
+        let alive = true
+        ;(async () => { if (alive) await loadInvoiceTiles() })()
+        const onChanged = () => loadInvoiceTiles()
+        window.addEventListener('data-changed', onChanged)
+        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    }, [loadInvoiceTiles])
+
+    return (
+        <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>Hallo{cashier ? ` ${cashier}` : ''}</div>
+                    <div className="helper">Willkommen zurück – hier ist dein Überblick.</div>
+                </div>
+                <div style={{ textAlign: 'right', maxWidth: 520 }}>
+                    <div className="helper">Satz der Woche</div>
+                    <div style={{ fontStyle: 'italic' }}>{loading ? '…' : (quote?.text || '—')}</div>
+                    <div className="helper">{quote?.author || quote?.source || ''}</div>
+                </div>
+            </div>
+            {/* KPI cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
+                    <div className="btn-group" role="tablist" aria-label="Zeitraum">
+                        <button className="btn ghost" onClick={() => setPeriod('MONAT')} style={{ background: period === 'MONAT' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Monat</button>
+                        <button className="btn ghost" onClick={() => setPeriod('JAHR')} style={{ background: period === 'JAHR' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Jahr</button>
+                    </div>
+                    {period === 'JAHR' && yearsAvail.length > 1 && (
+                        <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))}>
+                            {yearsAvail.map((y) => (
+                                <option key={y} value={String(y)}>{y}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                    <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+                    <div style={{ fontWeight: 600 }}>{eur.format(sum?.inGross || 0)}</div>
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                    <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+                    <div style={{ fontWeight: 600 }}>{eur.format(sum?.outGross || 0)}</div>
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                    <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+                    <div style={{ fontWeight: 600, color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
+                </div>
+            </div>
+            {/* Offene Rechnungen */}
+            <div className="card" style={{ padding: 12, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong>Offene Rechnungen</strong>
+                        <span className="chip" title="Summen berücksichtigen offene (OPEN+PARTIAL) Rechnungen. 'Fällig in ≤ 5 Tagen' bezieht sich auf heute bis +5 Tage, 'Überfällig' ist vor heute.">ⓘ</span>
+                    </div>
+                    <button className="btn ghost" onClick={onGoToInvoices}>Zu Rechnungen</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 8, overflow: 'hidden' }}>
+                    <div className="card" style={{ padding: 10, minWidth: 0 }}>
+                        <div className="helper">Offen gesamt</div>
+                        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
+                    </div>
+                    <div className="card" style={{ padding: 10, minWidth: 0 }}>
+                        <div className="helper">Fällig in ≤ 5 Tagen</div>
+                        <div style={{ fontWeight: 600, color: '#f9a825', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
+                    </div>
+                    <div className="card" style={{ padding: 10, borderLeft: '4px solid var(--danger)', minWidth: 0 }}>
+                        <div className="helper">Überfällig</div>
+                        <div style={{ fontWeight: 600, color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
+                    </div>
+                </div>
+                <div style={{ marginTop: 10, overflow: 'hidden' }}>
+                    <div className="helper">Nächste Fälligkeiten</div>
+                    {invTopDue.length > 0 ? (
+                        <div style={{ marginTop: 6, maxHeight: 180, overflowY: 'auto', display: 'grid', gap: 4 }}>
+                            {invTopDue.map((r) => {
+                                const onOpen = () => {
+                                    try { onGoToInvoices() } catch {}
+                                    window.setTimeout(() => { window.dispatchEvent(new CustomEvent('open-invoice-details', { detail: { id: r.id } })) }, 0)
+                                }
+                                return (
+                                    <div key={r.id} onClick={onOpen} title="Details öffnen" style={{ cursor: 'pointer', display: 'grid', gridTemplateColumns: '120px 1fr auto', alignItems: 'center', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                                        <div style={{ color: 'var(--text-dim)' }}>{r.dueDate || '—'}</div>
+                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party || '—'}</div>
+                                        <div style={{ textAlign: 'right', fontWeight: 600 }}>{eur.format(r.remaining || 0)}</div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="helper" style={{ marginTop: 6 }}>—</div>
+                    )}
+                </div>
+            </div>
+
+            {/* Charts preview */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {(() => {
+                    const now = new Date()
+                    const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+                    const f = period === 'MONAT'
+                        ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+                        : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+                    const t = period === 'MONAT'
+                        ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+                        : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+                    return (
+                        <>
+                            <ReportsMonthlyChart from={f} to={t} />
+                            <ReportsCashBars from={f} to={t} />
+                        </>
+                    )
+                })()}
+            </div>
+            {/* Earmarks at a glance: top active ones */}
+            <DashboardEarmarksPeek />
+
+            {/* Recent Activity: last vouchers */}
+            <DashboardRecentActivity />
+        </div>
+    )
+}
+
+function AutoBackupPromptModal({ intervalDays, onClose, onBackupNow }: { intervalDays: number; onClose: () => void; onBackupNow: () => Promise<void> }) {
+    return (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
+                    <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                    Seit der letzten Sicherung sind mehr als {intervalDays} Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button className="btn" onClick={onClose}>Später</button>
+                    <button className="btn primary" onClick={onBackupNow}>Jetzt sichern</button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // Basic Members UI: list with search and add/edit modal (Phase 1)
 function MembersView() {
@@ -2053,8 +2681,9 @@ function MembersView() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn ghost" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
-                    <button className="btn primary" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
+                        style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
+                    <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
@@ -4118,7 +4747,7 @@ function InvoicesView() {
                             </span>
                         </div>
                     )}
-                    <table className="invoices-table" cellPadding={6} style={{ width: '100%' }}>
+                    <table cellPadding={6} style={{ width: '100%' }}>
                         <thead>
                             <tr>
                                 <th align="center" title="Typ">Typ</th>
@@ -4213,7 +4842,7 @@ function InvoicesView() {
                             )}
                         </tbody>
                     </table>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
                         <div className="helper">Gesamt: {total}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <label className="helper">Pro Seite</label>
@@ -4222,46 +4851,9 @@ function InvoicesView() {
                                 <option value={20}>20</option>
                                 <option value={50}>50</option>
                             </select>
-                                <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste Seite" aria-label="Erste Seite">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                        <polyline points="11 17 6 12 11 7" />
-                                        <polyline points="18 17 13 12 18 7" />
-                                    </svg>
-                                </button>
-                            <button
-                                className="btn"
-                                disabled={!canPrev}
-                                onClick={() => setOffset(Math.max(0, offset - limit))}
-                                title="Zurück"
-                                aria-label="Zurück"
-                                style={!canPrev ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-                            >
-                                ‹
-                            </button>
+                            <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))}>Zurück</button>
                             <span className="helper">Seite {page} / {pages}</span>
-                            <button
-                                className="btn"
-                                disabled={!canNext}
-                                onClick={() => setOffset(offset + limit)}
-                                title="Weiter"
-                                aria-label="Weiter"
-                                style={!canNext ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-                            >
-                                ›
-                            </button>
-                            <button
-                                className="btn"
-                                disabled={!canNext}
-                                onClick={() => setOffset(Math.max(0, (pages - 1) * limit))}
-                                title="Letzte Seite"
-                                aria-label="Letzte Seite"
-                                style={!canNext ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
-                                    <polyline points="11 17 6 12 11 7" />
-                                    <polyline points="18 17 13 12 18 7" />
-                                </svg>
-                            </button>
+                            <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)}>Weiter</button>
                         </div>
                     </div>
                 </>
@@ -4341,9 +4933,8 @@ function InvoicesView() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                     <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Rechnung anlegen' : 'Rechnung bearbeiten'}</h2>
-                                    <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px' }}>
                                         <input aria-label="Datum" className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={{ height: 26, padding: '2px 6px' }} />
-                                        <span className="required-asterisk" aria-hidden="true">*</span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -4375,7 +4966,7 @@ function InvoicesView() {
                                     <input className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" />
                                 </div>
                                 <div className="field">
-                                    <label>Partei<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                    <label>Partei</label>
                                     <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" />
                                     {/* datalist placed later */}
                                 </div>
@@ -4384,7 +4975,7 @@ function InvoicesView() {
                                     <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
                                 </div>
                                 <div className="field">
-                                    <label>Betrag (EUR)<span className="required-asterisk" aria-hidden="true">*</span></label>
+                                    <label>Betrag (EUR)</label>
                                     <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} />
                                     <div className="helper">{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : 'Bitte Betrag eingeben' })()}</div>
                                 </div>
@@ -4911,7 +5502,7 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
     )
 }
 
-function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; onEdit?: (b: any) => void }) {
+function EarmarkUsageCards({ bindings, from, to, sphere }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
     const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number }>>({})
     useEffect(() => {
         let alive = true
@@ -4934,38 +5525,28 @@ function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: A
                 const u = usage[b.id]
                 const bg = b.color || undefined
                 const fg = contrastText(bg)
-                const planned = Math.max(0, u?.budget ?? 0)
-                const expenses = Math.max(0, u?.released ?? 0)
-                const income = Math.max(0, u?.allocated ?? 0)
-                const rest = planned - expenses + income
-                const title = `${b.code} – ${b.name}`
                 return (
-                    <div key={b.id} className="card" style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}>
+                    <div
+                        key={b.id}
+                        className="card"
+                        style={{ padding: 10, cursor: 'pointer', borderTop: bg ? `4px solid ${bg}` : undefined }}
+                        onClick={() => { const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } }); window.dispatchEvent(ev) }}
+                        title={`Nach Zweckbindung ${b.code} filtern`}
+                    >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                             <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{b.name}</span>
+                            <span className="helper">{b.name}</span>
                         </div>
-                        <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                            <div>
-                                <div className="helper">Geplant</div>
-                                <div>{fmt.format(planned)}</div>
-                            </div>
-                            <div>
-                                <div className="helper">Ausgaben</div>
-                                <div style={{ color: 'var(--danger)' }}>{fmt.format(expenses)}</div>
-                            </div>
-                            <div>
-                                <div className="helper">Einnahmen</div>
-                                <div style={{ color: 'var(--success)' }}>{fmt.format(income)}</div>
-                            </div>
-                            <div>
-                                <div className="helper">Rest</div>
-                                <div style={{ color: rest >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt.format(rest)}</div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-                            <button className="btn ghost" onClick={() => { const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } }); window.dispatchEvent(ev) }}>Zu Buchungen</button>
-                            <button className="btn" onClick={() => onEdit?.(b)}>✎ Bearbeiten</button>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                            <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>
+                            <span className="badge out">OUT: {fmt.format(u?.released ?? 0)}</span>
+                            <span className="badge">Saldo: {fmt.format(u?.balance ?? 0)}</span>
+                            {((u?.budget ?? 0) > 0) && (
+                                <>
+                                    <span className="badge" title="Anfangsbudget">Budget: {fmt.format(u?.budget ?? 0)}</span>
+                                    <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? 0)}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 )
@@ -4998,8 +5579,10 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
 
     if (!budgets.length) return null
     return (
-        <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-            {budgets.map((b) => {
+        <div style={{ marginTop: 12 }}>
+            <strong>Übersicht</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 8 }}>
+                {budgets.map((b) => {
                     const bg = b.color || undefined
                     const fg = contrastText(bg)
                     const plan = b.amountPlanned || 0
@@ -5024,12 +5607,12 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                                     <div style={{ color: 'var(--danger)' }}>{eurFmt.format(spent)}</div>
                                 </div>
                                 <div>
-                                    <div className="helper">Einnahmen (Budget)</div>
-                                    <div style={{ color: 'var(--success)' }}>{eurFmt.format(inflow)}</div>
-                                </div>
-                                <div>
                                     <div className="helper">Rest</div>
                                     <div style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eurFmt.format(remaining)}</div>
+                                </div>
+                                <div>
+                                    <div className="helper">Einnahmen (Budget)</div>
+                                    <div style={{ color: 'var(--success)' }}>{eurFmt.format(inflow)}</div>
                                 </div>
                                 <div>
                                     <div className="helper">Buchungen</div>
@@ -5055,7 +5638,8 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                             </div>
                         </div>
                     )
-            })}
+                })}
+            </div>
         </div>
     )
 }
@@ -5372,9 +5956,15 @@ function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number;
                                         const color = saldoMonth >= 0 ? '#2e7d32' : '#c62828'
                                         return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill={color} rx={2} opacity={0.7} />
                                     })()}
-                                    {/* Hover text tooltip removed to avoid duplication with the overlay; keep only month label below */}
+                                    {hoverIdx === i && (
+                                        <g>
+                                            <text x={gx + barW} y={Math.min(yIn, yOut) - 6} textAnchor="middle" fontSize="10">
+                                                {`${monthLabel(s.month, true)}: IN ${eurFmt.format(s.inGross)}, OUT ${eurFmt.format(s.outGross)}, Saldo ${eurFmt.format(saldoMonth)}`}
+                                            </text>
+                                        </g>
+                                    )}
                                     <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
-                                    {/* Remove native browser tooltip (<title>) to prevent redundant hover popups */}
+                                    <title>{`${monthLabel(s.month, true)}\nIN: ${eurFmt.format(s.inGross)}\nOUT: ${eurFmt.format(Math.abs(s.outGross))}\nNetto: ${eurFmt.format(saldoMonth)}\nKlick für Drilldown`}</title>
                                     </g>
                                 </g>
                             )
@@ -6244,9 +6834,7 @@ function SettingsView({
     notify,
     bumpDataVersion,
     openTagsManager,
-    openSetupWizard,
     labelForCol,
-    onOpenSmartRestore,
 }: {
     defaultCols: Record<string, boolean>
     defaultOrder: string[]
@@ -6275,9 +6863,7 @@ function SettingsView({
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
     bumpDataVersion: () => void
     openTagsManager?: () => void
-    openSetupWizard?: () => void
     labelForCol: (k: string) => string
-    onOpenSmartRestore?: (preview: any) => void
 }) {
     type TileKey = 'general' | 'table' | 'import' | 'storage' | 'org' | 'tags' | 'yearEnd' | 'tutorial' | 'about'
     const [active, setActive] = useState<TileKey>('general')
@@ -6293,12 +6879,6 @@ function SettingsView({
         const [busyImport, setBusyImport] = useState(false)
         return (
             <div style={{ display: 'grid', gap: 12 }}>
-                {/* Quick access: Re-run setup wizard */}
-                <div className="card settings-card" style={{ padding: 12 }}>
-                    <div className="settings-title"><span aria-hidden>✨</span> <strong>Setup (Erststart)</strong></div>
-                    <div className="settings-sub">Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.</div>
-                    <button className="btn" onClick={() => openSetupWizard && openSetupWizard()}>Setup erneut öffnen…</button>
-                </div>
                 {/* Cluster 1: Darstellung & Layout */}
                 <div className="card settings-card" style={{ padding: 12 }}>
                     <div className="settings-title"><span aria-hidden>🖼️</span> <strong>Aussehen & Navigation</strong></div>
@@ -6698,20 +7278,9 @@ function SettingsView({
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn" disabled={busy} onClick={() => doAction('pick')}>Ordner wählen…</button>
-                    <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={async () => {
-                        if (!info?.configuredRoot) return
-                        try {
-                            setBusy(true)
-                            const prev = await window.api?.db?.smartRestore?.preview?.()
-                            onOpenSmartRestore && onOpenSmartRestore(prev)
-                        } catch (e: any) {
-                            notify('error', e?.message || String(e))
-                        } finally {
-                            setBusy(false)
-                        }
-                    }}>Standard wiederherstellen (Smart)</button>
+                    <button className="btn" disabled={busy || !info?.configuredRoot} title={!info?.configuredRoot ? 'Bereits Standard' : ''} onClick={() => doAction('reset')}>Standard wiederherstellen</button>
                 </div>
-                {/* state hook must not be rendered; moved to top of component – leftover text removed */}
+        const [showBackupsAll, setShowBackupsAll] = useState(false)
                 {backupDir && (
                     <div className="helper" style={{ wordBreak: 'break-all' }}>Backup-Ordner: {backupDir}</div>
                 )}
@@ -8417,79 +8986,42 @@ function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters
                         </>
                     )}
 
-                    {activePage === 'Buchungen' && (
-                        <div className="card">
-                            <JournalTable
-                                rows={rows}
-                                order={order}
-                                cols={cols}
-                                onReorder={(o: any) => setOrder(o as any)}
-                                earmarks={earmarks}
-                                tagDefs={tagDefs}
-                                eurFmt={eurFmt}
-                                fmtDate={fmtDate}
-                                onEdit={(r) => setEditRow({
-                                    ...r,
-                                    mode: (r as any).grossAmount != null ? 'GROSS' : 'NET',
-                                    netAmount: (r as any).netAmount ?? null,
-                                    grossAmount: (r as any).grossAmount ?? null,
-                                    vatRate: (r as any).vatRate ?? 0
-                                } as any)}
-                                onDelete={(r) => setDeleteRow(r)}
-                                onToggleSort={(col: 'date' | 'net' | 'gross') => {
-                                    setPage(1)
-                                    setSortBy(col)
-                                    setSortDir(prev => (col === sortBy ? (prev === 'DESC' ? 'ASC' : 'DESC') : 'DESC'))
-                                }}
-                                sortDir={sortDir}
-                                sortBy={sortBy}
-                                highlightId={flashId}
-                                lockedUntil={periodLock?.closedUntil || null}
-                                onTagClick={async (name) => {
-                                    setFilterTag(name)
-                                    setActivePage('Buchungen')
-                                    setPage(1)
-                                    await loadRecent()
-                                }}
-                                onEarmarkClick={async (id) => {
-                                    setFilterEarmark(id)
-                                    setActivePage('Buchungen')
-                                    setPage(1)
-                                    await loadRecent()
-                                }}
-                                onBudgetClick={async (id) => {
-                                    setFilterBudgetId(id)
-                                    setActivePage('Buchungen')
-                                    setPage(1)
-                                    await loadRecent()
-                                }}
-                            />
-                            {/* Unified pagination footer (like Invoices) */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
-                                <div className="helper">Gesamt: {totalRows}</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <label className="helper">Pro Seite</label>
-                                    <select className="input" value={journalLimit} onChange={e => { setJournalLimit(Number(e.target.value)); setPage(1) }} style={{ width: 80 }}>
-                                        <option value={10}>10</option>
-                                        <option value={20}>20</option>
-                                        <option value={50}>50</option>
-                                        <option value={100}>100</option>
-                                    </select>
-                                    <button className="btn" onClick={() => setPage(1)} disabled={page <= 1} title="Erste Seite" aria-label="Erste Seite" style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                            <polyline points="11 17 6 12 11 7" />
-                                            <polyline points="18 17 13 12 18 7" />
-                                        </svg>
-                                    </button>
-                                    <button className="btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} title="Zurück" aria-label="Zurück" style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹</button>
-                                    <span className="helper">Seite {page} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
-                                    <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter" aria-label="Weiter" style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>›</button>
-                                    <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte Seite" aria-label="Letzte Seite" style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
-                                            <polyline points="11 17 6 12 11 7" />
-                                            <polyline points="18 17 13 12 18 7" />
-                                        </svg>
-                                    </button>
-                                </div>
+                    {mode === 'BUDGET' && (
+                        <>
+                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                <label>Budget</label>
+                                <select className="input" value={budgetId as any} onChange={(e) => setBudgetId(e.target.value ? Number(e.target.value) : '')}>
+                                    <option value="">— bitte wählen —</option>
+                                    {budgets.map(b => (
+                                        <option key={b.id} value={b.id}>{b.label}</option>
+                                    ))}
+                                </select>
                             </div>
-                        </div>
+                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                <label><input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} /> Nur Buchungen ohne Budget aktualisieren</label>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="card" style={{ gridColumn: '1 / span 2', padding: 10 }}>
+                        <div className="helper">Betroffene Buchungen: Aktuelle Filter werden angewandt (Suche, Zeitraum, Sphäre, Art, Zahlweg).</div>
+                        <ul style={{ margin: '6px 0 0 16px' }}>
+                            {currentFilters.q && <li>Suche: <code>{currentFilters.q}</code></li>}
+                            {currentFilters.from && currentFilters.to && <li>Zeitraum: {currentFilters.from} – {currentFilters.to}</li>}
+                            {currentFilters.sphere && <li>Sphäre: {currentFilters.sphere}</li>}
+                            {currentFilters.type && <li>Art: {currentFilters.type}</li>}
+                            {currentFilters.paymentMethod && <li>Zahlweg: {currentFilters.paymentMethod}</li>}
+                            {onlyWithout && mode === 'EARMARK' && <li>Nur ohne bestehende Zweckbindung</li>}
+                            {onlyWithout && mode === 'BUDGET' && <li>Nur ohne bestehendes Budget</li>}
+                        </ul>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                    <button className="btn" onClick={onClose}>Abbrechen</button>
+                    <button className="btn primary" disabled={busy || (mode === 'EARMARK' && !earmarkId) || (mode === 'BUDGET' && !budgetId)} onClick={run}>Übernehmen</button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    )
+}
