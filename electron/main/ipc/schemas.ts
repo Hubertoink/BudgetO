@@ -175,6 +175,7 @@ export type TReportsMonthlyOutput = z.infer<typeof ReportsMonthlyOutput>
 
 // Cash balance as of a date (year-to-date inflow-outflow; opening booked as IN at year's start)
 export const ReportsCashBalanceInput = z.object({
+    from: z.string().optional(),
     to: z.string().optional(),
     sphere: Sphere.optional()
 })

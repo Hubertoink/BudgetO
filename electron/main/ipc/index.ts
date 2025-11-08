@@ -93,7 +93,7 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.cashBalance', async (_e, payload) => {
         const parsed = ReportsCashBalanceInput.parse(payload)
-        const res = cashBalance({ to: parsed.to, sphere: parsed.sphere as any })
+        const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any })
         return ReportsCashBalanceOutput.parse(res)
     })
 

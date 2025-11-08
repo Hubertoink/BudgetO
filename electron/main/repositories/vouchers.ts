@@ -802,12 +802,14 @@ export function clearAllVouchers() {
     })
 }
 
-export function cashBalance(params: { to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
+export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
     const d = getDb()
     const to = params.to ?? new Date().toISOString().slice(0, 10)
     const year = to.slice(0, 4)
+    // Wenn 'from' übergeben wird, nutze es; sonst Jahresanfang
+    const from = params.from ?? `${year}-01-01`
     const wh: string[] = ["date >= ?", "date <= ?"]
-    const vals: any[] = [`${year}-01-01`, to]
+    const vals: any[] = [from, to]
     if (params.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
     const whereSql = ' WHERE ' + wh.join(' AND ')
     const rows = d.prepare(`
