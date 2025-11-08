@@ -2630,8 +2630,7 @@ function MembersView() {
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                {/* Info tooltip instead of right-side column */}
-                                <button className="btn ghost" title={'IBAN/BIC werden live geprüft.\nBeitragsvorschau zeigt die initiale Fälligkeit.\nMit Tab lassen sich Felder schnell durchlaufen.'}>ℹ️</button>
+                                {/* Info tooltip entfernt */}
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
                                 <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
                             </div>
@@ -3115,12 +3114,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             })}
                                         </tbody>
                                     </table>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                                        <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                        <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                        <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                        <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
-                                    </div>
+                                    {/* Duplicate pagination controls removed (footer) to avoid redundancy */}
                                 </>
                             )}
                         </div>

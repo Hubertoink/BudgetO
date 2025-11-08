@@ -70,9 +70,9 @@ export function SettingsView(props: SettingsProps) {
           />
         )}
         
-        {activeTile === 'import' && <ImportPane />}
-        
-        {activeTile === 'org' && <OrgPane />}
+  {activeTile === 'import' && <ImportPane notify={props.notify} />}
+
+  {activeTile === 'org' && <OrgPane notify={props.notify} />}
         
         {activeTile === 'tags' && (
           <TagsPane
@@ -84,7 +84,12 @@ export function SettingsView(props: SettingsProps) {
           />
         )}
         
-        {activeTile === 'yearEnd' && <YearEndPane />}
+        {activeTile === 'yearEnd' && (
+          <YearEndPane
+            notify={props.notify}
+            bumpDataVersion={props.bumpDataVersion}
+          />
+        )}
       </div>
     </div>
   )

@@ -187,3 +187,16 @@ export interface TagsPaneProps {
   bumpDataVersion: () => void
   openTagsManager?: () => void
 }
+
+export interface OrgPaneProps {
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+}
+
+export interface YearEndPaneProps {
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  bumpDataVersion: () => void
+}
+
+export interface ImportPaneProps {
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+}
