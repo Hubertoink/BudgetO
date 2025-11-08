@@ -987,7 +987,7 @@ export default function App() {
 
                     {/* Heading removed per request */}
                     {activePage === 'Buchungen' && (
-                        <FilterTotals refreshKey={refreshKey} from={from || undefined} to={to || undefined} paymentMethod={filterPM || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} q={q || undefined} tag={filterTag || undefined} />
+                        <FilterTotals refreshKey={refreshKey} from={from || undefined} to={to || undefined} paymentMethod={filterPM || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId ?? undefined} q={q || undefined} tag={filterTag || undefined} />
                     )}
                     {activePage === 'Buchungen' && (
                         <div>
@@ -4317,7 +4317,7 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
 }
 
 // Lightweight totals bar for current filters
-function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earmarkId, q, tag }: { refreshKey?: number; from?: string; to?: string; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; earmarkId?: number; q?: string; tag?: string }) {
+function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag }: { refreshKey?: number; from?: string; to?: string; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; earmarkId?: number; budgetId?: number | null; q?: string; tag?: string }) {
     const [loading, setLoading] = useState(false)
     const [values, setValues] = useState<{ inGross: number; outGross: number; diff: number } | null>(null)
     useEffect(() => {
@@ -4325,14 +4325,22 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
         async function run() {
             setLoading(true)
             try {
-                const res = await window.api?.reports.summary?.({ from, to, paymentMethod, sphere, type, earmarkId, q, tag })
-                if (alive && res) {
-                    const t = res.byType || []
-                    const inGross = t.find(x => x.key === 'IN')?.gross || 0
-                    const outGrossRaw = t.find(x => x.key === 'OUT')?.gross || 0
-                    const outGross = Math.abs(outGrossRaw)
-                    const diff = Math.round((inGross - outGross) * 100) / 100
-                    setValues({ inGross, outGross, diff })
+                if (typeof budgetId === 'number') {
+                    const u = await window.api?.budgets.usage?.({ budgetId, from, to })
+                    const inflow = Math.max(0, Number(u?.inflow || 0))
+                    const spent = Math.max(0, Number(u?.spent || 0))
+                    const diff = Math.round((inflow - spent) * 100) / 100
+                    if (alive) setValues({ inGross: inflow, outGross: spent, diff })
+                } else {
+                    const res = await window.api?.reports.summary?.({ from, to, paymentMethod, sphere, type, earmarkId, q, tag })
+                    if (alive && res) {
+                        const t = res.byType || []
+                        const inGross = t.find((x: any) => x.key === 'IN')?.gross || 0
+                        const outGrossRaw = t.find((x: any) => x.key === 'OUT')?.gross || 0
+                        const outGross = Math.abs(outGrossRaw)
+                        const diff = Math.round((inGross - outGross) * 100) / 100
+                        setValues({ inGross, outGross, diff })
+                    }
                 }
             } finally {
                 if (alive) setLoading(false)
@@ -4340,7 +4348,7 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
         }
         run()
         return () => { alive = false }
-    }, [from, to, paymentMethod, sphere, type, earmarkId, q, tag, refreshKey])
+    }, [from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag, refreshKey])
     const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     if (!values && !loading) return null
     return (

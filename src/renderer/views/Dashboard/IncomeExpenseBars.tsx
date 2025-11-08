@@ -62,8 +62,12 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
     ...rowsNet.map(r => Math.abs(r.gross))
   )
 
-  const W = 760, H = 220, P = 40
-  const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
+  // Increase horizontal padding so all month labels can fit; distribute bars to avoid clipping.
+  const W = 760, H = 220, P = 64
+  const xs = (i: number, n: number) => {
+    const usable = W - 2 * P
+    return P + (i * usable) / Math.max(1, n - 1)
+  }
   const baseY = H - 28
   const maxH = baseY - 16
   const barW = 8
@@ -121,7 +125,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
         <span className="helper">{from} → {to}</span>
       </header>
       <div style={{ position: 'relative', overflow: 'hidden' }}>
-        <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Einnahmen vs Ausgaben">
+  <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Einnahmen vs Ausgaben">
           {/* Axes */}
           <line x1={P/2} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -137,22 +141,20 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
             const xCenter = xs(i, labels.length)
             const hIn = Math.round((rowsIn[i]?.gross || 0) / maxVal * maxH)
             const hOut = Math.round((rowsOut[i]?.gross || 0) / maxVal * maxH)
-            const netVal = rowsNet[i]?.gross || 0
-            const hNet = Math.round(Math.abs(netVal) / maxVal * maxH)
+            // Netto wird nur im Tooltip angezeigt, nicht als eigener Balken
             return (
               <g key={m}>
                 {/* IN bar (left) */}
                 <rect x={xCenter - barW * 1.5 - gap} y={baseY - hIn} width={barW} height={hIn} fill="var(--success)" rx={2} />
                 {/* OUT bar (center) */}
                 <rect x={xCenter - barW / 2} y={baseY - hOut} width={barW} height={hOut} fill="var(--danger)" rx={2} />
-                {/* Netto bar (right) - yellow */}
-                <rect x={xCenter + barW / 2 + gap} y={baseY - hNet} width={barW} height={hNet} fill="#f9a825" rx={2} />
               </g>
             )
           })}
           {/* X labels */}
           {labels.map((m, i) => {
-            if (labels.length > 8 && i % Math.ceil(labels.length/8) !== 0 && i !== labels.length - 1) return null
+            // Always show all months when <=12; if more (unlikely yearly) then thin out
+            if (labels.length > 14 && i % 2 !== 0) return null
             const x = xs(i, labels.length)
             const mon = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
             return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
@@ -165,11 +167,11 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
           )}
         </svg>
         {hoverIdx != null && (
-          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: '#f9a825', color: '#000', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)' }}>
+          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)' }}>
             <div style={{ fontSize: 12, fontWeight: 600 }}>{monthNames[Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))] || String(labels[hoverIdx]).slice(5)}</div>
-            <div><span style={{ opacity: 0.8 }}>Einnahmen</span> <strong>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
-            <div><span style={{ opacity: 0.8 }}>Ausgaben</span> <strong>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
-            <div><span style={{ opacity: 0.8 }}>Netto</span> <strong>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
+            <div><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
+            <div><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
+            <div><span style={{ color: '#f9a825' }}>Netto</span> <strong>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
           </div>
         )}
         {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}

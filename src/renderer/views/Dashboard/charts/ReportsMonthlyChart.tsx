@@ -77,10 +77,15 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const maxBar = Math.max(1, ...rowsIn.map(r=>r.gross), ...rowsOut.map(r=>r.gross))
   const minLine = Math.min(0, ...cumSeries)
   const maxLine = Math.max(0, ...cumSeries)
-  const W = 900, H = 260, P = 48
+  // Increase left padding slightly to avoid hover needing to be far left and ensure full month labels visible.
+  const W = 900, H = 260, P = 64
   const baseY = H - 28
   const maxH = baseY - 24
-  const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
+  const xs = (i: number, n: number) => {
+    // distribute with small intra padding so last labels don't sit flush to right edge
+    const usable = W - 2 * P
+    return P + (i * usable) / Math.max(1, n - 1)
+  }
   const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxBar)) * maxH
   const yLine = (v: number) => {
     const top = 16
@@ -132,7 +137,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
         <span className="helper">{from} → {to}</span>
       </div>
       <div className="chart-canvas" style={{ overflow: 'hidden' }}>
-        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatsverlauf">
+  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatsverlauf">
           {/* Axes */}
           <line x1={P} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -154,11 +159,10 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
           {/* X labels */}
           {labels.map((m,i)=>{
-            if (labels.length > 10 && i % Math.ceil(labels.length/10) !== 0 && i !== labels.length-1) return null
+            // Always show all months for year view; if many (edge case multi-year) fallback to every second
+            if (labels.length > 24 && i % 2 !== 0) return null
             const mon = MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5)
-            return (
-              <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
-            )
+            return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
           })}
           {/* Hover guide + tooltip (single instance) */}
           {hoverIdx != null && labels[hoverIdx] && (
@@ -166,19 +170,22 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               <line x1={xs(hoverIdx, labels.length)} x2={xs(hoverIdx, labels.length)} y1={16} y2={baseY} stroke="var(--border)" strokeDasharray="3 4" />
               <circle cx={xs(hoverIdx, labels.length)} cy={yLine(cumSeries[hoverIdx]||0)} r={3} fill="var(--accent)" />
               {(() => {
-                const w = 190, h = 74, pad = 8
+                const w = 200, h = 86, pad = 8
                 const cx = xs(hoverIdx, labels.length)
                 const x = Math.max(P, Math.min(cx - w/2, W - P - w))
                 const y = 8
                 const monthIdx = Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))
                 const mLabel = MONTH_NAMES[monthIdx] || String(labels[hoverIdx]).slice(5)
+                const inVal = eur.format(rowsIn[hoverIdx]?.gross || 0)
+                const outVal = eur.format(rowsOut[hoverIdx]?.gross || 0)
+                const saldo = eur.format(cumSeries[hoverIdx] || 0)
                 return (
                   <g>
                     <rect x={x} y={y} width={w} height={h} rx={8} ry={8} fill="var(--surface)" stroke="var(--border)" />
-                    <text x={x+pad} y={y+16} fontSize={12} fill="var(--text-dim)">{mLabel}</text>
-                    <text x={x+pad} y={y+32} fontSize={12} fill="var(--text)">IN: {eur.format(rowsIn[hoverIdx]?.gross || 0)}</text>
-                    <text x={x+pad} y={y+48} fontSize={12} fill="var(--text)">OUT: {eur.format(rowsOut[hoverIdx]?.gross || 0)}</text>
-                    <text x={x+pad} y={y+64} fontSize={12} fill="var(--text)">Saldo kum.: {eur.format(cumSeries[hoverIdx] || 0)}</text>
+                    <text x={x+pad} y={y+16} fontSize={12} fill="var(--text-dim)" fontWeight={600}>{mLabel}</text>
+                    <text x={x+pad} y={y+34} fontSize={12} fill="var(--success)">Einnahmen: {inVal}</text>
+                    <text x={x+pad} y={y+50} fontSize={12} fill="var(--danger)">Ausgaben: {outVal}</text>
+                    <text x={x+pad} y={y+66} fontSize={12} fill="#f9a825">Saldo kum.: {saldo}</text>
                   </g>
                 )
               })()}

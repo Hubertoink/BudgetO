@@ -3,10 +3,12 @@ import BalanceAreaChart from './BalanceAreaChart'
 import IncomeExpenseBars from './IncomeExpenseBars'
 import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
 import ReportsCashBars from './charts/ReportsCashBars'
-import EarmarksUsageBars from './EarmarksUsageBars'
-import BudgetDeviationList from './BudgetDeviationList'
-import WorkQueueCard from './WorkQueueCard'
+// EarmarksUsageBars removed to avoid duplicate tile – combined in detail card
+// BudgetDeviationList (older Sphären‑Anteile donut) removed in favor of SphereShareCard
+// WorkQueueCard removed (Offene Aufgaben) per dashboard simplification request
 import EarmarkDetailCard from './EarmarkDetailCard'
+import BudgetDetailCard from './BudgetDetailCard'
+import SphereShareCard from './SphereShareCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
 
@@ -130,6 +132,58 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
   }, [loadInvoiceTiles])
 
+  // Active Zweckbindungen (earmarks) & Budgets for dashboard cards (max 2 each, exclude ended)
+  const [activeEarmarks, setActiveEarmarks] = useState<Array<{ id: number; code: string; name: string; endDate?: string | null; color?: string | null }>>([])
+  const [activeBudgets, setActiveBudgets] = useState<Array<{ id: number; name?: string | null; amountPlanned: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
+  useEffect(() => {
+    let alive = true
+  const todayIso = new Date().toISOString().slice(0,10)
+    const load = async () => {
+      try {
+        const earmarkRes = await (window as any).api?.bindings?.list?.({ activeOnly: true })
+        const rawEarmarks = (earmarkRes?.rows || []) as Array<any>
+        const filteredEarmarks = rawEarmarks
+          .filter(e => {
+            const sd = e.startDate ? String(e.startDate) : null
+            const ed = e.endDate ? String(e.endDate) : null
+            const startedOk = !sd || sd <= todayIso
+            const notEnded = !ed || ed >= todayIso
+            return startedOk && notEnded
+          })
+          .sort((a,b)=>{
+            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
+            const be = b.endDate ? String(b.endDate) : '9999-12-31'
+            return ae.localeCompare(be)
+          })
+          .slice(0,2)
+        if (alive) setActiveEarmarks(filteredEarmarks.map(e => ({ id: e.id, code: e.code, name: e.name, endDate: e.endDate || null, color: e.color || null })))
+      } catch { if (alive) setActiveEarmarks([]) }
+      try {
+        const budgetRes = await (window as any).api?.budgets?.list?.({})
+        const rawBudgets = (budgetRes?.rows || []) as Array<any>
+        const filteredBudgets = rawBudgets
+          .filter(b => {
+            const sd = b.startDate ? String(b.startDate) : null
+            const ed = b.endDate ? String(b.endDate) : null
+            const startedOk = !sd || sd <= todayIso
+            const notEnded = !ed || ed >= todayIso
+            return startedOk && notEnded
+          })
+          .sort((a,b)=>{
+            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
+            const be = b.endDate ? String(b.endDate) : '9999-12-31'
+            return ae.localeCompare(be)
+          })
+          .slice(0,2)
+        if (alive) setActiveBudgets(filteredBudgets.map(b => ({ id: b.id, name: b.name || null, amountPlanned: b.amountPlanned || 0, sphere: b.sphere, startDate: b.startDate || null, endDate: b.endDate || null, color: b.color || null })))
+      } catch { if (alive) setActiveBudgets([]) }
+    }
+    load()
+    const onChanged = () => load()
+    window.addEventListener('data-changed', onChanged)
+    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+  }, [])
+
   return (
     <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -235,12 +289,25 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
             {/* Alle Komponenten untereinander in einer Spalte */}
             <div style={{ display: 'grid', gap: 12 }}>
               <BalanceAreaChart {...balanceFilters} />
-              <WorkQueueCard {...yearFilters} />
-              <BudgetDeviationList {...yearFilters} limit={5} />
-              <EarmarksUsageBars {...yearFilters} limit={5} />
-              <EarmarkDetailCard {...yearFilters} />
+              {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
+              {/* Two-column layout: Zweckbindungen (max 2) left, Budgets (max 2) right */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {activeEarmarks.map(em => (
+                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...yearFilters} />
+                  ))}
+                  {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
+                </div>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {activeBudgets.map(b => (
+                    <BudgetDetailCard key={b.id} budgetId={b.id} from={yearFilters.from} to={yearFilters.to} />
+                  ))}
+                  {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
+                </div>
+              </div>
               <ReportsMonthlyChart from={yearFilters.from} to={yearFilters.to} />
               <ReportsCashBars from={yearFilters.from} to={yearFilters.to} />
+              <SphereShareCard from={yearFilters.from} to={yearFilters.to} />
               <IncomeExpenseBars {...yearFilters} />
             </div>
           </>

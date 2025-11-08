@@ -99,8 +99,15 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
     return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
   }, [from, to])
 
-  // Prepare values for chart: we use gross as signed monthly saldo (IN positive, OUT negative)
-  const series = rows.map(r => Number(r.gross) || 0)
+  // Prepare values for chart
+  // isDaily: when the selected range is within one month (we built per-day rows above)
+  const isDaily = (from && to && from.slice(0,7) === to.slice(0,7))
+  // Convert signed values (IN positive, OUT negative) into a cumulative saldo over time
+  const baseSeries = rows.map(r => Number(r.gross) || 0)
+  const series = (() => {
+    let run = 0
+    return baseSeries.map(v => { run += v; return Math.round(run * 100) / 100 })
+  })()
   const minV = Math.min(0, ...series)
   const maxV = Math.max(0, ...series)
   const range = Math.max(1, maxV - minV)
@@ -129,7 +136,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   })()
 
   // X labels: months for yearly, days for monthly
-  const isDaily = (from && to && from.slice(0,7) === to.slice(0,7))
+  // isDaily already computed above
   // Yearly view: show all months; Daily view: reduce to ~8 labels
   const tickEvery = isDaily ? Math.max(1, Math.ceil(labels.length / 8)) : 1
 
@@ -178,11 +185,11 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   return (
     <section className="card" style={{ padding: 12, overflow: 'hidden' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <strong>{isDaily ? 'Kassenstand (Saldo täglich)' : 'Kassenstand (Saldo monatlich)'}</strong>
+        <strong>{isDaily ? 'Kassenstand Entwicklung (Saldo kumuliert täglich)' : 'Kassenstand Entwicklung (Saldo kumuliert monatlich)'}</strong>
         <span className="helper">{from} → {to}</span>
       </header>
       <div style={{ position: 'relative', overflow: 'hidden' }}>
-        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatlicher Saldo">
+  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatlicher Saldo">
           {/* Zero/baseline axis */}
           {(yMin <= 0 && yMax >= 0) && (<line x1={P/2} x2={W-P/2} y1={ys(0)} y2={ys(0)} stroke="var(--border)" strokeWidth={1} />)}
           {/* Y axis */}
@@ -231,7 +238,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
         )}
         {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}
       </div>
-      <div className="helper" style={{ marginTop: 6 }}>Werte: IN positiv, OUT negativ. Grundlage: Brutto je Monat.</div>
+      <div className="helper" style={{ marginTop: 6 }}>Kumulierte Differenz: IN positiv, OUT negativ. Monate ohne Bewegung tragen den letzten Saldo fort.</div>
     </section>
   )
 }
