@@ -53,11 +53,12 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
             const idx = hoverIdx
             if (idx == null || !arcs[idx]) return null
             const a = arcs[idx]
+            const pct = Math.round(a.frac * 100)
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center', zIndex: 10 }}>
-                <strong style={{ fontSize: 12 }}>{a.key}</strong>
-                <span className="chip" style={{ background: colors[a.key], color: '#fff' }}>{eurFmt.format(a.gross)}</span>
-                <span className="chip" style={{ background: '#555', color: '#fff' }}>{Math.round(a.frac * 100)}%</span>
+              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{a.key}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Betrag</span> <strong style={{ color: colors[a.key] }}>{eurFmt.format(a.gross)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Anteil</span> <strong>{pct}%</strong></div>
               </div>
             )
           })()}

@@ -41,10 +41,12 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
             const label = idx === 0 ? 'BAR' : 'BANK'
             const value = idx === 0 ? (balance?.bar || 0) : (balance?.bank || 0)
             const color = idx === 0 ? '#42a5f5' : '#26a69a'
+            const pct = total > 0 ? Math.round((value / total) * 100) : 0
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center', zIndex: 10 }}>
-                <strong style={{ fontSize: 12, color }}>{label}</strong>
-                <span className="chip" style={{ background: color, color: '#fff' }}>{eurFmt.format(value)} ({total>0?Math.round((value/total)*100):0}%)</span>
+              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Betrag</span> <strong style={{ color }}>{eurFmt.format(value)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Anteil</span> <strong>{pct}%</strong></div>
               </div>
             )
           })()}

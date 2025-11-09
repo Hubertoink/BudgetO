@@ -2,7 +2,7 @@ import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
-import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
+import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
@@ -89,6 +89,18 @@ export function registerIpcHandlers() {
             type: parsed.type as any
         })
         return ReportsMonthlyOutput.parse({ buckets })
+    })
+
+    ipcMain.handle('reports.daily', async (_e, payload) => {
+        const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
+        const buckets = dailyVouchers({
+            from: parsed.from,
+            to: parsed.to,
+            paymentMethod: parsed.paymentMethod as any,
+            sphere: parsed.sphere as any,
+            type: parsed.type as any
+        })
+        return { buckets } // Same output format, just date instead of month
     })
 
     ipcMain.handle('reports.cashBalance', async (_e, payload) => {

@@ -105,6 +105,8 @@ contextBridge.exposeInMainWorld('api', {
         export: (payload: any) => ipcRenderer.invoke('reports.export', payload),
         summary: (payload: any) => ipcRenderer.invoke('reports.summary', payload),
         monthly: (payload: any) => ipcRenderer.invoke('reports.monthly', payload),
+        // Expose daily buckets endpoint for Dashboard day-level charts
+        daily: (payload: any) => ipcRenderer.invoke('reports.daily', payload),
         cashBalance: (payload: any) => ipcRenderer.invoke('reports.cashBalance', payload),
         years: () => ipcRenderer.invoke('reports.years'),
     },

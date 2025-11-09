@@ -34,28 +34,63 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return { from: f, to: t }
   })()
 
+  // Detect if this is a single month (daily view) or multiple months
+  const isDaily = useMemo(() => {
+    if (!from || !to) return false
+    return from.slice(0, 7) === to.slice(0, 7) // Same year-month
+  }, [from, to])
+
   useEffect(() => {
     let alive = true
     const load = async () => {
       try {
         setLoading(true)
-        const [rin, rout, rall] = await Promise.all([
-          (window as any).api?.reports?.monthly?.({ from, to, type: 'IN' }),
-          (window as any).api?.reports?.monthly?.({ from, to, type: 'OUT' }),
-          (window as any).api?.reports?.monthly?.({ from, to }),
-        ])
-        if (!alive) return
-        const keys = monthKeys(from, to)
-        const fill = (arr: any[]): Bucket[] => {
-          const map = new Map(arr.map((b: any) => [String(b.month), Number(b.gross)||0]))
-          return keys.map(k => ({ month: k, gross: Number(map.get(k) || 0) }))
+        if (isDaily) {
+          // Use daily API for single-month view
+          const [rin, rout, rall] = await Promise.all([
+            (window as any).api?.reports?.daily?.({ from, to, type: 'IN' }),
+            (window as any).api?.reports?.daily?.({ from, to, type: 'OUT' }),
+            (window as any).api?.reports?.daily?.({ from, to }),
+          ])
+          if (!alive) return
+          const days: string[] = []
+          const d = new Date(from + 'T00:00:00Z')
+          const endDate = new Date(to + 'T00:00:00Z')
+          while (d <= endDate) {
+            days.push(d.toISOString().slice(0, 10))
+            d.setUTCDate(d.getUTCDate() + 1)
+          }
+          const fill = (arr: any[]): Bucket[] => {
+            const map = new Map(arr.map((b: any) => [String(b.date), Number(b.gross)||0]))
+            return days.map(k => ({ month: k, gross: Number(map.get(k) || 0) }))
+          }
+          const ins = fill(rin?.buckets || rin || [])
+          const outsRaw = (rout?.buckets || rout || []).map((b: any) => ({ ...b, gross: Math.abs(Number(b.gross)||0) }))
+          const outs = fill(outsRaw)
+          const all = fill(rall?.buckets || rall || [])
+          setRowsIn(ins)
+          setRowsOut(outs)
+          setRowsAll(all)
+        } else {
+          // Use monthly API for multi-month/year view
+          const [rin, rout, rall] = await Promise.all([
+            (window as any).api?.reports?.monthly?.({ from, to, type: 'IN' }),
+            (window as any).api?.reports?.monthly?.({ from, to, type: 'OUT' }),
+            (window as any).api?.reports?.monthly?.({ from, to }),
+          ])
+          if (!alive) return
+          const keys = monthKeys(from, to)
+          const fill = (arr: any[]): Bucket[] => {
+            const map = new Map(arr.map((b: any) => [String(b.month), Number(b.gross)||0]))
+            return keys.map(k => ({ month: k, gross: Number(map.get(k) || 0) }))
+          }
+          const ins = fill(rin?.buckets || rin || [])
+          const outs = fill((rout?.buckets || rout || []).map((b: any) => ({ month: b.month, gross: Math.abs(Number(b.gross)||0) })))
+          const all = fill(rall?.buckets || rall || [])
+          setRowsIn(ins)
+          setRowsOut(outs)
+          setRowsAll(all)
         }
-        const ins = fill(rin?.buckets || rin || [])
-        const outs = fill((rout?.buckets || rout || []).map((b: any) => ({ month: b.month, gross: Math.abs(Number(b.gross)||0) })))
-        const all = fill(rall?.buckets || rall || [])
-        setRowsIn(ins)
-        setRowsOut(outs)
-        setRowsAll(all)
       } catch {
         if (alive) { setRowsIn([]); setRowsOut([]); setRowsAll([]) }
       } finally { if (alive) setLoading(false) }
@@ -64,7 +99,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const onChanged = () => load()
     window.addEventListener('data-changed', onChanged)
     return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [from, to, props.activateKey, props.refreshKey])
+  }, [from, to, isDaily, props.activateKey, props.refreshKey])
 
   const labels = rowsAll.map(r => r.month)
   const cumSeries = (() => {
@@ -118,7 +153,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const svg = svgRef.current
     if (!svg || !labels.length) return
     const rect = svg.getBoundingClientRect()
-    const mouseX = ev.clientX - rect.left
+    // Convert screen coordinates to SVG viewBox coordinates
+    const scaleX = W / rect.width
+    const mouseX = (ev.clientX - rect.left) * scaleX
     
     // Find which month segment the mouse is in
     // Calculate the spacing between months
@@ -154,7 +191,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   return (
     <div className="card chart-card" style={{ overflow: 'hidden' }}>
       <div className="chart-head">
-        <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
+        <strong>{isDaily ? 'Tagesverlauf' : 'Monatsverlauf'} (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <span className="helper">{from} → {to}</span>
       </div>
       <div className="chart-canvas" style={{ overflow: 'hidden', position: 'relative' }}>
@@ -180,10 +217,18 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
           {/* X labels */}
           {labels.map((m,i)=>{
-            // Always show all months for year view; if many (edge case multi-year) fallback to every second
-            if (labels.length > 24 && i % 2 !== 0) return null
-            const mon = MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5)
-            return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
+            if (isDaily) {
+              // Show every n-th day for daily view
+              const showEvery = labels.length > 15 ? Math.ceil(labels.length / 10) : labels.length > 7 ? 2 : 1
+              if (i % showEvery !== 0 && i !== labels.length - 1) return null
+              const day = m.slice(8, 10)
+              return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{day}</text>
+            } else {
+              // Show months for year view
+              if (labels.length > 24 && i % 2 !== 0) return null
+              const mon = MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5)
+              return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
+            }
           })}
           {/* Hover guide only (tooltip rendered as HTML overlay) */}
           {hoverIdx != null && labels[hoverIdx] && (
@@ -195,17 +240,26 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
         </svg>
         {/* HTML tooltip overlay for better theming/accessibility */}
         {hoverIdx != null && labels[hoverIdx] && (() => {
-          const monthIdx = Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))
-          const mLabel = MONTH_NAMES[monthIdx] || String(labels[hoverIdx]).slice(5)
-          const inVal = eur.format(rowsIn[hoverIdx]?.gross || 0)
-          const outVal = eur.format(rowsOut[hoverIdx]?.gross || 0)
-          const saldo = eur.format(cumSeries[hoverIdx] || 0)
+          const label = String(labels[hoverIdx])
+          let mLabel: string
+          if (isDaily) {
+            // Format: "DD.MM."
+            mLabel = `${label.slice(8, 10)}.${label.slice(5, 7)}.`
+          } else {
+            const monthIdx = Math.max(0, Math.min(11, Number(label.slice(5)) - 1))
+            mLabel = MONTH_NAMES[monthIdx] || label.slice(5)
+          }
+          const inVal = rowsIn[hoverIdx]?.gross || 0
+          const outVal = rowsOut[hoverIdx]?.gross || 0
+          const saldo = cumSeries[hoverIdx] || 0
+          const gx = xs(hoverIdx, labels.length)
+          const tooltipX = (gx / W) * 100
           return (
-            <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center' }}>
-              <strong style={{ fontSize: 12 }}>{mLabel}</strong>
-              <span className="chip" style={{ background: '#2e7d32', color: '#fff' }}>Einnahmen {inVal}</span>
-              <span className="chip" style={{ background: '#c62828', color: '#fff' }}>Ausgaben {outVal}</span>
-              <span className="chip" style={{ background: '#f9a825', color: '#1a1a1a' }}>Saldo kum. {saldo}</span>
+            <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{mLabel}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(inVal)}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(outVal)}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Saldo kum.</span> <strong style={{ color: 'var(--warning)' }}>{eur.format(saldo)}</strong></div>
             </div>
           )
         })()}

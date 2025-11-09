@@ -64,15 +64,17 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   )
 
   // Increase horizontal padding so all month labels can fit; distribute bars to avoid clipping.
-  const W = 760, H = 220, P = 64
+  // Increased P from 64 to 72 to prevent leftmost month labels (e.g., November) from overlapping with Y-axis
+  const W = 760, H = 220, P = 72
   const xs = (i: number, n: number) => {
     const usable = W - 2 * P
     return P + (i * usable) / Math.max(1, n - 1)
   }
   const baseY = H - 28
   const maxH = baseY - 16
-  const barW = 8
-  const gap = 4
+  // Slightly wider bars for better visibility
+  const barW = 10
+  const gap = 5
 
   // Y-axis ticks (nice numbers)
   function niceStep(max: number) {

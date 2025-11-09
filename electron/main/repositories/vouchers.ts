@@ -620,6 +620,35 @@ export function monthlyVouchers(filters: {
     return rows
 }
 
+export function dailyVouchers(filters: {
+    from?: string
+    to?: string
+    paymentMethod?: 'BAR' | 'BANK'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    type?: 'IN' | 'OUT' | 'TRANSFER'
+}) {
+    const d = getDb()
+    const { from, to, paymentMethod, sphere, type } = filters
+    const params: any[] = []
+    const wh: string[] = []
+    if (from) { wh.push('date >= ?'); params.push(from) }
+    if (to) { wh.push('date <= ?'); params.push(to) }
+    if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
+    if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
+    if (type) { wh.push('type = ?'); params.push(type) }
+    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+    const rows = d.prepare(`
+        SELECT date,
+               IFNULL(SUM(CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END), 0) as net,
+               IFNULL(SUM(CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END), 0) as vat,
+               IFNULL(SUM(CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END), 0) as gross
+        FROM vouchers${whereSql}
+        GROUP BY date
+        ORDER BY date ASC
+    `).all(...params) as any[]
+    return rows
+}
+
 export function updateVoucher(input: {
     id: number
     date?: string

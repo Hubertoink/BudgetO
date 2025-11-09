@@ -305,10 +305,10 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
                   {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
                 </div>
               </div>
-              <ReportsMonthlyChart from={yearFilters.from} to={yearFilters.to} />
-              <ReportsCashBars from={yearFilters.from} to={yearFilters.to} />
+              <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} />
+              <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
               <SphereShareCard from={yearFilters.from} to={yearFilters.to} />
-              <IncomeExpenseBars {...yearFilters} />
+              <IncomeExpenseBars {...balanceFilters} />
             </div>
           </>
         )

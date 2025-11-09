@@ -119,7 +119,10 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // Build simple SVG line + filled area around zero for clarity
   // Increase left padding so Y-axis labels don't get clipped by the SVG viewport
   // Previously P=36 caused longer values (e.g., 1.500,00 €) to render partially ("00,00 €")
-  const W = 760, H = 240, P = 80
+  // For daily view, reduce width and increase horizontal padding for better spacing
+  const W = isDaily ? 920 : 760
+  const H = 240
+  const P = 80
   const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
   const ys = (v: number) => {
     const top = 16
@@ -137,14 +140,17 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
 
   // X labels: months for yearly, days for monthly
   // isDaily already computed above
-  // Yearly view: show all months; Daily view: reduce to ~8 labels
-  const tickEvery = isDaily ? Math.max(1, Math.ceil(labels.length / 8)) : 1
+  // Yearly view: show all months; Daily view: reduce to ~6-7 labels for cleaner look
+  const tickEvery = isDaily ? Math.max(1, Math.ceil(labels.length / 6)) : 1
 
   // Y-axis ticks (nice range around min..max incl. 0 when in range)
+  // For daily view, use fewer ticks (3-4) for cleaner look
   function niceTicks(min: number, max: number, count = 5): number[] {
     if (!isFinite(min) || !isFinite(max) || min === max) return [0]
+    // Reduce tick count for daily view to avoid congestion
+    const targetCount = isDaily ? Math.min(4, count) : count
     const span = max - min
-    const raw = span / Math.max(1, count)
+    const raw = span / Math.max(1, targetCount)
     const pow10 = Math.pow(10, Math.floor(Math.log10(Math.max(1e-9, raw))))
     let step = raw / pow10
     if (step >= 7.5) step = 10
@@ -203,8 +209,8 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
           ))}
           {/* Area fill */}
           <path d={areaPath} fill="color-mix(in oklab, var(--accent) 22%, transparent)" />
-          {/* Line */}
-          <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={2} />
+          {/* Line - thicker stroke for better visibility */}
+          <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
           {/* Ticks and labels */}
           {labels.map((m, i) => {
             if (i % tickEvery !== 0 && i !== labels.length - 1) return null

@@ -77,10 +77,10 @@ function TopHeaderOrg() {
     }, [])
     const text = [org || null, cashier || null].filter(Boolean).join(' | ')
     return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <div className="inline-flex items-center gap-8">
             <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
             {text ? (
-                <div className="helper" title={text} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{text}</div>
+                <div className="helper text-ellipsis" title={text}>{text}</div>
             ) : null}
         </div>
     )
@@ -103,10 +103,10 @@ export default function App() {
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgew�hlten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgew�hlten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgew�hlte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung w�rde den verf�gbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese �nderung w�rde den verf�gbaren Rahmen der Zweckbindung unterschreiten.'
+        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgew?hlten Zweckbindung.'
+        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgew?hlten Zweckbindung.'
+        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgew?hlte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+        if (/Zweckbindung w?rde den verf?gbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese ?nderung w?rde den verf?gbaren Rahmen der Zweckbindung unterschreiten.'
         return 'Fehler: ' + msg
     }
     // Dynamic available years from vouchers
@@ -324,7 +324,7 @@ export default function App() {
 
     async function createSampleVoucher() {
         try {
-            notify('info', 'Erzeuge Beleg �')
+            notify('info', 'Erzeuge Beleg ?')
             const res = await window.api?.vouchers.create?.({
                 date: today,
                 type: 'IN',
@@ -352,7 +352,7 @@ export default function App() {
             return
         }
         try {
-            notify('info', 'Storniere Beleg �')
+            notify('info', 'Storniere Beleg ?')
             const res = await window.api?.vouchers.reverse?.({ originalId: lastId, reason: 'Dev Reverse' })
             if (res) {
                 notify('success', `Storno erstellt: #${res.voucherNo}`)
@@ -423,8 +423,8 @@ export default function App() {
     const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from || to) list.push({ key: 'range', label: `${from || '�'} � ${to || '�'}`, clear: () => { setFrom(''); setTo('') } })
-        if (filterSphere) list.push({ key: 'sphere', label: `Sph�re: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
+        if (filterSphere) list.push({ key: 'sphere', label: `Sph?re: ${filterSphere}`, clear: () => setFilterSphere(null) })
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
         if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
         if (filterEarmark != null) {
@@ -436,7 +436,7 @@ export default function App() {
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
         }
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '�' : ''), clear: () => setQ('') })
+    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '?' : ''), clear: () => setQ('') })
         return list
     }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
@@ -461,19 +461,19 @@ export default function App() {
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
     const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
     const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    // Human‑readable labels for columns (used in Einstellungen > Tabelle)
+    // Human-readable labels for columns (used in Einstellungen > Tabelle)
     const labelForCol = (k: string): string => {
         switch (k) {
             case 'actions': return 'Aktionen'
             case 'date': return 'Datum'
             case 'voucherNo': return 'Nr.'
             case 'type': return 'Art'
-            case 'sphere': return 'Sph�re'
+            case 'sphere': return 'Sph?re'
             case 'description': return 'Beschreibung'
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'
             case 'paymentMethod': return 'Zahlweg'
-            case 'attachments': return 'Anh�nge'
+            case 'attachments': return 'Anh?nge'
             case 'net': return 'Netto'
             case 'vat': return 'USt'
             case 'gross': return 'Brutto'
@@ -584,7 +584,7 @@ export default function App() {
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
-    // Refresh attachments when opening an edit modal (so neue Anh�nge erscheinen beim erneuten �ffnen)
+    // Refresh attachments when opening an edit modal (so neue Anh?nge erscheinen beim erneuten ?ffnen)
     useEffect(() => {
         if (editRow?.id) {
             setEditRowFilesLoading(true)
@@ -616,11 +616,11 @@ export default function App() {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
             if (b.name && String(b.name).trim()) return String(b.name).trim()
-            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} � ${b.categoryName}`
-            if (b.projectName && String(b.projectName).trim()) return `${b.year} � ${b.projectName}`
+            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} ? ${b.categoryName}`
+            if (b.projectName && String(b.projectName).trim()) return `${b.year} ? ${b.projectName}`
             if (b.earmarkId) {
                 const em = byIdEarmark.get(b.earmarkId)
-                if (em) return `${b.year} � ?? ${em.code}`
+                if (em) return `${b.year} ? ?? ${em.code}`
             }
             return String(b.year)
         }
@@ -636,11 +636,11 @@ export default function App() {
                 for (const b of res.rows) {
                     let label = ''
                     if (b.name && String(b.name).trim()) label = String(b.name).trim()
-                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} � ${b.categoryName}`
-                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} � ${b.projectName}`
+                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} ? ${b.categoryName}`
+                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} ? ${b.projectName}`
                     else if (b.earmarkId) {
                         const em: any = byIdEarmark.get(b.earmarkId)
-                        if (em) label = `${b.year} � ?? ${em.code}`
+                        if (em) label = `${b.year} ? ?? ${em.code}`
                     }
                     if (!label) label = String(b.year)
                     map.set(b.id, label)
@@ -691,11 +691,10 @@ export default function App() {
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
                     {!isTopNav && (
                         <button
-                            className="btn ghost"
+                            className="btn ghost icon-btn"
                             title={sidebarCollapsed ? 'Seitenleiste erweitern' : 'Seitenleiste komprimieren'}
                             aria-label="Seitenleiste umschalten"
                             onClick={() => setSidebarCollapsed(v => !v)}
-                            style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}
                         >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                 <rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -706,7 +705,7 @@ export default function App() {
                     <TopHeaderOrg />
                 </div>
                 {isTopNav ? (
-                    <nav aria-label="Hauptmen� (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
+                    <nav aria-label="Hauptmen? (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
                         {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
                         {[
                             [
@@ -751,12 +750,12 @@ export default function App() {
                                             </span>
                                         </button>
                                         {(['Buchungen','Rechnungen','Mitglieder'] as const).includes(key as any) && (
-                                            <span aria-hidden style={{ display: 'inline-block', width: 1, height: 24, background: 'var(--border)', margin: '0 8px' }} />
+                                            <span aria-hidden className="divider-v" />
                                         )}
                                     </React.Fragment>
                                 ))}
                                 {gi < arr.length - 1 && (
-                                    <span aria-hidden style={{ display: 'inline-block', width: 1, height: 24, background: 'var(--border)', margin: '0 8px' }} />
+                                    <span aria-hidden className="divider-v" />
                                 )}
                             </React.Fragment>
                         ))}
@@ -765,30 +764,30 @@ export default function App() {
                 {isTopNav && <div />}
                 {/* Window controls */}
                 <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
-                    <button className="btn ghost" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                    <button className="btn ghost icon-btn" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
                     </button>
-                    <button className="btn ghost" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                    <button className="btn ghost icon-btn" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
                     </button>
-                    <button className="btn danger" title="Schlie�en" aria-label="Schlie�en" onClick={() => window.api?.window?.close?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                    <button className="btn danger icon-btn" title="Schlie?en" aria-label="Schlie?en" onClick={() => window.api?.window?.close?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
                     </button>
                 </div>
             </header>
             {!isTopNav && (
                 <aside aria-label="Seitenleiste" style={{ gridArea: 'side', display: 'flex', flexDirection: 'column', padding: 8, borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div className="flex flex-col gap-6">
                                 {/* Group 1: Dashboard */}
                                 {[
                                     { key: 'Dashboard', label: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
                                 ].map(({ key, label, icon }) => (
                                     <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center' }}>{icon}</span>
+                                        <span className="icon-wrapper">{icon}</span>
                                         {!sidebarCollapsed && <span>{label}</span>}
                                     </button>
                                 ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+                                <div aria-hidden className="divider-h" />
                                 {/* Group 2: Buchungen, Rechnungen, Mitglieder, Budgets, Zweckbindungen */}
                                 {[
                                     { key: 'Buchungen', label: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
@@ -811,7 +810,7 @@ export default function App() {
                                         {!sidebarCollapsed && <span>{label}</span>}
                                     </button>
                                 ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+                                <div aria-hidden className="divider-h" />
                                 {/* Group 3: Belege, Reports */}
                                 {[
                                     { key: 'Belege', label: 'Belege', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8l-6-6zM8 12h8v2H8v-2zm0-4h5v2H8V8z" /></svg>) },
@@ -822,7 +821,7 @@ export default function App() {
                                         {!sidebarCollapsed && <span>{label}</span>}
                                     </button>
                                 ))}
-                                <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
+                                <div aria-hidden className="divider-h" />
                                 <button
                                     className="btn ghost"
                                     onClick={() => setActivePage('Einstellungen')}
@@ -989,7 +988,7 @@ export default function App() {
                 {toasts.map(t => (
                     <div key={t.id} className={`toast ${t.type}`} role="status" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span className="title">{t.type === 'error' ? 'Fehler' : t.type === 'success' ? 'OK' : 'Info'}</span>
-                        <span style={{ flex: 1 }}>{t.text}</span>
+                        <span className="flex-1">{t.text}</span>
                         {t.action && (
                             <button className="btn" onClick={() => t.action?.onClick?.()}>{t.action.label}</button>
                         )}
@@ -1032,7 +1031,7 @@ export default function App() {
                 to={to}
                 onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt) }}
             />
-            {/* Meta Filter Modal (Sph�re, Zweckbindung, Budget) */}
+            {/* Meta Filter Modal (Sph?re, Zweckbindung, Budget) */}
             <MetaFilterModal
                 open={activePage === 'Buchungen' && showMetaFilter}
                 onClose={() => setShowMetaFilter(false)}
@@ -1101,7 +1100,7 @@ export default function App() {
                             if (res) {
                                 const dir = res.filePath?.replace(/\\[^\\/]+$/,'').replace(/\/[^^/]+$/, '') || ''
                                 notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
-                                    label: 'Ordner �ffnen',
+                                    label: 'Ordner ?ffnen',
                                     onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
                                 })
                             }
@@ -1115,7 +1114,7 @@ export default function App() {
         </div>
     )
 }
-// Meta Filter Modal: groups Sph�re, Zweckbindung, Budget
+// Meta Filter Modal: groups Sph?re, Zweckbindung, Budget
 // MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
 
 // Time Filter Modal: controls date range and quick year selection
@@ -1193,36 +1192,36 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
             {open && (
                 <div className="modal-overlay" onClick={() => setOpen(false)}>
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
+                        <header className="flex justify-between items-center">
+                            <h3 className="m-0">Beitragsstatus</h3>
                             <button className="btn" onClick={()=>setOpen(false)}>?</button>
                         </header>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-                            <div className="helper" style={{ fontWeight: 600 }}>{name}{memberNo ? ` (${memberNo})` : ''}</div>
-                            <span className="helper">•</span>
-                            <span className="helper">Eintritt: {status?.joinDate || '�'}</span>
+                            <div className="helper font-semibold">{name}{memberNo ? ` (${memberNo})` : ''}</div>
                             <span className="helper">�</span>
-                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `�berf�llig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '�'}</span>
-                            <span className="helper">�</span>
-                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '�'}</span>
-                            <span className="helper">�</span>
-                            <span className="helper">Initiale F�lligkeit: {status?.nextDue || '�'}</span>
+                            <span className="helper">Eintritt: {status?.joinDate || '?'}</span>
+                            <span className="helper">?</span>
+                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `?berf?llig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '?'}</span>
+                            <span className="helper">?</span>
+                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '?'}</span>
+                            <span className="helper">?</span>
+                            <span className="helper">Initiale F?lligkeit: {status?.nextDue || '?'}</span>
                         </div>
                         <MemberTimeline status={status} history={history} />
                         {/* Due payments for this member */}
-                        <div className="card" style={{ padding: 10 }}>
-                            <strong>F�llige Beitr�ge</strong>
+                        <div className="card p-10">
+                            <strong>F?llige Beitr?ge</strong>
                             {due.length === 0 ? (
-                                <div className="helper" style={{ marginTop: 6 }}>Aktuell keine offenen Perioden.</div>
+                                <div className="helper mt-6">Aktuell keine offenen Perioden.</div>
                             ) : (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} � {due.length} offen</div>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>?</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>� Zur�ck</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter �</button>
-                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>?</button>
+                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} ? {due.length} offen</div>
+                                        <div className="flex gap-6">
+                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(1)} disabled={duePage <= 1}>?</button>
+                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1}>? Zur?ck</button>
+                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>Weiter ?</button>
+                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>?</button>
                                         </div>
                                     </div>
                                     <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
@@ -1230,7 +1229,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             <tr>
                                                 <th align="left">Periode</th>
                                                 <th align="right">Betrag</th>
-                                                <th align="left">Verkn�pfen</th>
+                                                <th align="left">Verkn?pfen</th>
                                                 <th align="left">Aktion</th>
                                             </tr>
                                         </thead>
@@ -1244,15 +1243,15 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                                         <td>{r.periodKey}</td>
                                                         <td align="right">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.amount)}</td>
                                                         <td>
-                                                            <div style={{ display: 'grid', gap: 6 }}>
-                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verkn�pfen">
-                                                                    <option value="">� ohne Verkn�pfung �</option>
+                                                            <div className="grid gap-6">
+                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verkn?pfen">
+                                                                    <option value="">? ohne Verkn?pfung ?</option>
                                                                     {manualList.map(s => (
-                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} � {s.date} � {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} � {(s.description || s.counterparty || '')}</option>
+                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} ? {s.date} ? {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} ? {(s.description || s.counterparty || '')}</option>
                                                                     ))}
                                                                 </select>
-                                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                                    <input className="input" placeholder="Buchung suchen�" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
+                                                                <div className="flex gap-6">
+                                                                    <input className="input" placeholder="Buchung suchen?" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
                                                                     <button className="btn" onClick={async () => {
                                                                         try {
                                                                             // widen range for earlier periods: from period start - 90 days to today
@@ -1299,16 +1298,16 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                 </>
                             )}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+                        <div className="flex justify-start items-center">
                             <button className="btn primary" onClick={async ()=>{
                                 try {
                                     const addr = memberData?.address || null
                                     const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
-                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht �ffnen')
+                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht ?ffnen')
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Mitglied anschreiben</button>
                         </div>
-                        <div className="card" style={{ padding: 10 }}>
+                        <div className="card p-10">
                             <strong>Historie</strong>
                             <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
                                 <thead>
@@ -1325,15 +1324,15 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             <td>{r.periodKey}</td>
                                             <td>{r.datePaid}</td>
                                             <td align="right">{new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(r.amount)}</td>
-                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '�'} {r.description ? `� ${r.description}` : ''}</td>
+                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '?'} {r.description ? `? ${r.description}` : ''}</td>
                                         </tr>
                                     ))}
                                     {history.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
                                 </tbody>
                             </table>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="btn" onClick={()=>setOpen(false)}>Schlie�en</button>
+                        <div className="flex justify-end">
+                            <button className="btn" onClick={()=>setOpen(false)}>Schlie?en</button>
                         </div>
                     </div>
                 </div>
@@ -1416,7 +1415,7 @@ function MemberTimeline({ status, history }: { status: any; history: Array<{ per
         return currentKey
     })()
     return (
-        <div className="card" style={{ padding: 10 }}>
+        <div className="card p-10">
             <strong>Zeitstrahl</strong>
             <div style={{ marginTop: 8, overflowX: 'auto' }}>
                 <svg width={Math.max(640, keys.length*56)} height={58} role="img" aria-label="Zeitstrahl Zahlungen">
@@ -1434,11 +1433,11 @@ function MemberTimeline({ status, history }: { status: any; history: Array<{ per
                         return (
                             <g key={pk}>
                                 <circle cx={x} cy={28} r={6} fill={color}>
-                                    <title>{`${pk} � ${isPaid ? 'bezahlt' : (isOverdue ? '�berf�llig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
+                                    <title>{`${pk} ? ${isPaid ? 'bezahlt' : (isOverdue ? '?berf?llig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
                                 </circle>
                                 <text x={x} y={12} textAnchor="middle" fontSize={10} fill="var(--text-dim)">{pk}</text>
                                 <text x={x} y={50} textAnchor="middle" fontSize={10} fill={isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : 'var(--text-dim)')}>
-                                    {isPaid ? 'bezahlt' : (isOverdue ? '�berf�llig' : (isCurrent ? 'jetzt' : ''))}
+                                    {isPaid ? 'bezahlt' : (isOverdue ? '?berf?llig' : (isCurrent ? 'jetzt' : ''))}
                                 </text>
                             </g>
                         )
@@ -1528,7 +1527,7 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     return (
                         <span key={t} className="chip" style={{ background: bg, color: bg ? fg : undefined }}>
                             {t}
-                            <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">�</button>
+                            <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">?</button>
                         </span>
                     )
                 })}
@@ -1538,9 +1537,9 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     value=""
                     onChange={(e) => { const name = e.target.value; if (name) addTag(name) }}
                     style={{ minWidth: 140 }}
-                    title="Tag aus Liste hinzuf�gen"
+                    title="Tag aus Liste hinzuf?gen"
                 >
-                    <option value="">+ Tag ausw�hlen�</option>
+                    <option value="">+ Tag ausw?hlen?</option>
                     {(tagDefs || []).filter(t => !(value || []).some(v => v.toLowerCase() === (t.name || '').toLowerCase())).map(t => (
                         <option key={t.id} value={t.name}>{t.name}</option>
                     ))}
@@ -1554,7 +1553,7 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     }}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
-                    placeholder={(value || []).length ? '' : 'Tag hinzuf�gen�'}
+                    placeholder={(value || []).length ? '' : 'Tag hinzuf?gen?'}
                     style={{ flex: 1, minWidth: 120, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)' }}
                 />
             </div>
@@ -1674,18 +1673,18 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     }
     const thFor = (k: string) => (
         k === 'actions' ? <th key={k} align="center" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Aktionen</th>
-            : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
+            : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} className="cursor-pointer">Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sph�re</th>
+                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sph?re</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
-                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>🎯</th>
-                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>💰</th>
+                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
+                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
                                         : k === 'paymentMethod' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Zahlweg</th>
-                                            : k === 'attachments' ? <th key={k} align="center" title="Anh�nge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>📎</th>
-                                                : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} style={{ cursor: 'pointer' }}>Netto {renderSortIcon('net')}</th>
+                                            : k === 'attachments' ? <th key={k} align="center" title="Anh?nge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
+                                                : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} className="cursor-pointer">Netto {renderSortIcon('net')}</th>
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
-                                                        : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} style={{ cursor: 'pointer' }}>Brutto {renderSortIcon('gross')}</th>
+                                                        : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} className="cursor-pointer">Brutto {renderSortIcon('gross')}</th>
     )
     const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
     const isLocked = (d: string) => {
@@ -1694,11 +1693,11 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     }
     const tdFor = (k: string, r: any) => (
         k === 'actions' ? (
-            <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
+            <td key={k} align="center" className="text-nowrap">
                 {isLocked(r.date) ? (
-                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
+                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">??</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
+                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>?</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -1711,7 +1710,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
             <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (
             <td key={k}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <div className="flex items-center gap-6 flex-wrap">
                     <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
                     {(r.tags || []).map((t: string) => {
                         const bg = colorFor(t) || undefined
@@ -1753,9 +1752,9 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from} → ${to}` : 'Transfer'
+                        const title = from && to ? `${from} ? ${to}` : 'Transfer'
                         return (
-                            <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span className="badge inline-flex items-center gap-6" title={title} aria-label={title}>
                                 {from === 'BAR' ? <IconCash /> : <IconBank />}
                                 <IconArrow />
                                 {to === 'BAR' ? <IconCash /> : <IconBank />}
@@ -1788,7 +1787,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 })()
             ) : ''}</td>
         ) : k === 'attachments' ? (
-            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anh�nge`}>📎 {r.fileCount}</span>) : ''}</td>
+            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anh?nge`}>?? {r.fileCount}</span>) : ''}</td>
         ) : k === 'net' ? (
             <td key={k} align="right">{eurFmt.format(r.netAmount)}</td>
         ) : k === 'vat' ? (

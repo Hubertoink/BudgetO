@@ -124,10 +124,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
             const inn = inBuckets.find(b => b.month === m)?.gross || 0
             const out = outBuckets.find(b => b.month === m)?.gross || 0
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center' }}>
-                <strong style={{ fontSize: 12 }}>{monthLabel(m, true)}</strong>
-                <span className="chip" style={{ background: '#2e7d32', color: '#fff' }}>IN {eurFmt.format(inn)}</span>
-                <span className="chip" style={{ background: '#c62828', color: '#fff' }}>OUT {eurFmt.format(out)}</span>
+              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabel(m, true)}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(inn)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(out))}</strong></div>
               </div>
             )
           })()}
