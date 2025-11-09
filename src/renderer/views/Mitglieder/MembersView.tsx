@@ -195,9 +195,11 @@ export default function MembersView() {
                         <option value="PAUSED">Pause</option>
                         <option value="LEFT">Ausgetreten</option>
                     </select>
-                    <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>Spalten</button>
+                    <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
+                    </button>
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
-                        <button className="btn ghost" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }}>Zurücksetzen</button>
+                        <button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
                     ) : null })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

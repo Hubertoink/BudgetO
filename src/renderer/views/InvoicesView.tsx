@@ -273,7 +273,10 @@ export default function InvoicesView() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
           </button>
           {(dueFrom || dueTo) && (<span className="helper">{dueFrom || '—'} – {dueTo || '—'}</span>)}
-          {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn ghost" onClick={clearFilters} title="Alle Filter löschen">Filter zurücksetzen</button>) : null })()}
+          <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => alert('Spalten-Auswahl: Noch nicht implementiert')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
+          </button>
+          {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
           <div style={{ width: 12 }} />
           <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
         </div>
