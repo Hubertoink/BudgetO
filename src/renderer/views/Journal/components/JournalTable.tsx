@@ -190,9 +190,9 @@ export default function JournalTable({
                 const id = r.earmarkId as number | null | undefined
                 return (
                     <button
-                        className="badge"
+                        className="badge-earmark"
                         title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
-                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer' }}
+                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
                         onClick={() => { if (id != null) onEarmarkClick?.(id) }}
                     >
                         {r.earmarkCode}
@@ -230,9 +230,9 @@ export default function JournalTable({
                     const id = r.budgetId as number | null | undefined
                     return (
                         <button
-                            className="badge"
+                            className="badge-budget"
                             title={`Nach Budget ${r.budgetLabel} filtern`}
-                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
+                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
                             onClick={() => { if (id != null) onBudgetClick?.(id) }}
                         >
                             {r.budgetLabel}

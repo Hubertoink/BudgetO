@@ -58,7 +58,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
 
   if (!budgets.length) return null
   return (
-    <div style={{ marginTop: 12 }}>
+    <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {budgets.map(b => {
           const bg = b.color || undefined
@@ -80,7 +80,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                 <span className="badge" style={{ background: bg, color: fg }}>{b.year}</span>
                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{title}</span>
               </div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                 <span className="badge in">IN: {eurFmt.format(inflow)}</span>
                 <span className="badge out">OUT: {eurFmt.format(spent)}</span>
                 <span className="badge">Budget: {eurFmt.format(plan)}</span>
@@ -104,8 +104,8 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-                <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Zu Buchungen</button>
-                <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>
+                <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)} title="Zu Buchungen springen">📄 Zu Buchungen</button>
+                <button className="btn" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>
               </div>
             </div>
           )

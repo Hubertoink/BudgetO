@@ -107,8 +107,8 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-              <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Zu Buchungen</button>
-              {onEdit && <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>}
+              <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)} title="Zu Buchungen springen">📄 Zu Buchungen</button>
+              {onEdit && <button className="btn" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
             </div>
           </div>
         )

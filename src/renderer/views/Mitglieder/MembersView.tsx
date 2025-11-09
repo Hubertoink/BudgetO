@@ -215,11 +215,11 @@ export default function MembersView() {
     const page = Math.floor(offset / Math.max(1, limit)) + 1
 
     return (
-        <div className="card" style={{ padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <h1 style={{ margin: 0 }}>Mitglieder</h1>
-                    <input className="input" placeholder="Suche (Name, E-Mail, Tel., Nr.)" value={q} onChange={(e) => { setOffset(0); setQ(e.target.value) }} style={{ width: 300 }} />
+        <div className="card members-header">
+            <div className="members-header-top">
+                <div className="members-header-left">
+                    <h1 className="members-title">Mitglieder</h1>
+                    <input className="input members-search" placeholder="Suche (Name, E-Mail, Tel., Nr.)" value={q} onChange={(e) => { setOffset(0); setQ(e.target.value) }} />
                     <select className="input" value={status} onChange={(e) => { setOffset(0); setStatus(e.target.value as any) }}>
                         <option value="ALL">Alle</option>
                         <option value="ACTIVE">Aktiv</option>
@@ -231,13 +231,13 @@ export default function MembersView() {
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
                     </button>
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
-                        <button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
+                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
                     ) : null })()}
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className="members-header-right">
                     <div className="helper">{busy ? <LoadingState size="small" message="" /> : `Seite ${page}/${pages} – ${total} Einträge`}</div>
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
-                    <button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn btn-accent" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
@@ -245,12 +245,12 @@ export default function MembersView() {
                 </div>
             </div>
             {colPrefs.showBoardTable && boardRows.length > 0 && (
-                <div className="card" style={{ marginTop: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 8px 0 8px' }}>
-                        <h2 style={{ margin: 0 }}>Vorstand</h2>
+                <div className="card members-board-card">
+                    <div className="members-board-header">
+                        <h2 className="members-board-title">Vorstand</h2>
                         <div className="helper">{boardRows.length} Personen</div>
                     </div>
-                    <table cellPadding={6} style={{ marginTop: 4, width: '100%' }}>
+                    <table cellPadding={6} className="members-board-table">
                         <thead>
                             <tr>
                                 <th align="left">Funktion</th>
@@ -264,12 +264,12 @@ export default function MembersView() {
                         <tbody>
                             {boardRows.map((r: any) => (
                                 <tr key={`board-${r.id}`}>
-                                    <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ background: def.color, color: '#fff' }}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
+                                    <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge members-badge-role" style={{ '--role-color': def.color } as React.CSSProperties}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
                                     <td>{r.name}</td>
                                     <td>{r.memberNo || '—'}</td>
                                     <td>{r.email || '—'}</td>
                                     <td>{r.phone || '—'}</td>
-                                    <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                                    <td align="center" className="members-nowrap">
                                         <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
                                             id: r.id,
                                             memberNo: r.memberNo ?? null,
@@ -297,23 +297,23 @@ export default function MembersView() {
                     </table>
                 </div>
             )}
-            <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
+            <table cellPadding={6} className="members-table">
                 <thead>
                     <tr>
-                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
-                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
-                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
                         <th align="left">Telefon</th>
                         {colPrefs.showAddress && (<th align="left">Adresse</th>)}
                         {colPrefs.showIBAN && (<th align="left">IBAN</th>)}
                         {colPrefs.showContribution && (<th align="right">Beitrag</th>)}
-                        <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
                         {colPrefs.showNotes && (<th align="left">Anmerkungen</th>)}
@@ -406,9 +406,11 @@ export default function MembersView() {
                                 const active = formTab === t.k
                                 const bg = active ? 'color-mix(in oklab, ' + t.color + ' 25%, transparent)' : undefined
                                 const br = active ? t.color : 'transparent'
+                                // Force white text for Mandat tab when active (yellow background)
+                                const textColor = active ? (t.k === 'MANDATE' ? '#fff' : contrastText(t.color)) : undefined
                                 return (
                                     <button key={t.k} role="tab" aria-selected={active} className="btn" onClick={() => setFormTab(t.k)}
-                                        style={{ borderColor: br, background: bg, color: active ? contrastText(t.color) : undefined }}>
+                                        style={{ borderColor: br, background: bg, color: textColor }}>
                                         {t.label}
                                     </button>
                                 )

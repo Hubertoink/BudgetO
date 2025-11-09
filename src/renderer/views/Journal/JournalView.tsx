@@ -53,6 +53,27 @@ interface JournalViewProps {
     journalLimit: number
     setJournalLimit: (n: number) => void
     dateFmt: 'ISO' | 'PRETTY'
+    // Filter states from App
+    from?: string
+    to?: string
+    filterSphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+    filterType?: 'IN' | 'OUT' | 'TRANSFER' | null
+    filterPM?: 'BAR' | 'BANK' | null
+    filterEarmark?: number | null
+    filterBudgetId?: number | null
+    filterTag?: string | null
+    q?: string
+    setFrom?: (v: string) => void
+    setTo?: (v: string) => void
+    setFilterSphere?: (v: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null) => void
+    setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
+    setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
+    setFilterEarmark?: (v: number | null) => void
+    setFilterBudgetId?: (v: number | null) => void
+    setFilterTag?: (v: string | null) => void
+    setQ?: (v: string) => void
+    page?: number
+    setPage?: (v: number) => void
 }
 
 export default function JournalView({
@@ -75,7 +96,28 @@ export default function JournalView({
     bufferToBase64Safe,
     journalLimit: journalLimitProp,
     setJournalLimit: setJournalLimitProp,
-    dateFmt
+    dateFmt,
+    // Filter props from App
+    from: fromProp,
+    to: toProp,
+    filterSphere: filterSphereProp,
+    filterType: filterTypeProp,
+    filterPM: filterPMProp,
+    filterEarmark: filterEarmarkProp,
+    filterBudgetId: filterBudgetIdProp,
+    filterTag: filterTagProp,
+    q: qProp,
+    setFrom: setFromProp,
+    setTo: setToProp,
+    setFilterSphere: setFilterSphereProp,
+    setFilterType: setFilterTypeProp,
+    setFilterPM: setFilterPMProp,
+    setFilterEarmark: setFilterEarmarkProp,
+    setFilterBudgetId: setFilterBudgetIdProp,
+    setFilterTag: setFilterTagProp,
+    setQ: setQProp,
+    page: pageProp,
+    setPage: setPageProp
 }: JournalViewProps) {
     // ==================== STATE ====================
     // Pagination & Sorting
@@ -97,7 +139,7 @@ export default function JournalView({
     // Nutze journalLimit aus Props (von Settings)
     const journalLimit = journalLimitProp
 
-    // Filter states
+    // Filter states - use from props if available, otherwise local state
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
@@ -107,6 +149,30 @@ export default function JournalView({
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
     const [q, setQ] = useState<string>('')
+    
+    // Use props if provided, otherwise use local state
+    const activeFrom = fromProp !== undefined ? fromProp : from
+    const activeTo = toProp !== undefined ? toProp : to
+    const activeFilterSphere = filterSphereProp !== undefined ? filterSphereProp : filterSphere
+    const activeFilterType = filterTypeProp !== undefined ? filterTypeProp : filterType
+    const activeFilterPM = filterPMProp !== undefined ? filterPMProp : filterPM
+    const activeFilterEarmark = filterEarmarkProp !== undefined ? filterEarmarkProp : filterEarmark
+    const activeFilterBudgetId = filterBudgetIdProp !== undefined ? filterBudgetIdProp : filterBudgetId
+    const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
+    const activeQ = qProp !== undefined ? qProp : q
+    const activePage = pageProp !== undefined ? pageProp : page
+    
+    // Setters that use props if available
+    const activeSetFrom = setFromProp || setFrom
+    const activeSetTo = setToProp || setTo
+    const activeSetFilterSphere = setFilterSphereProp || setFilterSphere
+    const activeSetFilterType = setFilterTypeProp || setFilterType
+    const activeSetFilterPM = setFilterPMProp || setFilterPM
+    const activeSetFilterEarmark = setFilterEarmarkProp || setFilterEarmark
+    const activeSetFilterBudgetId = setFilterBudgetIdProp || setFilterBudgetId
+    const activeSetFilterTag = setFilterTagProp || setFilterTag
+    const activeSetQ = setQProp || setQ
+    const activeSetPage = setPageProp || setPage
 
     // Column preferences
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'

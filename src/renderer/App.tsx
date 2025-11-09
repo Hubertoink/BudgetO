@@ -763,6 +763,26 @@ function AppInner() {
                             journalLimit={journalLimit}
                             setJournalLimit={(n: number) => { setJournalLimit(n); setPage(1) }}
                             dateFmt={dateFmt}
+                            from={from}
+                            to={to}
+                            filterSphere={filterSphere}
+                            filterType={filterType}
+                            filterPM={filterPM}
+                            filterEarmark={filterEarmark}
+                            filterBudgetId={filterBudgetId}
+                            filterTag={filterTag}
+                            q={q}
+                            setFrom={setFrom}
+                            setTo={setTo}
+                            setFilterSphere={setFilterSphere}
+                            setFilterType={setFilterType}
+                            setFilterPM={setFilterPM}
+                            setFilterEarmark={setFilterEarmark}
+                            setFilterBudgetId={setFilterBudgetId}
+                            setFilterTag={setFilterTag}
+                            setQ={setQ}
+                            page={page}
+                            setPage={setPage}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -811,9 +831,21 @@ function AppInner() {
                             to={to || undefined}
                             filterSphere={filterSphere || undefined}
                             onGoToBookings={(earmarkId) => {
+                                // Reset other filters first, then set earmark and navigate
+                                setFilterBudgetId(null)
+                                setFilterTag(null)
+                                setFilterType(null)
+                                setFilterPM(null)
+                                setFilterSphere(null)
+                                setQ('')
+                                setFrom('')
+                                setTo('')
                                 setFilterEarmark(earmarkId)
-                                setActivePage('Buchungen')
-                                setPage(1)
+                                // Use setTimeout to ensure state updates before navigation
+                                setTimeout(() => {
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                }, 0)
                             }}
                             onLoadEarmarks={loadEarmarks}
                             notify={notify}
@@ -823,9 +855,21 @@ function AppInner() {
                     {activePage === 'Budgets' && (
                         <BudgetsView
                             onGoToBookings={(budgetId) => {
+                                // Reset other filters first, then set budget and navigate
+                                setFilterEarmark(null)
+                                setFilterTag(null)
+                                setFilterType(null)
+                                setFilterPM(null)
+                                setFilterSphere(null)
+                                setQ('')
+                                setFrom('')
+                                setTo('')
                                 setFilterBudgetId(budgetId)
-                                setActivePage('Buchungen')
-                                setPage(1)
+                                // Use setTimeout to ensure state updates before navigation
+                                setTimeout(() => {
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                }, 0)
                             }}
                             notify={notify}
                         />
@@ -863,7 +907,10 @@ function AppInner() {
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
-                <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
+                <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
+                    <span className="fab-buchung-icon">+</span>
+                    <span className="fab-buchung-text">Buchung</span>
+                </button>
             )}
             {/* Auto-backup prompt modal (renderer) */}
             {autoBackupPrompt && (

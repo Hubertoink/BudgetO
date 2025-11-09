@@ -420,6 +420,11 @@ pre {
     background: var(--accent-hover);
 }
 
+.btn-accent {
+    background: var(--accent);
+    color: #000;
+}
+
 .btn.ghost {
     background: transparent;
 }
@@ -899,7 +904,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     margin-left: 4px;
 }
 
-/* Chips for active filters */
+/* Chips for active filters (tags) - fully rounded */
 .chip {
     display: inline-flex;
     align-items: center;
@@ -917,6 +922,42 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     background: transparent;
     color: var(--text-dim);
     cursor: pointer;
+}
+
+/* Budget badges - slightly rounded, with icon */
+.badge-budget {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-budget::before {
+    content: '💰';
+    font-size: 14px;
+}
+
+/* Earmark (Zweckbindung) badges - slightly rounded, with icon */
+.badge-earmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-earmark::before {
+    content: '🎯';
+    font-size: 14px;
 }
 
 /* Brief flash highlight for newly created/updated rows */
@@ -1139,7 +1180,7 @@ textarea:focus {
 /* Floating Action Button (FAB) for + Buchung */
 .fab {
     position: fixed;
-    right: 24px;
+    right: 50px;
     bottom: 24px;
     z-index: 3000;
     /* above cards and tables, below toasts (9999) */
@@ -1154,13 +1195,54 @@ textarea:focus {
 }
 
 .fab-buchung {
-    background: var(--accent);
-    color: #0B0E14;
+    background: color-mix(in oklab, var(--accent) 20%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: var(--accent);
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-buchung-icon {
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1;
+    transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-buchung-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-left: 0;
 }
 
 .fab-buchung:hover {
-    background: var(--accent-hover);
-    color: #0B0E14;
+    background: color-mix(in oklab, var(--accent) 40%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--accent);
+    width: auto;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.fab-buchung:hover .fab-buchung-icon {
+    font-size: 20px;
+}
+
+.fab-buchung:hover .fab-buchung-text {
+    opacity: 1;
+    width: auto;
+    margin-left: 6px;
 }
 
 /* Base sizing for invoice modal fields (prevent over-stretching) */
@@ -2262,3 +2344,75 @@ label .req-asterisk {
         .btn-type-out-active {
             background: color-mix(in oklab, var(--danger) 25%, transparent);
         }
+
+/* ========== Members View ========== */
+.members-header {
+    padding: 12px;
+}
+
+.members-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.members-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.members-header-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.members-title {
+    margin: 0;
+}
+
+.members-search {
+    width: 300px;
+}
+
+.members-board-card {
+    margin-top: 8px;
+}
+
+.members-board-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 8px 0 8px;
+}
+
+.members-board-title {
+    margin: 0;
+}
+
+.members-board-table {
+    margin-top: 4px;
+    width: 100%;
+}
+
+.members-table {
+    margin-top: 8px;
+    width: 100%;
+}
+
+.members-sort-header {
+    cursor: pointer;
+}
+
+.members-nowrap {
+    white-space: nowrap;
+}
+
+.members-badge-role {
+    background: var(--role-color);
+    color: #fff;
+}
