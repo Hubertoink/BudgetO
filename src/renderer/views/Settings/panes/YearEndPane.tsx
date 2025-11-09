@@ -8,6 +8,7 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
   const [year, setYear] = React.useState<number>(new Date().getFullYear())
   const [yearsAvail, setYearsAvail] = React.useState<number[]>([])
   const [preview, setPreview] = React.useState<any | null>(null)
+  const [overall, setOverall] = React.useState<any | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
   const [status, setStatus] = React.useState<{ closedUntil: string | null } | null>(null)
@@ -23,7 +24,14 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
 
   async function refresh() {
     setErr('')
-    try { setBusy(true); const res = await window.api?.yearEnd?.preview?.({ year }); setPreview(res || null) }
+    try { 
+      setBusy(true)
+      const res = await window.api?.yearEnd?.preview?.({ year })
+      setPreview(res || null)
+      // Load overall totals (all time)
+      const overallRes = await window.api?.reports?.summary?.({ from: '', to: '' })
+      setOverall(overallRes || null)
+    }
     catch (e: any) { setErr(e?.message || String(e)) }
     finally { setBusy(false) }
   }
@@ -76,7 +84,7 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
           </div>
           <div className="field" style={{ minWidth: 160 }}>
             <label>Jahr</label>
-            <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))} title="Jahr auswählen">
               {[...new Set([new Date().getFullYear(), ...yearsAvail])].sort((a, b) => b - a).map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
@@ -103,24 +111,65 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
           <div className="helper">Zeitraum: {preview.from} – {preview.to}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <div className="card" style={{ padding: 12 }}>
-              <div className="helper">Netto</div>
+              <div className="helper">Einnahmen</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden>🧾</span>
-                <div style={{ fontWeight: 600 }}>{eur.format(preview.totals.net)}</div>
+                <span aria-hidden style={{ fontSize: 20 }}>📈</span>
+                <div style={{ fontWeight: 600, color: 'var(--success)' }}>
+                  {eur.format(preview.totals.inGross || 0)}
+                </div>
               </div>
             </div>
             <div className="card" style={{ padding: 12 }}>
-              <div className="helper">MwSt</div>
+              <div className="helper">Ausgaben</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden>🧾</span>
-                <div style={{ fontWeight: 600 }}>{eur.format(preview.totals.vat)}</div>
+                <span aria-hidden style={{ fontSize: 20 }}>📉</span>
+                <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
+                  {eur.format(Math.abs(preview.totals.outGross || 0))}
+                </div>
               </div>
             </div>
             <div className="card" style={{ padding: 12 }}>
-              <div className="helper">Brutto</div>
+              <div className="helper">Saldo</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden>💰</span>
-                <div style={{ fontWeight: 600 }}>{eur.format(preview.totals.gross)}</div>
+                <span aria-hidden style={{ fontSize: 20 }}>💰</span>
+                <div style={{ fontWeight: 600, color: (preview.totals.inGross - Math.abs(preview.totals.outGross)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {eur.format(preview.totals.inGross - Math.abs(preview.totals.outGross))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {overall && (
+        <section className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
+          <div className="helper">Gesamtzeitraum (alle Buchungen)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="helper">Einnahmen</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden style={{ fontSize: 20 }}>📈</span>
+                <div style={{ fontWeight: 600, color: 'var(--success)' }}>
+                  {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0))}
+                </div>
+              </div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="helper">Ausgaben</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden style={{ fontSize: 20 }}>📉</span>
+                <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
+                  {eur.format(Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
+                </div>
+              </div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="helper">Saldo</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span aria-hidden style={{ fontSize: 20 }}>💰</span>
+                <div style={{ fontWeight: 600, color: ((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
+                </div>
               </div>
             </div>
           </div>

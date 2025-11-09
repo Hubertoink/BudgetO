@@ -12,13 +12,14 @@ export async function preview(year: number) {
     const to = `${year}-12-31`
     const summary = summarizeVouchers({ from, to } as any)
     const cashBalance = getCashBalance({ to })
-    // Adjust totals to present Brutto as saldo (IN − OUT) for the preview,
-    // aligning the UI with export semantics. Keep groupings unchanged.
+    // Extract IN and OUT totals
     const inType = (summary.byType as any[]).find((t: any) => t.key === 'IN') || { net: 0, vat: 0, gross: 0 }
     const outType = (summary.byType as any[]).find((t: any) => t.key === 'OUT') || { net: 0, vat: 0, gross: 0 }
     const round2 = (n: number) => Math.round(n * 100) / 100
     const adjustedTotals = {
         ...summary.totals,
+        inGross: round2(Number(inType.gross || 0)),
+        outGross: round2(Number(outType.gross || 0)),
         // Show saldo for gross (Einnahmen − Ausgaben)
         gross: round2(Number(inType.gross || 0) - Number(outType.gross || 0))
         // Note: net and vat remain as simple sums to preserve existing breakdown expectations

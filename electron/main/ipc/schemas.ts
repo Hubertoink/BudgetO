@@ -97,7 +97,7 @@ export const YearEndPreviewOutput = z.object({
     year: z.number(),
     from: z.string(),
     to: z.string(),
-    totals: z.object({ net: z.number(), vat: z.number(), gross: z.number() }),
+    totals: z.object({ net: z.number(), vat: z.number(), gross: z.number(), inGross: z.number(), outGross: z.number() }),
     bySphere: z.array(z.object({ key: Sphere, net: z.number(), vat: z.number(), gross: z.number() })),
     byPaymentMethod: z.array(z.object({ key: PaymentMethod.nullable(), net: z.number(), vat: z.number(), gross: z.number() })),
     byType: z.array(z.object({ key: VoucherType, net: z.number(), vat: z.number(), gross: z.number() })),
