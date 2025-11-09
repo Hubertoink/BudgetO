@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ICONS } from './utils/icons'
 import ReportsView from './views/Reports/ReportsView'
 import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
+import InvoicesView from './views/InvoicesView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
+import JournalView from './views/Journal/JournalView'
 import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
@@ -432,7 +435,7 @@ export default function App() {
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
         }
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-        if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
+    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
         return list
     }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
@@ -457,7 +460,7 @@ export default function App() {
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
     const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
     const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    // Human‑readable labels for columns (used in Einstellungen > Tabelle)
+    // Humanâ€‘readable labels for columns (used in Einstellungen > Tabelle)
     const labelForCol = (k: string): string => {
         switch (k) {
             case 'actions': return 'Aktionen'
@@ -837,622 +840,54 @@ export default function App() {
             {/* Main content */}
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
                     
-                    {activePage === 'Reports' && <h1>Reports</h1>}
+                    {activePage === 'Reports' && (
+                        <ReportsView
+                            from={from}
+                            to={to}
+                            setFrom={setFrom}
+                            setTo={setTo}
+                            yearsAvail={yearsAvail}
+                            filterSphere={reportsFilterSphere}
+                            setFilterSphere={setReportsFilterSphere}
+                            filterType={reportsFilterType}
+                            setFilterType={setReportsFilterType}
+                            filterPM={reportsFilterPM}
+                            setFilterPM={setReportsFilterPM}
+                            onOpenExport={() => setShowExportOptions(true)}
+                            refreshKey={refreshKey}
+                            activateKey={reportsActivateKey}
+                        />
+                    )}
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
                     {activePage === 'Dashboard' && (
                         <DashboardView today={today} onGoToInvoices={() => setActivePage('Rechnungen')} />
                     )}
                     {activePage === 'Buchungen' && (
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                            {/* Sphäre/Zweckbindung/Budget via Modal; keep rest inline */}
-                            <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-                            <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as any) || null)}>
-                                <option value="">Alle</option>
-                                <option value="IN">IN</option>
-                                <option value="OUT">OUT</option>
-                                <option value="TRANSFER">TRANSFER</option>
-                            </select>
-                            <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-                            <select className="input" value={filterPM ?? ''} onChange={(e) => { const v = e.target.value as any; setFilterPM(v || null); }}>
-                                <option value="">Alle</option>
-                                <option value="BAR">Bar</option>
-                                <option value="BANK">Bank</option>
-                            </select>
-                            <span style={{ color: 'var(--text-dim)' }}>Tag:</span>
-                            <select className="input" value={filterTag ?? ''} onChange={(e) => setFilterTag(e.target.value || null)}>
-                                <option value="">Alle</option>
-                                {tagDefs.map(t => (
-                                    <option key={t.id} value={t.name}>{t.name}</option>
-                                ))}
-                            </select>
-
-                            {/* Textsuche */}
-                            <input
-                                className="input"
-                                placeholder="Suche (#ID, Text, Betrag …)"
-                                value={q}
-                                onChange={(e) => { setQ(e.target.value); setPage(1); }}
-                                style={{ minWidth: 200, flex: '1 1 260px' }}
-                                aria-label="Suche"
-                            />
-
-                            {/* Icons: Zeitraum & Meta-Filter */}
-                            <button
-                                className="btn ghost"
-                                title="Zeitraum wählen"
-                                aria-label="Zeitraum wählen"
-                                onClick={() => setShowTimeFilter(true)}
-                                style={{ display: 'grid', placeItems: 'center' }}
-                            >
-                                {/* Calendar icon */}
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm-1 6v12h12V8H6zm2 2h3v3H8v-3z" />
-                                </svg>
-                            </button>
-                            <button
-                                className="btn ghost"
-                                title="Sphäre / Zweckbindung / Budget filtern"
-                                aria-label="Sphäre / Zweckbindung / Budget filtern"
-                                onClick={() => setShowMetaFilter(true)}
-                                style={{ display: 'grid', placeItems: 'center' }}
-                            >
-                                {/* Funnel/Filter icon */}
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
-                                </svg>
-                            </button>
-
-                            {/* Aktualisieren Button entfernt (Live-Filter aktualisiert automatisch) */}
-                            <button
-                                className="btn ghost"
-                                title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
-                                aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
-                                onClick={() => setShowBatchEarmark(true)}
-                                style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="4" rx="1" />
-                                    <rect x="3" y="10" width="18" height="4" rx="1" />
-                                    <rect x="3" y="16" width="18" height="4" rx="1" />
-                                </svg>
-                            </button>
-                            {/* Batch button moved to the top toolbar */}
-                        </div>
-                    )}
-                    {activePage === 'Reports' && (
-                        <ReportsView
-                            from={reportsFrom}
-                            to={reportsTo}
-                            setFrom={setReportsFrom}
-                            setTo={setReportsTo}
-                            yearsAvail={yearsAvail}
-                            filterSphere={reportsFilterSphere as any}
-                            setFilterSphere={setReportsFilterSphere as any}
-                            filterType={reportsFilterType as any}
-                            setFilterType={setReportsFilterType as any}
-                            filterPM={reportsFilterPM as any}
-                            setFilterPM={setReportsFilterPM as any}
-                            onOpenExport={() => setShowExportOptions(true)}
+                        <JournalView
+                            flashId={flashId}
+                            setFlashId={setFlashId}
+                            periodLock={periodLock}
                             refreshKey={refreshKey}
-                            activateKey={reportsActivateKey}
+                            notify={notify}
+                            bumpDataVersion={bumpDataVersion}
+                            fmtDate={fmtDate}
+                            setActivePage={setActivePage}
+                            setShowTimeFilter={setShowTimeFilter}
+                            setShowMetaFilter={setShowMetaFilter}
+                            earmarks={earmarks}
+                            tagDefs={tagDefs}
+                            budgetsForEdit={budgetsForEdit}
+                            budgetNames={budgetNames}
+                            eurFmt={eurFmt}
+                            friendlyError={friendlyError}
+                            bufferToBase64Safe={bufferToBase64Safe}
+                            journalLimit={journalLimit}
+                            setJournalLimit={(n: number) => { setJournalLimit(n); setPage(1) }}
+                            dateFmt={dateFmt}
                         />
                     )}
-
-                    {activePage === 'Buchungen' && activeChips.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
-                            {activeChips.map((c) => (
-                                <span key={c.key} className="chip">
-                                    {c.label}
-                                    <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
-                                </span>
-                            ))}
-                            {/* X-Button: Alle Filter zurücksetzen */}
-                            {(filterType || filterPM || filterTag || filterSphere || filterEarmark || filterBudgetId || from || to || q.trim()) && (
-                                <button
-                                    className="btn ghost"
-                                    title="Alle Filter zurücksetzen"
-                                    onClick={() => { 
-                                        setFilterType(null);
-                                        setFilterPM(null);
-                                        setFilterTag(null);
-                                        setFilterSphere(null);
-                                        setFilterEarmark(null);
-                                        setFilterBudgetId(null);
-                                        setFrom('');
-                                        setTo('');
-                                        setQ('');
-                                        setPage(1);
-                                    }}
-                                    style={{ padding: '4px 8px', color: 'var(--accent)' }}
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Status card removed; replaced by toasts */}
-
-                    {/* Heading removed per request */}
-                    {activePage === 'Buchungen' && (
-                        <FilterTotals refreshKey={refreshKey} from={from || undefined} to={to || undefined} paymentMethod={filterPM || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId ?? undefined} q={q || undefined} tag={filterTag || undefined} />
-                    )}
-                    {activePage === 'Buchungen' && (
-                        <div>
-                            <div className="card">
-                                {/* Pagination controls */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                                    <div className="helper">Seite {page} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
-                                    <div style={{ display: 'flex', gap: 6 }}>
-                                        <button className="btn" onClick={() => { setPage(1) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                        <button className="btn" onClick={() => { setPage(p => Math.max(1, p - 1)) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
-                                    </div>
-                                </div>
-                                <JournalTable
-                                    rows={rows}
-                                    order={order}
-                                    cols={cols}
-                                    onReorder={(o: any) => setOrder(o as any)}
-                                    earmarks={earmarks}
-                                    tagDefs={tagDefs}
-                                    eurFmt={eurFmt}
-                                    fmtDate={fmtDate}
-                                    onEdit={(r) => setEditRow({
-                                        ...r,
-                                        // defaults for amount editor
-                                        mode: (r as any).grossAmount != null ? 'GROSS' : 'NET',
-                                        netAmount: (r as any).netAmount ?? null,
-                                        grossAmount: (r as any).grossAmount ?? null,
-                                        vatRate: (r as any).vatRate ?? 0
-                                    } as any)}
-                                    onDelete={(r) => setDeleteRow(r)}
-                                    onToggleSort={(col: 'date' | 'net' | 'gross') => {
-                                        setPage(1)
-                                        setSortBy(col)
-                                        setSortDir(prev => (col === sortBy ? (prev === 'DESC' ? 'ASC' : 'DESC') : 'DESC'))
-                                    }}
-                                    sortDir={sortDir}
-                                    sortBy={sortBy}
-                                    highlightId={flashId}
-                                    lockedUntil={periodLock?.closedUntil || null}
-                                    onTagClick={async (name) => {
-                                        setFilterTag(name)
-                                        setActivePage('Buchungen')
-                                        setPage(1)
-                                        await loadRecent()
-                                    }}
-                                    onEarmarkClick={async (id) => {
-                                        setFilterEarmark(id)
-                                        setActivePage('Buchungen')
-                                        setPage(1)
-                                        await loadRecent()
-                                    }}
-                                    onBudgetClick={async (id) => {
-                                        setFilterBudgetId(id)
-                                        setActivePage('Buchungen')
-                                        setPage(1)
-                                        await loadRecent()
-                                    }}
-                                />
-                            </div>
-                            {/* Batch assign modal (earmark, tags, budget) */}
-                            {showBatchEarmark && (
-                                <BatchEarmarkModal
-                                    onClose={() => setShowBatchEarmark(false)}
-                                    earmarks={earmarks}
-                                    tagDefs={tagDefs}
-                                    budgets={budgetsForEdit}
-                                    currentFilters={{
-                                        paymentMethod: filterPM || undefined,
-                                        sphere: filterSphere || undefined,
-                                        type: filterType || undefined,
-                                        from: from || undefined,
-                                        to: to || undefined,
-                                        q: q || undefined,
-                                    }}
-                                    onApplied={async (updated) => {
-                                        notify('success', `${updated} Buchung(en) aktualisiert`)
-                                        setShowBatchEarmark(false)
-                                        await loadRecent()
-                                        bumpDataVersion()
-                                    }}
-                                    notify={notify}
-                                />
-                            )}
-                            {/* Edit Modal */}
-                            {editRow && (
-                                <div className="modal-overlay" onClick={() => setEditRow(null)}>
-                                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <h2 style={{ margin: 0 }}>
-                                                {(() => {
-                                                    const desc = (editRow.description || '').trim()
-                                                    const label = desc ? `+ Buchung (${desc.length > 60 ? desc.slice(0,60) + '…' : desc}) bearbeiten` : `+ Buchung bearbeiten`
-                                                    return label
-                                                })()}
-                                            </h2>
-                                            <button className="btn danger" onClick={() => setEditRow(null)}>Schließen</button>
-                                        </header>
-
-                                        <form onSubmit={async (e) => {
-                                            e.preventDefault()
-                                            try {
-                                                // Validate transfer direction
-                                                if (editRow.type === 'TRANSFER' && (!editRow.transferFrom || !editRow.transferTo)) {
-                                                    notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
-                                                    return
-                                                }
-                                                const payload: any = { id: editRow.id, date: editRow.date, description: editRow.description ?? null, type: editRow.type, sphere: editRow.sphere, earmarkId: editRow.earmarkId, budgetId: editRow.budgetId, tags: editRow.tags || [] }
-                                                if (editRow.type === 'TRANSFER') {
-                                                    delete payload.paymentMethod
-                                                    payload.transferFrom = editRow.transferFrom ?? null
-                                                    payload.transferTo = editRow.transferTo ?? null
-                                                } else {
-                                                    payload.paymentMethod = editRow.paymentMethod ?? null
-                                                    payload.transferFrom = null
-                                                    payload.transferTo = null
-                                                }
-                                                if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
-                                                    payload.grossAmount = Number((editRow as any).grossAmount)
-                                                    if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
-                                                } else if ((editRow as any).mode === 'NET' && (editRow as any).netAmount != null && (editRow as any).netAmount !== '') {
-                                                    payload.netAmount = Number((editRow as any).netAmount)
-                                                    if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
-                                                }
-                                                const res = await window.api?.vouchers.update?.(payload)
-                                                notify('success', 'Buchung gespeichert')
-                                                const w = (res as any)?.warnings as string[] | undefined
-                                                if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
-                                                setFlashId(editRow.id); window.setTimeout(() => setFlashId((cur) => (cur === editRow.id ? null : cur)), 3000)
-                                                setEditRow(null); await loadRecent(); bumpDataVersion()
-                                            } catch (e: any) {
-                                                notify('error', friendlyError(e))
-                                            }
-                                        }}>
-                                            {/* Live Summary */}
-                                            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-                                                <div className="helper">Zusammenfassung</div>
-                                                <div style={{ fontWeight: 600 }}>
-                                                    {(() => {
-                                                        const date = fmtDate(editRow.date)
-                                                        const type = editRow.type
-                                                        const pm = editRow.type === 'TRANSFER' ? (((editRow as any).transferFrom || '—') + ' → ' + ((editRow as any).transferTo || '—')) : ((editRow as any).paymentMethod || '—')
-                                                        const amount = (() => {
-                                                            if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
-                                                            if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
-                                                            const n = Number((editRow as any).netAmount || 0); const v = Number((editRow as any).vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                                            return eurFmt.format(g)
-                                                        })()
-                                                        const sphere = editRow.sphere
-                                                        return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
-                                                    })()}
-                                                </div>
-                                            </div>
-
-                                            {/* Blocks A+B in a side-by-side grid on wide screens */}
-                                            <div className="block-grid" style={{ marginBottom: 8 }}>
-                                                {/* Block A – Basisinfos */}
-                                                <div className="card" style={{ padding: 12 }}>
-                                                    <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
-                                                    <div className="row">
-                                                        <div className="field">
-                                                            <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                            <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
-                                                        </div>
-                                                        <div className="field">
-                                                            <label>Art</label>
-                                                            <div className="btn-group" role="group" aria-label="Art wählen">
-                                                                {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                                    <button key={t} type="button" className="btn" onClick={() => {
-                                                                        const newRow = { ...editRow, type: t }
-                                                                        if (t === 'TRANSFER' && (!newRow.transferFrom || !newRow.transferTo)) {
-                                                                            newRow.transferFrom = 'BAR'
-                                                                            newRow.transferTo = 'BANK'
-                                                                        }
-                                                                        setEditRow(newRow)
-                                                                    }} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                        <div className="field">
-                                                            <label>Sphäre</label>
-                                                            <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
-                                                                <option value="">—</option>
-                                                                <option value="IDEELL">IDEELL</option>
-                                                                <option value="ZWECK">ZWECK</option>
-                                                                <option value="VERMOEGEN">VERMOEGEN</option>
-                                                                <option value="WGB">WGB</option>
-                                                            </select>
-                                                        </div>
-                                                        {editRow.type === 'TRANSFER' ? (
-                                                            <div className="field">
-                                                                <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                                <select value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
-                                                                    onChange={(e) => {
-                                                                        const v = e.target.value
-                                                                        if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
-                                                                        else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
-                                                                    }}>
-                                                                    <option value="BAR->BANK">BAR → BANK</option>
-                                                                    <option value="BANK->BAR">BANK → BAR</option>
-                                                                </select>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="field">
-                                                                <label>Zahlweg</label>
-                                                                <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                                                    {(['BAR','BANK'] as const).map(pm => (
-                                                                        <button key={pm} type="button" className="btn" onClick={() => setEditRow({ ...editRow, paymentMethod: pm })} style={{ background: (editRow as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Block B – Finanzdetails */}
-                                                <div className="card" style={{ padding: 12 }}>
-                                                    <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
-                                                    <div className="row">
-                                                        {editRow.type === 'TRANSFER' ? (
-                                                            <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                                <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                                <span className="adorn-wrap">
-                                                                    <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
-                                                                        onChange={(e) => {
-                                                                            const v = Number(e.target.value)
-                                                                            setEditRow({ ...(editRow as any), grossAmount: v } as any)
-                                                                        }} />
-                                                                    <span className="adorn-suffix">€</span>
-                                                                </span>
-                                                                <div className="helper">Transfers sind umsatzsteuerneutral.</div>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <div className="field">
-                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                                    <div style={{ display: 'flex', gap: 8 }}>
-                                                                        <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
-                                                                            <option value="NET">Netto</option>
-                                                                            <option value="GROSS">Brutto</option>
-                                                                        </select>
-                                                                        <span className="adorn-wrap" style={{ flex: 1 }}>
-                                                                            <input className="input" type="number" step="0.01" value={(editRow as any).mode === 'GROSS' ? (editRow as any).grossAmount ?? '' : (editRow as any).netAmount ?? ''}
-                                                                                onChange={(e) => {
-                                                                                    const v = Number(e.target.value)
-                                                                                    if ((editRow as any).mode === 'GROSS') setEditRow({ ...(editRow as any), grossAmount: v } as any)
-                                                                                    else setEditRow({ ...(editRow as any), netAmount: v } as any)
-                                                                                }} />
-                                                                            <span className="adorn-suffix">€</span>
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="helper">{(editRow as any).mode === 'GROSS' ? 'Bei Brutto wird USt/Netto nicht berechnet' : 'USt wird automatisch berechnet'}</div>
-                                                                </div>
-                                                                {(editRow as any).mode === 'NET' && (
-                                                                    <div className="field">
-                                                                        <label>USt %</label>
-                                                                        <input className="input" type="number" step="0.1" value={(editRow as any).vatRate ?? 0} onChange={(e) => setEditRow({ ...(editRow as any), vatRate: Number(e.target.value) } as any)} />
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    <div className="row">
-                                                        <div className="field">
-                                                            <label>Budget</label>
-                                                            <select value={(editRow as any).budgetId ?? ''} onChange={(e) => setEditRow({ ...editRow, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                                                <option value="">—</option>
-                                                                {budgetsForEdit.map(b => (
-                                                                    <option key={b.id} value={b.id}>{b.label}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <div className="field">
-                                                            <label>Zweckbindung</label>
-                                                            <select value={(editRow as any).earmarkId ?? ''} onChange={(e) => setEditRow({ ...editRow, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                                                <option value="">—</option>
-                                                                {earmarks.map(em => (
-                                                                    <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Block C+D – Beschreibung & Tags + Anhänge */}
-                                            <div className="block-grid" style={{ marginBottom: 8 }}>
-                                                {/* Block C – Beschreibung & Tags */}
-                                                <div className="card" style={{ padding: 12 }}>
-                                                    <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                                    <div className="row">
-                                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                            <label>Beschreibung</label>
-                                                            <input className="input" value={editRow.description ?? ''} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
-                                                        </div>
-                                                        <TagsEditor
-                                                            label="Tags"
-                                                            value={editRow.tags || []}
-                                                            onChange={(tags) => setEditRow({ ...editRow, tags })}
-                                                            tagDefs={tagDefs}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {/* Block D – Anhänge */}
-                                                <div
-                                                    className="card"
-                                                    style={{ padding: 12 }}
-                                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-                                                onDrop={async (e) => {
-                                                    e.preventDefault(); e.stopPropagation();
-                                                    if (!editRow) return
-                                                    try {
-                                                        const list = Array.from(e.dataTransfer?.files || [])
-                                                        for (const f of list) {
-                                                            const buf = await f.arrayBuffer()
-                                                            const dataBase64 = bufferToBase64Safe(buf)
-                                                            await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: f.name, dataBase64, mimeType: f.type || undefined })
-                                                        }
-                                                        const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                                                        setEditRowFiles(res?.files || [])
-                                                    } catch (err: any) {
-                                                        notify('error', 'Upload fehlgeschlagen: ' + (err?.message || String(err)))
-                                                    }
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                                        <strong>Anhänge</strong>
-                                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', gap: 8 }}>
-                                                        <input ref={editFileInputRef} type="file" multiple hidden onChange={async (e) => {
-                                                            const list = e.target.files
-                                                            if (!list || !list.length || !editRow) return
-                                                            try {
-                                                                for (const f of Array.from(list)) {
-                                                                    const buf = await f.arrayBuffer()
-                                                                    const dataBase64 = bufferToBase64Safe(buf)
-                                                                    await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: f.name, dataBase64, mimeType: f.type || undefined })
-                                                                }
-                                                                const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                                                                setEditRowFiles(res?.files || [])
-                                                            } catch (e: any) {
-                                                                notify('error', 'Upload fehlgeschlagen: ' + (e?.message || String(e)))
-                                                            } finally { if (editFileInputRef.current) editFileInputRef.current.value = '' }
-                                                        }} />
-                                                        <button type="button" className="btn" onClick={() => editFileInputRef.current?.click?.()}>+ Datei(en)</button>
-                                                    </div>
-                                                </div>
-                                                {editRowFilesLoading && <div className="helper">Lade …</div>}
-                                                {!editRowFilesLoading && (
-                                                    editRowFiles.length ? (
-                                                        <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                                                            {editRowFiles.map((f) => (
-                                                                <li key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</span>
-                                                                    <button className="btn" onClick={() => window.api?.attachments.open?.({ fileId: f.id })}>Öffnen</button>
-                                                                    <button className="btn" onClick={async () => {
-                                                                        try {
-                                                                            const r = await window.api?.attachments.saveAs?.({ fileId: f.id })
-                                                                            if (r) notify('success', 'Gespeichert: ' + r.filePath)
-                                                                        } catch (e: any) {
-                                                                            const m = e?.message || String(e)
-                                                                            if (/Abbruch/i.test(m)) return
-                                                                            notify('error', 'Speichern fehlgeschlagen: ' + m)
-                                                                        }
-                                                                    }}>Herunterladen</button>
-                                                                    <button className="btn danger" title="Löschen" onClick={() => setConfirmDeleteAttachment({ id: f.id, fileName: f.fileName })}>🗑</button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    ) : (
-                                                        <div className="helper">Keine Dateien vorhanden</div>
-                                                    )
-                                                )}
-                                            </div>
-                                            </div>
-                                            {confirmDeleteAttachment && (
-                                                <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
-                                                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <h3 style={{ margin: 0 }}>Anhang löschen</h3>
-                                                            <button
-                                                                className="btn ghost"
-                                                                onClick={() => setConfirmDeleteAttachment(null)}
-                                                                aria-label="Schließen"
-                                                                style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </div>
-                                                        <div>
-                                                            Möchtest du den Anhang
-                                                            {` `}
-                                                            <strong>{confirmDeleteAttachment.fileName}</strong>
-                                                            {` `}
-                                                            wirklich löschen?
-                                                        </div>
-                                                        <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
-                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                                            <button className="btn" onClick={() => setConfirmDeleteAttachment(null)}>Abbrechen</button>
-                                                            <button className="btn danger" onClick={async () => {
-                                                                if (!editRow) { setConfirmDeleteAttachment(null); return }
-                                                                try {
-                                                                    await window.api?.attachments.delete?.({ fileId: confirmDeleteAttachment.id })
-                                                                    const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                                                                    setEditRowFiles(res?.files || [])
-                                                                    setConfirmDeleteAttachment(null)
-                                                                } catch (e: any) {
-                                                                    notify('error', e?.message || String(e))
-                                                                }
-                                                            }}>Ja, löschen</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                                                <div>
-                                                    <button type="button" className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑 Löschen</button>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button type="button" className="btn" onClick={() => setEditRow(null)}>Abbrechen</button>
-                                                    <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
-                                                </div>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Delete Modal */}
-                            {deleteRow && (
-                                <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0 }}>
-                                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <h2 style={{ margin: 0 }}>Buchung löschen</h2>
-                                            <button className="btn danger" onClick={() => setDeleteRow(null)}>Schließen</button>
-                                        </header>
-                                        <p>Möchtest du die Buchung <strong>{deleteRow.voucherNo ? `#${deleteRow.voucherNo}` : ''}{deleteRow.description ? ` ${deleteRow.voucherNo ? '– ' : ''}${deleteRow.description}` : ''}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                                            <button className="btn" onClick={() => setDeleteRow(null)}>Abbrechen</button>
-                                            <button className="btn danger" onClick={async () => {
-                                                try {
-                                                    await window.api?.vouchers.delete?.({ id: deleteRow.id })
-                                                    setDeleteRow(null)
-                                                    // Close edit modal if deletion was initiated from edit, or if the currently edited row matches the deleted one
-                                                    try {
-                                                        if (deleteRow.fromEdit) setEditRow(null)
-                                                        else if (editRow && editRow.id === deleteRow.id) setEditRow(null)
-                                                    } catch {}
-                                                    await loadRecent()
-                                                    bumpDataVersion()
-                                                    notify('success', 'Buchung gelöscht')
-                                                } catch (e: any) {
-                                                    const raw = String(e?.message || e || '')
-                                                    // If delete is blocked due to linked invoice, show an explanatory toast
-                                                    if (/FOREIGN KEY|constraint|invoice|posted_voucher_id/i.test(raw)) {
-                                                        notify('info', 'Diese Buchung ist mit einer Rechnung verknüpft und kann nicht gelöscht werden. Bitte zuerst die Rechnung löschen – danach ist die Buchung löschbar.')
-                                                    } else {
-                                                        notify('error', friendlyError(e))
-                                                    }
-                                                }
-                                            }}>Ja, löschen</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                        </div>
-                    )}
+                    {/* Old Buchungen block removed - now using JournalView component */}
 
                     {activePage === 'Einstellungen' && (
                         <SettingsView
@@ -1558,7 +993,7 @@ export default function App() {
 
                             {/* Blocks A+B in a side-by-side grid on wide screens */}
                             <div className="block-grid" style={{ marginBottom: 8 }}>
-                            {/* Block A – Basisinfos */}
+                            {/* Block A â€“ Basisinfos */}
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                                 <div className="row">
@@ -1616,7 +1051,7 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* Block B – Finanzdetails */}
+                            {/* Block B â€“ Finanzdetails */}
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                                 <div className="row">
@@ -1688,7 +1123,7 @@ export default function App() {
 
                             {/* Block C+D – Beschreibung & Tags + Anhänge */}
                             <div className="block-grid" style={{ marginBottom: 8 }}>
-                                {/* Block C – Beschreibung & Tags */}
+                                {/* Block C â€“ Beschreibung & Tags */}
                                 <div className="card" style={{ padding: 12 }}>
                                     <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
                                     <div className="row">
@@ -1986,7 +1421,7 @@ function MembersView() {
     function validateIBAN(iban?: string | null): { ok: boolean; msg?: string } {
         if (!iban) return { ok: true }
         const s = iban.replace(/\s+/g, '').toUpperCase()
-        if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/.test(s)) return { ok: false, msg: 'Format ungültig' }
+    if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/.test(s)) return { ok: false, msg: 'Format ungültig' }
         const rearr = s.slice(4) + s.slice(0, 4)
         const nums = rearr.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55))
         let mod = 0
@@ -1994,12 +1429,12 @@ function MembersView() {
             const part = String(mod) + nums.slice(i, i + 7)
             mod = Number(BigInt(part) % 97n)
         }
-        return { ok: mod === 1, msg: mod === 1 ? undefined : 'Prüfziffer ungültig' }
+    return { ok: mod === 1, msg: mod === 1 ? undefined : 'Prüfziffer ungültig' }
     }
     function validateBIC(bic?: string | null): { ok: boolean; msg?: string } {
         if (!bic) return { ok: true }
         const s = bic.replace(/\s+/g, '').toUpperCase()
-        if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s)) return { ok: false, msg: 'Format ungültig' }
+    if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s)) return { ok: false, msg: 'Format ungültig' }
         return { ok: true }
     }
     function nextDuePreview(amount?: number | null, interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null, anchor?: string | null): string | null {
@@ -2171,20 +1606,20 @@ function MembersView() {
                 <thead>
                     <tr>
                         <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? ICONS.ARROW_UP : ICONS.ARROW_DOWN) : ICONS.ARROW_BOTH}</span>
                         </th>
                         <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? ICONS.ARROW_UP : ICONS.ARROW_DOWN) : ICONS.ARROW_BOTH}</span>
                         </th>
                         <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? ICONS.ARROW_UP : ICONS.ARROW_DOWN) : ICONS.ARROW_BOTH}</span>
                         </th>
                         <th align="left">Telefon</th>
                         {colPrefs.showAddress && (<th align="left">Adresse</th>)}
                         {colPrefs.showIBAN && (<th align="left">IBAN</th>)}
                         {colPrefs.showContribution && (<th align="right">Beitrag</th>)}
                         <th align="left" style={{ cursor: 'pointer' }} onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? ICONS.ARROW_UP : ICONS.ARROW_DOWN) : ICONS.ARROW_BOTH}</span>
                         </th>
                         {colPrefs.showNotes && (<th align="left">Anmerkungen</th>)}
                         <th align="center">Aktionen</th>
@@ -2246,7 +1681,7 @@ function MembersView() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
                 <div className="helper">{total} Einträge</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">⏮</button>
+                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">«</button>
                     <button className="btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
                     <button className="btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
                 </div>
@@ -2260,7 +1695,7 @@ function MembersView() {
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                 {/* Info tooltip entfernt */}
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
-                                <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
+                                <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
                             </div>
                         </header>
                         {/* Tabs */}
@@ -2430,7 +1865,7 @@ function MembersView() {
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
-                            <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
+                            <button className="btn" onClick={() => setShowColumnsModal(false)}>Ã—</button>
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2466,7 +1901,7 @@ function MembersView() {
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 900px)', maxWidth: 900, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Einladung per E-Mail</h3>
-                            <button className="btn" onClick={()=>setShowInvite(false)}>×</button>
+                            <button className="btn" onClick={()=>setShowInvite(false)}>✕</button>
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -2528,7 +1963,7 @@ function MembersView() {
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
-                            <button className="btn" onClick={() => setMissingRequired([])}>×</button>
+                            <button className="btn" onClick={() => setMissingRequired([])}>✕</button>
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <div>Bitte ergänze die folgenden Felder:</div>
@@ -2547,7 +1982,7 @@ function MembersView() {
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Mitglied löschen</h3>
-                            <button className="btn" onClick={() => setDeleteConfirm(null)}>×</button>
+                            <button className="btn" onClick={() => setDeleteConfirm(null)}>✕</button>
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <div style={{ marginBottom: 6 }}>Soll das folgende Mitglied wirklich gelöscht werden?</div>
@@ -2642,14 +2077,14 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
-                            <button className="btn" onClick={()=>setOpen(false)}>×</button>
+                            <button className="btn" onClick={()=>setOpen(false)}>✕</button>
                         </header>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
                             <div className="helper" style={{ fontWeight: 600 }}>{name}{memberNo ? ` (${memberNo})` : ''}</div>
-                            <span className="helper">•</span>
+                            <span className="helper">â€¢</span>
                             <span className="helper">Eintritt: {status?.joinDate || '—'}</span>
                             <span className="helper">•</span>
-                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `Überfällig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '—'}</span>
+                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `überfällig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '—'}</span>
                             <span className="helper">•</span>
                             <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '—'}</span>
                             <span className="helper">•</span>
@@ -3262,7 +2697,7 @@ function InvoicesView() {
         if (!d.date) { setFormError('Bitte Datum angeben'); return }
         if (!d.party || !d.party.trim()) { setFormError('Bitte Partei angeben'); return }
         const amt = parseAmount(d.grossAmount)
-        if (amt == null || amt <= 0) { setFormError('Bitte gültigen Betrag eingeben (> 0)'); return }
+    if (amt == null || amt <= 0) { setFormError('Bitte gültigen Betrag eingeben (> 0)'); return }
 
         try {
             if (form.mode === 'create') {
@@ -3473,13 +2908,13 @@ function InvoicesView() {
                                 <th align="left">
                                     <button className="btn ghost" title="Nach Datum sortieren" onClick={() => { setSortBy('date'); setSortDir(prev => (sortBy === 'date' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                                         <span>Datum</span>
-                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'date' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'date' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'date' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'date' ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH}</span>
                                     </button>
                                 </th>
                                 <th align="left">
                                     <button className="btn ghost" title="Nach Fälligkeit sortieren" onClick={() => { setSortBy('due'); setSortDir(prev => (sortBy === 'due' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'ASC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                                         <span>Fällig</span>
-                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'due' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'due' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'due' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'due' ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH}</span>
                                     </button>
                                 </th>
                                 <th align="left">Nr.</th>
@@ -3488,7 +2923,7 @@ function InvoicesView() {
                                 <th align="right">
                                     <button className="btn ghost" title="Nach Betrag sortieren" onClick={() => { setSortBy('amount'); setSortDir(prev => (sortBy === 'amount' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                                         <span>Brutto</span>
-                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'amount' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'amount' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                                        <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'amount' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'amount' ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH}</span>
                                     </button>
                                 </th>
                                 <th align="right">Bezahlt</th>
@@ -3505,7 +2940,7 @@ function InvoicesView() {
                                     <tr key={r.id} className={flashId === r.id ? 'row-flash' : undefined}>
                                         <td align="center" title={r.voucherType === 'IN' ? 'Einnahme' : 'Ausgabe'}>
                                             <span className="badge" style={{ background: r.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)', color: 'white', padding: '2px 6px' }}>
-                                                {r.voucherType === 'IN' ? '↑ IN' : '↓ OUT'}
+                                                {r.voucherType === 'IN' ? `${ICONS.ARROW_UP} IN` : `${ICONS.ARROW_DOWN} OUT`}
                                             </span>
                                         </td>
                                         <td>{fmtDateLocal(r.date)}</td>
@@ -4291,7 +3726,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     }
     const renderSortIcon = (col: 'date' | 'net' | 'gross') => {
         const active = sortBy === col
-        const sym = active ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'
+        const sym = active ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH
         const color = active ? 'var(--warning)' : 'var(--text-dim)'
         return <span className={`sort-icon ${active ? 'active' : 'inactive'}`} aria-hidden="true" style={{ color }}>{sym}</span>
     }
@@ -4302,10 +3737,10 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
                         : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sphäre</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
-                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>🎯</th>
-                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>💰</th>
+                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸŽ¯</th>
+                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸ’°</th>
                                         : k === 'paymentMethod' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Zahlweg</th>
-                                            : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>📎</th>
+                                            : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸ“Ž</th>
                                                 : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} style={{ cursor: 'pointer' }}>Netto {renderSortIcon('net')}</th>
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
                                                         : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} style={{ cursor: 'pointer' }}>Brutto {renderSortIcon('gross')}</th>
@@ -4319,9 +3754,9 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
         k === 'actions' ? (
             <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
                 {isLocked(r.date) ? (
-                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
+                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">ðŸ”’</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
+                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>âœŽ</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -4376,7 +3811,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from} → ${to}` : 'Transfer'
+                        const title = from && to ? `${from} â†’ ${to}` : 'Transfer'
                         return (
                             <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                 {from === 'BAR' ? <IconCash /> : <IconBank />}
@@ -4411,7 +3846,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 })()
             ) : ''}</td>
         ) : k === 'attachments' ? (
-            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anhänge`}>📎 {r.fileCount}</span>) : ''}</td>
+            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anhänge`}>ðŸ“Ž {r.fileCount}</span>) : ''}</td>
         ) : k === 'net' ? (
             <td key={k} align="right">{eurFmt.format(r.netAmount)}</td>
         ) : k === 'vat' ? (
@@ -4509,7 +3944,7 @@ function ReceiptsView() {
                 <strong>Belege</strong>
                 <div className="helper">Buchungen mit angehängten Dateien</div>
             </div>
-            {loading && <div>Lade …</div>}
+            {loading && <div>Lade â€¦</div>}
             {!loading && rows.length > 0 && (
                 <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
                     <thead>
@@ -4531,7 +3966,7 @@ function ReceiptsView() {
                                         className="btn"
                                         onClick={() => setAttachmentsModal({ voucherId: r.id, voucherNo: r.voucherNo, date: r.date, description: r.description || '' })}
                                         title="Belege anzeigen"
-                                    >📎 {r.fileCount}</button>
+                                    >ðŸ“Ž {r.fileCount}</button>
                                 </td>
                             </tr>
                         ))}
@@ -4560,169 +3995,3 @@ function ReceiptsView() {
     )
 }
 
-// AttachmentsModal extracted to components/modals/AttachmentsModal.tsx
-
-// DomDebugger removed for release
-
-// Batch assignment modal (Zweckbindung, Tags, Budget)
-// BatchEarmarkModal extracted to components/modals/BatchEarmarkModal.tsx
-/* function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters, onApplied, notify }: {
-    onClose: () => void
-    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
-    tagDefs: Array<{ id: number; name: string; color?: string | null }>
-    budgets: Array<{ id: number; label: string }>
-    currentFilters: { paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string }
-    onApplied: (updated: number) => void
-    notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
-}) {
-    const [mode, setMode] = useState<'EARMARK' | 'TAGS' | 'BUDGET'>('EARMARK')
-    const [earmarkId, setEarmarkId] = useState<number | ''>('')
-    const [onlyWithout, setOnlyWithout] = useState<boolean>(false)
-    const [tagInput, setTagInput] = useState<string>('')
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
-    const [budgetId, setBudgetId] = useState<number | ''>('')
-    const [busy, setBusy] = useState(false)
-
-    // helpers
-    const selectedEarmark = earmarks.find(e => e.id === (typeof earmarkId === 'number' ? earmarkId : -1))
-    const addTag = (t: string) => {
-        const v = (t || '').trim()
-        if (!v) return
-        if (!selectedTags.some(x => x.toLowerCase() === v.toLowerCase())) setSelectedTags(prev => [...prev, v])
-    }
-    const removeTag = (name: string) => setSelectedTags(prev => prev.filter(t => t.toLowerCase() !== name.toLowerCase()))
-
-    async function run() {
-        try {
-            setBusy(true)
-            if (mode === 'EARMARK') {
-                if (!earmarkId) { notify?.('error', 'Bitte eine Zweckbindung wählen'); return }
-                const payload: any = { earmarkId: Number(earmarkId), ...currentFilters }
-                if (onlyWithout) payload.onlyWithout = true
-                const res = await window.api?.vouchers.batchAssignEarmark?.(payload)
-                const n = res?.updated ?? 0
-                onApplied(n)
-                onClose()
-            } else if (mode === 'TAGS') {
-                const tags = selectedTags.length ? selectedTags : (tagInput || '').split(',').map(s => s.trim()).filter(Boolean)
-                if (!tags.length) { notify?.('error', 'Bitte mindestens einen Tag angeben'); return }
-                const res = await window.api?.vouchers.batchAssignTags?.({ tags, ...currentFilters })
-                const n = res?.updated ?? 0
-                onApplied(n)
-                onClose()
-            } else if (mode === 'BUDGET') {
-                if (!budgetId) { notify?.('error', 'Bitte ein Budget wählen'); return }
-                const payload: any = { budgetId: Number(budgetId), ...currentFilters }
-                if (onlyWithout) payload.onlyWithout = true
-                const res = await window.api?.vouchers.batchAssignBudget?.(payload)
-                const n = res?.updated ?? 0
-                onApplied(n)
-                onClose()
-            }
-        } catch (e: any) {
-            notify?.('error', e?.message || String(e))
-        } finally { setBusy(false) }
-    }
-
-    return createPortal(
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Batch zuweisen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Was soll zugewiesen werden?</label>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button className={`btn ${mode === 'EARMARK' ? 'primary' : ''}`} onClick={() => setMode('EARMARK')}>Zweckbindung</button>
-                            <button className={`btn ${mode === 'TAGS' ? 'primary' : ''}`} onClick={() => setMode('TAGS')}>Tags</button>
-                            <button className={`btn ${mode === 'BUDGET' ? 'primary' : ''}`} onClick={() => setMode('BUDGET')}>Budget</button>
-                        </div>
-                    </div>
-
-                    {mode === 'EARMARK' && (
-                        <>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Zweckbindung</label>
-                                <select className="input" value={earmarkId as any} onChange={(e) => setEarmarkId(e.target.value ? Number(e.target.value) : '')}>
-                                    <option value="">— bitte wählen —</option>
-                                    {earmarks.map(em => (
-                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                    ))}
-                                </select>
-                                {selectedEarmark?.color && (
-                                    <div className="helper" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                        <span>Farbe:</span>
-                                        <span title={selectedEarmark.color || ''} style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 4, background: selectedEarmark.color || undefined }} />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label><input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} /> Nur Buchungen ohne Zweckbindung aktualisieren</label>
-                            </div>
-                        </>
-                    )}
-
-                    {mode === 'TAGS' && (
-                        <>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Tags hinzufügen</label>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    {(selectedTags || []).map(t => (
-                                        <span key={t} className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                            {t}
-                                            <button className="btn" title="Entfernen" onClick={() => removeTag(t)}>×</button>
-                                        </span>
-                                    ))}
-                                </div>
-                                <input className="input" placeholder="Tags, kommasepariert…" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && tagInput.trim()) { addTag(tagInput.trim()); setTagInput('') } }} />
-                                {!!tagDefs.length && (
-                                    <div className="helper">Vorschläge: {(tagDefs || []).slice(0, 8).map(t => (
-                                        <button key={t.id} className="btn ghost" onClick={() => addTag(t.name)}>{t.name}</button>
-                                    ))}</div>
-                                )}
-                                <div className="helper">Tipp: Mit Enter hinzufügen. Bereits existierende Tags werden automatisch wiederverwendet.</div>
-                            </div>
-                        </>
-                    )}
-
-                    {mode === 'BUDGET' && (
-                        <>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Budget</label>
-                                <select className="input" value={budgetId as any} onChange={(e) => setBudgetId(e.target.value ? Number(e.target.value) : '')}>
-                                    <option value="">— bitte wählen —</option>
-                                    {budgets.map(b => (
-                                        <option key={b.id} value={b.id}>{b.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label><input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} /> Nur Buchungen ohne Budget aktualisieren</label>
-                            </div>
-                        </>
-                    )}
-
-                    <div className="card" style={{ gridColumn: '1 / span 2', padding: 10 }}>
-                        <div className="helper">Betroffene Buchungen: Aktuelle Filter werden angewandt (Suche, Zeitraum, Sphäre, Art, Zahlweg).</div>
-                        <ul style={{ margin: '6px 0 0 16px' }}>
-                            {currentFilters.q && <li>Suche: <code>{currentFilters.q}</code></li>}
-                            {currentFilters.from && currentFilters.to && <li>Zeitraum: {currentFilters.from} – {currentFilters.to}</li>}
-                            {currentFilters.sphere && <li>Sphäre: {currentFilters.sphere}</li>}
-                            {currentFilters.type && <li>Art: {currentFilters.type}</li>}
-                            {currentFilters.paymentMethod && <li>Zahlweg: {currentFilters.paymentMethod}</li>}
-                            {onlyWithout && mode === 'EARMARK' && <li>Nur ohne bestehende Zweckbindung</li>}
-                            {onlyWithout && mode === 'BUDGET' && <li>Nur ohne bestehendes Budget</li>}
-                        </ul>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" disabled={busy || (mode === 'EARMARK' && !earmarkId) || (mode === 'BUDGET' && !budgetId)} onClick={run}>Übernehmen</button>
-                </div>
-            </div>
-        </div>,
-        document.body
-    )
-}*/
