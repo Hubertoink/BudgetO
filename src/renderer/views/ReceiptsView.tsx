@@ -1,0 +1,85 @@
+import React, { useEffect, useState } from 'react'
+import AttachmentsModal from '../components/modals/AttachmentsModal'
+
+export default function ReceiptsView() {
+    const [rows, setRows] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string | null; fileCount?: number }>>([])
+    const [page, setPage] = useState(1)
+    const [limit, setLimit] = useState(20)
+    const [total, setTotal] = useState(0)
+    const [loading, setLoading] = useState(false)
+    const [attachmentsModal, setAttachmentsModal] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
+
+    async function load() {
+        setLoading(true)
+        try {
+            const res = await window.api?.vouchers.list?.({ limit, offset: (page - 1) * limit, sort: 'DESC' })
+            if (res) {
+                const withFiles = res.rows.filter(r => (r.fileCount || 0) > 0)
+                setRows(withFiles.map(r => ({ id: r.id, voucherNo: r.voucherNo, date: r.date, description: r.description || '', fileCount: r.fileCount || 0 })))
+                setTotal(res.total)
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => { load() }, [page, limit])
+
+    // AttachmentsModal handles listing, preview and download
+
+    return (
+        <div className="card" style={{ padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong>Belege</strong>
+                <div className="helper">Buchungen mit angehängten Dateien</div>
+            </div>
+            {loading && <div>Lade …</div>}
+            {!loading && rows.length > 0 && (
+                <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
+                    <thead>
+                        <tr>
+                            <th align="left">Datum</th>
+                            <th align="left">Nr.</th>
+                            <th align="left">Beschreibung</th>
+                            <th align="center">Belege</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(r => (
+                            <tr key={r.id}>
+                                <td>{r.date}</td>
+                                <td>{r.voucherNo}</td>
+                                <td>{r.description}</td>
+                                <td align="center">
+                                    <button
+                                        className="btn"
+                                        onClick={() => setAttachmentsModal({ voucherId: r.id, voucherNo: r.voucherNo, date: r.date, description: r.description || '' })}
+                                        title="Belege anzeigen"
+                                    >🔎 {r.fileCount}</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+            {!loading && rows.length === 0 && (
+                <div className="card" style={{ padding: 16, marginTop: 12 }}>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                        <div><strong>Keine Belege gefunden</strong></div>
+                        <div className="helper">Es wurden noch keine Dateien an Buchungen angehängt. Du kannst in „Buchungen" Belege hinzufügen oder neue Buchungen anlegen.</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn" onClick={() => (window as any).scrollTo?.(0,0) || null}>Nach oben</button>
+                            <button className="btn primary" onClick={() => (document.querySelector('.fab-buchung') as HTMLButtonElement | null)?.click?.()}>+ Buchung</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {attachmentsModal && (
+                <AttachmentsModal
+                    voucher={attachmentsModal}
+                    onClose={() => setAttachmentsModal(null)}
+                />
+            )}
+        </div>
+    )
+}
