@@ -1349,6 +1349,11 @@ textarea:focus {
     display: inline-block;
 }
 
+/* Loading spinner animation */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Required field asterisk marker */
 .req-asterisk {
     color: var(--danger);

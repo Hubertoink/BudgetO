@@ -1,0 +1,275 @@
+import React, { useRef } from 'react'
+import TagsEditor from '../TagsEditor'
+import type { QA } from '../../hooks/useQuickAdd'
+
+interface QuickAddModalProps {
+    qa: QA
+    setQa: (qa: QA) => void
+    onSave: () => void
+    onClose: () => void
+    files: File[]
+    setFiles: (files: File[]) => void
+    openFilePicker: () => void
+    onDropFiles: (files: FileList | null) => void
+    fileInputRef: React.RefObject<HTMLInputElement>
+    fmtDate: (d: string) => string
+    eurFmt: Intl.NumberFormat
+    budgetsForEdit: Array<{ id: number; label: string }>
+    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
+    tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    descSuggest: string[]
+}
+
+/**
+ * QuickAddModal - Buchung schnell erfassen
+ * 
+ * Modal für das schnelle Erfassen von Buchungen mit allen Details
+ * Extrahiert aus App.tsx für bessere Wartbarkeit
+ */
+export default function QuickAddModal({
+    qa,
+    setQa,
+    onSave,
+    onClose,
+    files,
+    setFiles,
+    openFilePicker,
+    onDropFiles,
+    fileInputRef,
+    fmtDate,
+    eurFmt,
+    budgetsForEdit,
+    earmarks,
+    tagDefs,
+    descSuggest
+}: QuickAddModalProps) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h2 style={{ margin: 0 }}>+ Buchung</h2>
+                    <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                </header>
+                
+                <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+                    {/* Live Summary */}
+                    <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+                        <div className="helper">Zusammenfassung</div>
+                        <div style={{ fontWeight: 600 }}>
+                            {(() => {
+                                const date = fmtDate(qa.date)
+                                const type = qa.type
+                                const pm = qa.type === 'TRANSFER' ? (((qa as any).transferFrom || '—') + ' → ' + ((qa as any).transferTo || '—')) : ((qa as any).paymentMethod || '—')
+                                const amount = (() => {
+                                    if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                    if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                    const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
+                                    return eurFmt.format(g)
+                                })()
+                                const sphere = qa.sphere
+                                return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* Blocks A+B in a side-by-side grid on wide screens */}
+                    <div className="block-grid" style={{ marginBottom: 8 }}>
+                        {/* Block A – Basisinfos */}
+                        <div className="card" style={{ padding: 12 }}>
+                            <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                            <div className="row">
+                                <div className="field">
+                                    <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                    <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
+                                </div>
+                                <div className="field">
+                                    <label>Art</label>
+                                    <div className="btn-group" role="group" aria-label="Art wählen">
+                                        {(['IN','OUT','TRANSFER'] as const).map(t => (
+                                            <button key={t} type="button" className="btn" onClick={() => {
+                                                const newQa = { ...qa, type: t }
+                                                if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
+                                                    (newQa as any).transferFrom = 'BAR';
+                                                    (newQa as any).transferTo = 'BANK'
+                                                }
+                                                setQa(newQa)
+                                            }} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="field">
+                                    <label>Sphäre</label>
+                                    <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })}>
+                                        <option value="IDEELL">IDEELL</option>
+                                        <option value="ZWECK">ZWECK</option>
+                                        <option value="VERMOEGEN">VERMOEGEN</option>
+                                        <option value="WGB">WGB</option>
+                                    </select>
+                                </div>
+                                {qa.type === 'TRANSFER' ? (
+                                    <div className="field">
+                                        <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                        <select value={`${(qa as any).transferFrom ?? ''}->${(qa as any).transferTo ?? ''}`}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
+                                                else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
+                                            }}>
+                                            <option value="BAR->BANK">BAR → BANK</option>
+                                            <option value="BANK->BAR">BANK → BAR</option>
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div className="field">
+                                        <label>Zahlweg</label>
+                                        <div className="btn-group" role="group" aria-label="Zahlweg wählen">
+                                            {(['BAR','BANK'] as const).map(pm => (
+                                                <button key={pm} type="button" className="btn" onClick={() => setQa({ ...qa, paymentMethod: pm })} style={{ background: (qa as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Block B – Finanzdetails */}
+                        <div className="card" style={{ padding: 12 }}>
+                            <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
+                            <div className="row">
+                                {qa.type === 'TRANSFER' ? (
+                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                        <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                        <span className="adorn-wrap">
+                                            <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
+                                                onChange={(e) => {
+                                                    const v = Number(e.target.value)
+                                                    setQa({ ...qa, grossAmount: v })
+                                                }} />
+                                            <span className="adorn-suffix">€</span>
+                                        </span>
+                                        <div className="helper">Transfers sind umsatzsteuerneutral.</div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="field">
+                                            <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
+                                                    <option value="NET">Netto</option>
+                                                    <option value="GROSS">Brutto</option>
+                                                </select>
+                                                <span className="adorn-wrap" style={{ flex: 1 }}>
+                                                    <input className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
+                                                        onChange={(e) => {
+                                                            const v = Number(e.target.value)
+                                                            if ((qa as any).mode === 'GROSS') setQa({ ...qa, grossAmount: v })
+                                                            else setQa({ ...qa, netAmount: v })
+                                                        }} />
+                                                    <span className="adorn-suffix">€</span>
+                                                </span>
+                                            </div>
+                                            <div className="helper">{(qa as any).mode === 'GROSS' ? 'Bei Brutto wird USt/Netto nicht berechnet' : 'USt wird automatisch berechnet'}</div>
+                                        </div>
+                                        {(qa as any).mode === 'NET' && (
+                                            <div className="field">
+                                                <label>USt %</label>
+                                                <input className="input" type="number" step="0.1" value={qa.vatRate} onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })} />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            <div className="row">
+                                <div className="field">
+                                    <label>Budget</label>
+                                    <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                        <option value="">—</option>
+                                        {budgetsForEdit.map(b => (
+                                            <option key={b.id} value={b.id}>{b.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="field">
+                                    <label>Zweckbindung</label>
+                                    <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                        <option value="">—</option>
+                                        {earmarks.map(em => (
+                                            <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Block C+D – Beschreibung & Tags + Anhänge */}
+                    <div className="block-grid" style={{ marginBottom: 8 }}>
+                        {/* Block C – Beschreibung & Tags */}
+                        <div className="card" style={{ padding: 12 }}>
+                            <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                            <div className="row">
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Beschreibung</label>
+                                    <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                    <datalist id="desc-suggestions">
+                                        {descSuggest.map((d, i) => (<option key={i} value={d} />))}
+                                    </datalist>
+                                </div>
+                                <TagsEditor
+                                    label="Tags"
+                                    value={(qa as any).tags || []}
+                                    onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
+                                    tagDefs={tagDefs}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Block D – Anhänge */}
+                        <div
+                            className="card"
+                            style={{ padding: 12 }}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                    <strong>Anhänge</strong>
+                                    <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
+                                    <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
+                                    {files.length > 0 && (
+                                        <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
+                                    )}
+                                </div>
+                            </div>
+                            {files.length > 0 && (
+                                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                                    {files.map((f, i) => (
+                                        <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                            <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                        <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="button" className="btn" onClick={() => { onClose(); setFiles([]) }}>Abbrechen</button>
+                            <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
+}

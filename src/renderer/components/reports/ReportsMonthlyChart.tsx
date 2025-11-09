@@ -157,6 +157,35 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return arr
   })()
 
+  // Robust mouse tracking with SVG coordinate transformation
+  const mouseMove = (ev: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || !series.length) return
+    // Use SVGPoint + CTM for accurate coordinate mapping (handles scaling/padding)
+    const pt = (svg as any).createSVGPoint ? (svg as any).createSVGPoint() : null
+    let x = 0
+    if (pt && (svg as any).getScreenCTM) {
+      pt.x = ev.clientX; pt.y = ev.clientY
+      const ctm = (svg as any).getScreenCTM()
+      const inv = ctm && ctm.inverse ? ctm.inverse() : null
+      const loc = inv ? pt.matrixTransform(inv) : null
+      x = loc ? Number(loc.x) : 0
+    } else {
+      // Fallback for browsers without SVGPoint
+      const rect = svg.getBoundingClientRect()
+      const scaleX = width / Math.max(1, rect.width)
+      x = (ev.clientX - rect.left) * scaleX
+    }
+    // Find closest bar group
+    let best = 0
+    let bestDist = Math.abs(x - (xFor(0) + barW))
+    for (let i = 1; i < series.length; i++) {
+      const d = Math.abs(x - (xFor(i) + barW))
+      if (d < bestDist) { best = i; bestDist = d }
+    }
+    setHoverIdx(best)
+  }
+
   return (
     <div className="card" style={{ marginTop: 12, padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -187,7 +216,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               </div>
             )
           })()}
-          <svg ref={svgRef} width={width} height={height} role="img" aria-label="Monatsverlauf">
+          <svg ref={svgRef} width={width} height={height} role="img" aria-label="Monatsverlauf" onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)}>
             {/* Y-Achse Grid + Labels */}
             {yTicks.map((v, i) => (
               <g key={`ytick-${i}`}>
@@ -203,7 +232,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               const yOut = yBase + (innerH - hOut)
               const saldoMonth = s.inGross + s.outGross
               return (
-                <g key={i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
+                <g key={i}>
                   <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
                   <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
                   {(() => {

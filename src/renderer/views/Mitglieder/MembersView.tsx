@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import ModalHeader from '../../components/ModalHeader'
+import LoadingState from '../../components/LoadingState'
 
 // Local helpers ported from App
 function contrastText(bg?: string | null) {
@@ -203,7 +205,7 @@ export default function MembersView() {
                     ) : null })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
+                    <div className="helper">{busy ? <LoadingState size="small" message="" /> : `Seite ${page}/${pages} – ${total} Einträge`}</div>
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
                     <button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
@@ -356,9 +358,12 @@ export default function MembersView() {
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                <button className="btn ghost" title={'IBAN/BIC werden live geprüft.\nBeitragsvorschau zeigt die initiale Fälligkeit.\nMit Tab lassen sich Felder schnell durchlaufen.'}>ℹ️</button>
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
-                                <button className="btn" onClick={() => setForm(null)} aria-label="Schließen">×</button>
+                                <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                    </svg>
+                                </button>
                             </div>
                         </header>
                         <div role="tablist" aria-label="Mitglied bearbeiten" style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', padding: '4px 0' }}>
@@ -1000,10 +1005,10 @@ function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal booking-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <h2 style={{ margin: 0 }}>Mitgliedsbeiträge zuordnen</h2>
-                    <button className="btn" onClick={onClose}>×</button>
-                </header>
+                <ModalHeader 
+                    title="Mitgliedsbeiträge zuordnen" 
+                    onClose={onClose} 
+                />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <select className="input" value={interval} onChange={e => {
                         const v = e.target.value as any; setInterval(v)

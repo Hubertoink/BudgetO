@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import ModalHeader from '../ModalHeader'
 
 // Local contrast helper (kept self-contained)
 function contrastText(bg?: string | null) {
@@ -39,10 +40,10 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
   return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>{v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}</h2>
-          <button className="btn danger" onClick={onClose}>Schließen</button>
-        </header>
+        <ModalHeader 
+          title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
+          onClose={onClose}
+        />
         <div className="row">
           <div className="field">
             <label>Code</label>

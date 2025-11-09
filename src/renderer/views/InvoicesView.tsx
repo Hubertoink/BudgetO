@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
+import ModalHeader from '../components/ModalHeader'
+import LoadingState from '../components/LoadingState'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {
@@ -302,7 +304,7 @@ export default function InvoicesView() {
       </div>
       {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
       {loading ? (
-        <div className="helper">Lade…</div>
+        <LoadingState message="Lade Rechnungen…" />
       ) : (
         <>
           {summary && (
@@ -429,11 +431,11 @@ export default function InvoicesView() {
       {showPayModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Zahlung hinzufügen</h2>
-              <button className="btn ghost" onClick={() => setShowPayModal(null)}>✕</button>
-            </div>
-            <div className="helper">{showPayModal.invoiceNo ? `Rechnung ${showPayModal.invoiceNo}` : `Rechnung #${showPayModal.id}`} · {showPayModal.party || ''}</div>
+            <ModalHeader 
+              title="Zahlung hinzufügen" 
+              subtitle={`${showPayModal.invoiceNo ? `Rechnung ${showPayModal.invoiceNo}` : `Rechnung #${showPayModal.id}`} · ${showPayModal.party || ''}`}
+              onClose={() => setShowPayModal(null)} 
+            />
             {typeof showPayModal.remaining === 'number' && (<div className="helper">Offener Rest: <strong>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.max(0, Math.round(showPayModal.remaining * 100) / 100))}</strong></div>)}
             <div className="row">
               <div className="field">
@@ -461,13 +463,12 @@ export default function InvoicesView() {
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Rechnung löschen</h2>
-              <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>✕</button>
-            </div>
-            <div>Diese Rechnung wirklich löschen?
-              <div className="helper">{deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · {deleteConfirm.party || ''}</div>
-            </div>
+            <ModalHeader 
+              title="Rechnung löschen" 
+              subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`}
+              onClose={() => setDeleteConfirm(null)} 
+            />
+            <div>Diese Rechnung wirklich löschen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
               <button className="btn danger" disabled={busyAction} onClick={() => deleteInvoice(deleteConfirm.id)}>Ja, löschen</button>

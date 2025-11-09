@@ -454,11 +454,15 @@ export default function JournalView({
                                 <h2 style={{ margin: 0 }}>
                                     {(() => {
                                         const desc = (editRow.description || '').trim()
-                                        const label = desc ? `+ Buchung (${desc.length > 60 ? desc.slice(0,60) + '…' : desc}) bearbeiten` : `+ Buchung bearbeiten`
+                                        const label = desc ? `Buchung (${desc.length > 60 ? desc.slice(0,60) + '…' : desc}) bearbeiten` : `Buchung bearbeiten`
                                         return label
                                     })()}
                                 </h2>
-                                <button className="btn danger" onClick={() => setEditRow(null)}>Schließen</button>
+                                <button className="btn ghost" onClick={() => setEditRow(null)} title="Schließen (ESC)">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                    </svg>
+                                </button>
                             </header>
 
                             <form onSubmit={async (e) => {

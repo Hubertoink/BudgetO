@@ -18,12 +18,14 @@ import ExportOptionsModal from './components/modals/ExportOptionsModal'
 import AttachmentsModal from './components/modals/AttachmentsModal'
 import PaymentsAssignModal from './components/modals/PaymentsAssignModal'
 import BatchEarmarkModal from './components/modals/BatchEarmarkModal'
+import QuickAddModal from './components/modals/QuickAddModal'
 import DbMigrateModal from './DbMigrateModal'
 import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
 import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
 import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
+import { useQuickAdd } from './hooks/useQuickAdd'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -101,10 +103,10 @@ export default function App() {
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
+        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgew�hlten Zweckbindung.'
+        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgew�hlten Zweckbindung.'
+        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgew�hlte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+        if (/Zweckbindung w�rde den verf�gbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese �nderung w�rde den verf�gbaren Rahmen der Zweckbindung unterschreiten.'
         return 'Fehler: ' + msg
     }
     // Dynamic available years from vouchers
@@ -322,7 +324,7 @@ export default function App() {
 
     async function createSampleVoucher() {
         try {
-            notify('info', 'Erzeuge Beleg …')
+            notify('info', 'Erzeuge Beleg �')
             const res = await window.api?.vouchers.create?.({
                 date: today,
                 type: 'IN',
@@ -350,7 +352,7 @@ export default function App() {
             return
         }
         try {
-            notify('info', 'Storniere Beleg …')
+            notify('info', 'Storniere Beleg �')
             const res = await window.api?.vouchers.reverse?.({ originalId: lastId, reason: 'Dev Reverse' })
             if (res) {
                 notify('success', `Storno erstellt: #${res.voucherNo}`)
@@ -421,8 +423,8 @@ export default function App() {
     const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from || to) list.push({ key: 'range', label: `${from || '…'} – ${to || '…'}`, clear: () => { setFrom(''); setTo('') } })
-        if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        if (from || to) list.push({ key: 'range', label: `${from || '�'} � ${to || '�'}`, clear: () => { setFrom(''); setTo('') } })
+        if (filterSphere) list.push({ key: 'sphere', label: `Sph�re: ${filterSphere}`, clear: () => setFilterSphere(null) })
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
         if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
         if (filterEarmark != null) {
@@ -434,7 +436,7 @@ export default function App() {
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
         }
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
+    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '�' : ''), clear: () => setQ('') })
         return list
     }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
@@ -459,19 +461,19 @@ export default function App() {
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
     const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
     const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    // Humanâ€‘readable labels for columns (used in Einstellungen > Tabelle)
+    // Human‑readable labels for columns (used in Einstellungen > Tabelle)
     const labelForCol = (k: string): string => {
         switch (k) {
             case 'actions': return 'Aktionen'
             case 'date': return 'Datum'
             case 'voucherNo': return 'Nr.'
             case 'type': return 'Art'
-            case 'sphere': return 'Sphäre'
+            case 'sphere': return 'Sph�re'
             case 'description': return 'Beschreibung'
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'
             case 'paymentMethod': return 'Zahlweg'
-            case 'attachments': return 'Anhänge'
+            case 'attachments': return 'Anh�nge'
             case 'net': return 'Netto'
             case 'vat': return 'USt'
             case 'gross': return 'Brutto'
@@ -582,7 +584,7 @@ export default function App() {
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
-    // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten Öffnen)
+    // Refresh attachments when opening an edit modal (so neue Anh�nge erscheinen beim erneuten �ffnen)
     useEffect(() => {
         if (editRow?.id) {
             setEditRowFilesLoading(true)
@@ -614,11 +616,11 @@ export default function App() {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
             if (b.name && String(b.name).trim()) return String(b.name).trim()
-            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} · ${b.categoryName}`
-            if (b.projectName && String(b.projectName).trim()) return `${b.year} · ${b.projectName}`
+            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} � ${b.categoryName}`
+            if (b.projectName && String(b.projectName).trim()) return `${b.year} � ${b.projectName}`
             if (b.earmarkId) {
                 const em = byIdEarmark.get(b.earmarkId)
-                if (em) return `${b.year} · 🎯 ${em.code}`
+                if (em) return `${b.year} � ?? ${em.code}`
             }
             return String(b.year)
         }
@@ -634,11 +636,11 @@ export default function App() {
                 for (const b of res.rows) {
                     let label = ''
                     if (b.name && String(b.name).trim()) label = String(b.name).trim()
-                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} · ${b.categoryName}`
-                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} · ${b.projectName}`
+                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} � ${b.categoryName}`
+                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} � ${b.projectName}`
                     else if (b.earmarkId) {
                         const em: any = byIdEarmark.get(b.earmarkId)
-                        if (em) label = `${b.year} · 🎯 ${em.code}`
+                        if (em) label = `${b.year} � ?? ${em.code}`
                     }
                     if (!label) label = String(b.year)
                     map.set(b.id, label)
@@ -704,7 +706,7 @@ export default function App() {
                     <TopHeaderOrg />
                 </div>
                 {isTopNav ? (
-                    <nav aria-label="Hauptmenü (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
+                    <nav aria-label="Hauptmen� (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
                         {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
                         {[
                             [
@@ -769,7 +771,7 @@ export default function App() {
                     <button className="btn ghost" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
                     </button>
-                    <button className="btn danger" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
+                    <button className="btn danger" title="Schlie�en" aria-label="Schlie�en" onClick={() => window.api?.window?.close?.()} style={{ width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
                     </button>
                 </div>
@@ -961,229 +963,25 @@ export default function App() {
                     )}
             </main>
 
-            {/* Quick-Add Modal */}
+{/* Quick-Add Modal */}
             {quickAdd && (
-                <div className="modal-overlay" onClick={() => setQuickAdd(false)}>
-                    <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <h2 style={{ margin: 0 }}>+ Buchung</h2>
-                            <button className="btn danger" onClick={() => { setQuickAdd(false); setFiles([]) }}>Schließen</button>
-                        </header>
-                        <form onSubmit={(e) => { e.preventDefault(); onQuickSave(); }}>
-                            {/* Live Summary */}
-                            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-                                <div className="helper">Zusammenfassung</div>
-                                <div style={{ fontWeight: 600 }}>
-                                    {(() => {
-                                        const date = fmtDate(qa.date)
-                                        const type = qa.type
-                                        const pm = qa.type === 'TRANSFER' ? (((qa as any).transferFrom || '—') + ' → ' + ((qa as any).transferTo || '—')) : ((qa as any).paymentMethod || '—')
-                                        const amount = (() => {
-                                            if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                            if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                            const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                            return eurFmt.format(g)
-                                        })()
-                                        const sphere = qa.sphere
-                                        return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
-                                    })()}
-                                </div>
-                            </div>
-
-                            {/* Blocks A+B in a side-by-side grid on wide screens */}
-                            <div className="block-grid" style={{ marginBottom: 8 }}>
-                            {/* Block A â€“ Basisinfos */}
-                            <div className="card" style={{ padding: 12 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
-                                <div className="row">
-                                    <div className="field">
-                                        <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                        <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
-                                    </div>
-                                    <div className="field">
-                                        <label>Art</label>
-                                        <div className="btn-group" role="group" aria-label="Art wählen">
-                                            {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                <button key={t} type="button" className="btn" onClick={() => {
-                                                    const newQa = { ...qa, type: t }
-                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
-                                                        (newQa as any).transferFrom = 'BAR';
-                                                        (newQa as any).transferTo = 'BANK'
-                                                    }
-                                                    setQa(newQa)
-                                                }} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="field">
-                                        <label>Sphäre</label>
-                                        <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })}>
-                                            <option value="IDEELL">IDEELL</option>
-                                            <option value="ZWECK">ZWECK</option>
-                                            <option value="VERMOEGEN">VERMOEGEN</option>
-                                            <option value="WGB">WGB</option>
-                                        </select>
-                                    </div>
-                                    {qa.type === 'TRANSFER' ? (
-                                        <div className="field">
-                                            <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                            <select value={`${(qa as any).transferFrom ?? ''}->${(qa as any).transferTo ?? ''}`}
-                                                onChange={(e) => {
-                                                    const v = e.target.value
-                                                    if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
-                                                    else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
-                                                }}>
-                                                <option value="BAR->BANK">BAR → BANK</option>
-                                                <option value="BANK->BAR">BANK → BAR</option>
-                                            </select>
-                                        </div>
-                                    ) : (
-                                        <div className="field">
-                                            <label>Zahlweg</label>
-                                            <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                                {(['BAR','BANK'] as const).map(pm => (
-                                                    <button key={pm} type="button" className="btn" onClick={() => setQa({ ...qa, paymentMethod: pm })} style={{ background: (qa as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Block B â€“ Finanzdetails */}
-                            <div className="card" style={{ padding: 12 }}>
-                                <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
-                                <div className="row">
-                                    {qa.type === 'TRANSFER' ? (
-                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                            <span className="adorn-wrap">
-                                                <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
-                                                    onChange={(e) => {
-                                                        const v = Number(e.target.value)
-                                                        setQa({ ...qa, grossAmount: v })
-                                                    }} />
-                                                <span className="adorn-suffix">€</span>
-                                            </span>
-                                            <div className="helper">Transfers sind umsatzsteuerneutral.</div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="field">
-                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                    <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
-                                                        <option value="NET">Netto</option>
-                                                        <option value="GROSS">Brutto</option>
-                                                    </select>
-                                                    <span className="adorn-wrap" style={{ flex: 1 }}>
-                                                        <input className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
-                                                            onChange={(e) => {
-                                                                const v = Number(e.target.value)
-                                                                if ((qa as any).mode === 'GROSS') setQa({ ...qa, grossAmount: v })
-                                                                else setQa({ ...qa, netAmount: v })
-                                                            }} />
-                                                        <span className="adorn-suffix">€</span>
-                                                    </span>
-                                                </div>
-                                                <div className="helper">{(qa as any).mode === 'GROSS' ? 'Bei Brutto wird USt/Netto nicht berechnet' : 'USt wird automatisch berechnet'}</div>
-                                            </div>
-                                            {(qa as any).mode === 'NET' && (
-                                                <div className="field">
-                                                    <label>USt %</label>
-                                                    <input className="input" type="number" step="0.1" value={qa.vatRate} onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })} />
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                                <div className="row">
-                                    <div className="field">
-                                        <label>Budget</label>
-                                        <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                            <option value="">—</option>
-                                            {budgetsForEdit.map(b => (
-                                                <option key={b.id} value={b.id}>{b.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="field">
-                                        <label>Zweckbindung</label>
-                                        <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                            <option value="">—</option>
-                                            {earmarks.map(em => (
-                                                <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            </div>
-
-                            {/* Block C+D – Beschreibung & Tags + Anhänge */}
-                            <div className="block-grid" style={{ marginBottom: 8 }}>
-                                {/* Block C â€“ Beschreibung & Tags */}
-                                <div className="card" style={{ padding: 12 }}>
-                                    <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                                    <div className="row">
-                                        <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Beschreibung</label>
-                                            <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
-                                            <datalist id="desc-suggestions">
-                                                {descSuggest.map((d, i) => (<option key={i} value={d} />))}
-                                            </datalist>
-                                        </div>
-                                        <TagsEditor
-                                            label="Tags"
-                                            value={(qa as any).tags || []}
-                                            onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
-                                            tagDefs={tagDefs}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Block D – Anhänge */}
-                                <div
-                                    className="card"
-                                    style={{ padding: 12 }}
-                                onDragOver={(e) => { if (quickAdd) { e.preventDefault(); e.stopPropagation() } }}
-                                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (quickAdd) onDropFiles(e.dataTransfer?.files) }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                        <strong>Anhänge</strong>
-                                        <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
-                                        <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
-                                        {files.length > 0 && (
-                                            <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
-                                        )}
-                                    </div>
-                                </div>
-                                {files.length > 0 && (
-                                    <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                                        {files.map((f, i) => (
-                                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                                <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <button type="button" className="btn" onClick={() => { setQuickAdd(false); setFiles([]) }}>Abbrechen</button>
-                                    <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                <QuickAddModal
+                    qa={qa}
+                    setQa={setQa}
+                    onSave={onQuickSave}
+                    onClose={() => setQuickAdd(false)}
+                    files={files}
+                    setFiles={setFiles}
+                    openFilePicker={openFilePicker}
+                    onDropFiles={onDropFiles}
+                    fileInputRef={fileInputRef}
+                    fmtDate={fmtDate}
+                    eurFmt={eurFmt}
+                    budgetsForEdit={budgetsForEdit}
+                    earmarks={earmarks}
+                    tagDefs={tagDefs}
+                    descSuggest={descSuggest}
+                />
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Toasts bottom-right */}
@@ -1198,8 +996,8 @@ export default function App() {
                     </div>
                 ))}
             </div>
-            {/* Global Floating Action Button: + Buchung (hidden in Einstellungen, Mitglieder und Rechnungen) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && (
+            {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
             )}
             {/* Auto-backup prompt modal (renderer) */}
@@ -1234,7 +1032,7 @@ export default function App() {
                 to={to}
                 onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt) }}
             />
-            {/* Meta Filter Modal (Sphäre, Zweckbindung, Budget) */}
+            {/* Meta Filter Modal (Sph�re, Zweckbindung, Budget) */}
             <MetaFilterModal
                 open={activePage === 'Buchungen' && showMetaFilter}
                 onClose={() => setShowMetaFilter(false)}
@@ -1303,7 +1101,7 @@ export default function App() {
                             if (res) {
                                 const dir = res.filePath?.replace(/\\[^\\/]+$/,'').replace(/\/[^^/]+$/, '') || ''
                                 notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
-                                    label: 'Ordner öffnen',
+                                    label: 'Ordner �ffnen',
                                     onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
                                 })
                             }
@@ -1317,7 +1115,7 @@ export default function App() {
         </div>
     )
 }
-// Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
+// Meta Filter Modal: groups Sph�re, Zweckbindung, Budget
 // MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
 
 // Time Filter Modal: controls date range and quick year selection
@@ -1397,34 +1195,34 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
-                            <button className="btn" onClick={()=>setOpen(false)}>✕</button>
+                            <button className="btn" onClick={()=>setOpen(false)}>?</button>
                         </header>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
                             <div className="helper" style={{ fontWeight: 600 }}>{name}{memberNo ? ` (${memberNo})` : ''}</div>
-                            <span className="helper">â€¢</span>
-                            <span className="helper">Eintritt: {status?.joinDate || '—'}</span>
                             <span className="helper">•</span>
-                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `überfällig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '—'}</span>
-                            <span className="helper">•</span>
-                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '—'}</span>
-                            <span className="helper">•</span>
-                            <span className="helper">Initiale Fälligkeit: {status?.nextDue || '—'}</span>
+                            <span className="helper">Eintritt: {status?.joinDate || '�'}</span>
+                            <span className="helper">�</span>
+                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `�berf�llig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '�'}</span>
+                            <span className="helper">�</span>
+                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '�'}</span>
+                            <span className="helper">�</span>
+                            <span className="helper">Initiale F�lligkeit: {status?.nextDue || '�'}</span>
                         </div>
                         <MemberTimeline status={status} history={history} />
                         {/* Due payments for this member */}
                         <div className="card" style={{ padding: 10 }}>
-                            <strong>Fällige Beiträge</strong>
+                            <strong>F�llige Beitr�ge</strong>
                             {due.length === 0 ? (
                                 <div className="helper" style={{ marginTop: 6 }}>Aktuell keine offenen Perioden.</div>
                             ) : (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} — {due.length} offen</div>
+                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} � {due.length} offen</div>
                                         <div style={{ display: 'flex', gap: 6 }}>
-                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
+                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>?</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>� Zur�ck</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter �</button>
+                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>?</button>
                                         </div>
                                     </div>
                                     <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
@@ -1432,7 +1230,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             <tr>
                                                 <th align="left">Periode</th>
                                                 <th align="right">Betrag</th>
-                                                <th align="left">Verknüpfen</th>
+                                                <th align="left">Verkn�pfen</th>
                                                 <th align="left">Aktion</th>
                                             </tr>
                                         </thead>
@@ -1447,14 +1245,14 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                                         <td align="right">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.amount)}</td>
                                                         <td>
                                                             <div style={{ display: 'grid', gap: 6 }}>
-                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verknüpfen">
-                                                                    <option value="">— ohne Verknüpfung —</option>
+                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verkn�pfen">
+                                                                    <option value="">� ohne Verkn�pfung �</option>
                                                                     {manualList.map(s => (
-                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} · {s.date} · {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} · {(s.description || s.counterparty || '')}</option>
+                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} � {s.date} � {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} � {(s.description || s.counterparty || '')}</option>
                                                                     ))}
                                                                 </select>
                                                                 <div style={{ display: 'flex', gap: 6 }}>
-                                                                    <input className="input" placeholder="Buchung suchen…" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
+                                                                    <input className="input" placeholder="Buchung suchen�" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
                                                                     <button className="btn" onClick={async () => {
                                                                         try {
                                                                             // widen range for earlier periods: from period start - 90 days to today
@@ -1506,7 +1304,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                 try {
                                     const addr = memberData?.address || null
                                     const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
-                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
+                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht �ffnen')
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Mitglied anschreiben</button>
                         </div>
@@ -1527,7 +1325,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             <td>{r.periodKey}</td>
                                             <td>{r.datePaid}</td>
                                             <td align="right">{new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(r.amount)}</td>
-                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '—'} {r.description ? `· ${r.description}` : ''}</td>
+                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '�'} {r.description ? `� ${r.description}` : ''}</td>
                                         </tr>
                                     ))}
                                     {history.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
@@ -1535,7 +1333,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                             </table>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="btn" onClick={()=>setOpen(false)}>Schließen</button>
+                            <button className="btn" onClick={()=>setOpen(false)}>Schlie�en</button>
                         </div>
                     </div>
                 </div>
@@ -1636,11 +1434,11 @@ function MemberTimeline({ status, history }: { status: any; history: Array<{ per
                         return (
                             <g key={pk}>
                                 <circle cx={x} cy={28} r={6} fill={color}>
-                                    <title>{`${pk} · ${isPaid ? 'bezahlt' : (isOverdue ? 'überfällig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
+                                    <title>{`${pk} � ${isPaid ? 'bezahlt' : (isOverdue ? '�berf�llig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
                                 </circle>
                                 <text x={x} y={12} textAnchor="middle" fontSize={10} fill="var(--text-dim)">{pk}</text>
                                 <text x={x} y={50} textAnchor="middle" fontSize={10} fill={isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : 'var(--text-dim)')}>
-                                    {isPaid ? 'bezahlt' : (isOverdue ? 'überfällig' : (isCurrent ? 'jetzt' : ''))}
+                                    {isPaid ? 'bezahlt' : (isOverdue ? '�berf�llig' : (isCurrent ? 'jetzt' : ''))}
                                 </text>
                             </g>
                         )
@@ -1702,121 +1500,6 @@ function periodRangeLocal(periodKey: string): { start: string; end: string } {
 // Invoices View
 // InvoicesView extracted to views/InvoicesView.tsx
 
-// Quick-Add state and logic
-type QA = {
-    date: string
-    type: 'IN' | 'OUT' | 'TRANSFER'
-    sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    netAmount?: number
-    grossAmount?: number
-    vatRate: number
-    description: string
-    paymentMethod?: 'BAR' | 'BANK'
-    mode?: 'NET' | 'GROSS'
-    tags?: string[]
-}
-
-function useQuickAdd(
-    today: string, 
-    create: (p: any) => Promise<any>, 
-    onOpenFilePicker?: () => void,
-    notify?: (type: 'success' | 'error' | 'info', text: string) => void
-) {
-    const [quickAdd, setQuickAdd] = useState(false)
-    const [qa, setQa] = useState<QA>({ date: today, type: 'IN', sphere: 'IDEELL', grossAmount: 100, vatRate: 19, description: '', paymentMethod: 'BAR', mode: 'GROSS' })
-    const [files, setFiles] = useState<File[]>([])
-
-    function onDropFiles(fileList: FileList | null) {
-        if (!fileList) return
-        const arr = Array.from(fileList)
-        setFiles((prev) => [...prev, ...arr])
-    }
-
-    async function onQuickSave() {
-        // Validate transfer direction
-        if (qa.type === 'TRANSFER' && (!(qa as any).transferFrom || !(qa as any).transferTo)) {
-            notify?.('error', 'Bitte wähle eine Richtung für den Transfer aus.')
-            return
-        }
-        const payload: any = {
-            date: qa.date,
-            type: qa.type,
-            sphere: qa.sphere,
-            description: qa.description || undefined,
-            vatRate: qa.vatRate
-        }
-        if (qa.type === 'TRANSFER') {
-            delete payload.paymentMethod
-            payload.transferFrom = (qa as any).transferFrom
-            payload.transferTo = (qa as any).transferTo
-            payload.vatRate = 0
-            payload.grossAmount = (qa as any).grossAmount ?? 0
-            delete payload.netAmount
-        } else {
-            payload.paymentMethod = qa.paymentMethod
-            payload.transferFrom = undefined
-            payload.transferTo = undefined
-        }
-        if (qa.mode === 'GROSS') payload.grossAmount = qa.grossAmount ?? 0
-        else payload.netAmount = qa.netAmount ?? 0
-        if (typeof (qa as any).earmarkId === 'number') payload.earmarkId = (qa as any).earmarkId
-        if (typeof (qa as any).budgetId === 'number') payload.budgetId = (qa as any).budgetId
-        if (Array.isArray((qa as any).tags)) payload.tags = (qa as any).tags
-
-        // Convert attachments to Base64
-        if (files.length) {
-            const enc = async (f: File) => {
-                const buf = await f.arrayBuffer()
-                let binary = ''
-                const bytes = new Uint8Array(buf)
-                const chunk = 0x8000
-                for (let i = 0; i < bytes.length; i += chunk) {
-                    binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-                }
-                const dataBase64 = btoa(binary)
-                return { name: f.name, dataBase64, mime: f.type || undefined }
-            }
-            payload.files = await Promise.all(files.map(enc))
-        }
-
-        const res = await create(payload)
-        if (res) {
-            setQuickAdd(false)
-            setFiles([])
-            setQa({ date: today, type: 'IN', sphere: 'IDEELL', grossAmount: 100, vatRate: 19, description: '', paymentMethod: 'BAR', mode: 'GROSS' })
-        }
-    }
-
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) {
-            const target = e.target as HTMLElement | null
-            const tag = (target?.tagName || '').toLowerCase()
-            const inEditable = !!(target && ((target as any).isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select'))
-
-            // Search focus (Ctrl+K) only when on Buchungen and not in another input
-            if (!inEditable && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-                try { const page = localStorage.getItem('activePage') || 'Buchungen'; if (page === 'Buchungen') { (document.querySelector('input[placeholder^="Suche Buchungen"]') as HTMLInputElement | null)?.focus(); e.preventDefault(); return } } catch { }
-            }
-
-            // Open Quick-Add robustly via Ctrl+Shift+N (no bare 'n')
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
-                setQuickAdd(true); e.preventDefault(); return
-            }
-
-            // Save and Upload hotkeys only when Quick-Add is open
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { if (quickAdd) { onQuickSave(); e.preventDefault() } return }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (quickAdd) { onOpenFilePicker?.(); e.preventDefault() } return }
-            if (e.key === 'Escape') { if (quickAdd) { setQuickAdd(false); e.preventDefault() } return }
-        }
-        window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
-    }, [qa, files, quickAdd])
-
-    const openFilePicker = () => onOpenFilePicker?.()
-
-    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles }
-}
-
 function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: string; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string }) {
     const [input, setInput] = useState('')
     const [focused, setFocused] = useState(false)
@@ -1845,7 +1528,7 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     return (
                         <span key={t} className="chip" style={{ background: bg, color: bg ? fg : undefined }}>
                             {t}
-                            <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">×</button>
+                            <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">�</button>
                         </span>
                     )
                 })}
@@ -1855,9 +1538,9 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     value=""
                     onChange={(e) => { const name = e.target.value; if (name) addTag(name) }}
                     style={{ minWidth: 140 }}
-                    title="Tag aus Liste hinzufügen"
+                    title="Tag aus Liste hinzuf�gen"
                 >
-                    <option value="">+ Tag auswählen…</option>
+                    <option value="">+ Tag ausw�hlen�</option>
                     {(tagDefs || []).filter(t => !(value || []).some(v => v.toLowerCase() === (t.name || '').toLowerCase())).map(t => (
                         <option key={t.id} value={t.name}>{t.name}</option>
                     ))}
@@ -1871,7 +1554,7 @@ function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: st
                     }}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
-                    placeholder={(value || []).length ? '' : 'Tag hinzufügen…'}
+                    placeholder={(value || []).length ? '' : 'Tag hinzuf�gen�'}
                     style={{ flex: 1, minWidth: 120, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)' }}
                 />
             </div>
@@ -1994,12 +1677,12 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sphäre</th>
+                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sph�re</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
-                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸŽ¯</th>
-                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸ’°</th>
+                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>🎯</th>
+                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>💰</th>
                                         : k === 'paymentMethod' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Zahlweg</th>
-                                            : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>ðŸ“Ž</th>
+                                            : k === 'attachments' ? <th key={k} align="center" title="Anh�nge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>📎</th>
                                                 : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} style={{ cursor: 'pointer' }}>Netto {renderSortIcon('net')}</th>
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
                                                         : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} style={{ cursor: 'pointer' }}>Brutto {renderSortIcon('gross')}</th>
@@ -2013,9 +1696,9 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
         k === 'actions' ? (
             <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
                 {isLocked(r.date) ? (
-                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">ðŸ”’</span>
+                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>âœŽ</button>
+                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -2070,7 +1753,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from} â†’ ${to}` : 'Transfer'
+                        const title = from && to ? `${from} → ${to}` : 'Transfer'
                         return (
                             <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                 {from === 'BAR' ? <IconCash /> : <IconBank />}
@@ -2105,7 +1788,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 })()
             ) : ''}</td>
         ) : k === 'attachments' ? (
-            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anhänge`}>ðŸ“Ž {r.fileCount}</span>) : ''}</td>
+            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anh�nge`}>📎 {r.fileCount}</span>) : ''}</td>
         ) : k === 'net' ? (
             <td key={k} align="right">{eurFmt.format(r.netAmount)}</td>
         ) : k === 'vat' ? (
