@@ -37,6 +37,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   const [loading, setLoading] = useState(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+  const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
   const svgRef = useRef<SVGSVGElement | null>(null)
   useEffect(() => {
     let alive = true
@@ -126,9 +127,14 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // Previously P=36 caused longer values (e.g., 1.500,00 €) to render partially ("00,00 €")
   // For daily view, reduce width and increase horizontal padding for better spacing
   const W = isDaily ? 920 : 760
-  const H = 240
+  const H = 210
   const P = 90
-  const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
+  // Center points inside month/day segments so the first tick isn't on the Y-axis
+  const xs = (i: number, n: number) => {
+    const usable = W - 2 * P
+    const seg = usable / Math.max(1, n)
+    return P + seg / 2 + i * seg
+  }
   const ys = (v: number) => {
     const top = 16
     const bottom = H - 28
@@ -143,19 +149,16 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
     return `M ${top} L ${bottom} Z`
   })()
 
-  // X labels: months for yearly, days for monthly
-  // isDaily already computed above
-  // Yearly view: show all months; Daily view: reduce to ~6-7 labels for cleaner look
-  // Multi-year view (>2 years): show only every 3rd, 6th or 12th month depending on span
+  // X labels: months for monthly view (thinned by total months); daily view uses ~6 labels
   let tickEvery = 1
   if (isDaily) {
     tickEvery = Math.max(1, Math.ceil(labels.length / 6))
-  } else if (isMultiYear) {
-    // For multi-year: show fewer labels (quarterly or yearly ticks)
+  } else {
     const totalMonths = labels.length
-    if (totalMonths > 48) tickEvery = 12 // Show yearly for > 4 years
-    else if (totalMonths > 24) tickEvery = 6 // Show every 6 months for 2-4 years
-    else tickEvery = 3 // Show quarterly for < 2 years
+    if (totalMonths > 48) tickEvery = 12
+    else if (totalMonths > 24) tickEvery = 6
+    else if (totalMonths > 12) tickEvery = 3
+    else tickEvery = 1
   }
 
   // Y-axis ticks (nice range around min..max incl. 0 when in range)
@@ -182,6 +185,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
     return ticks.sort((a,b)=>a-b)
   }
   const yTicks = niceTicks(yMin, yMax, 5)
+  const yLabelEvery = Math.max(1, Math.ceil(yTicks.length / 5))
 
   // hover logic
   const onMouseMove = (ev: React.MouseEvent<SVGSVGElement>) => {
@@ -219,7 +223,9 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W-P/2} y1={ys(v)} y2={ys(v)} stroke="var(--border)" opacity={0.25} />
-              <text x={P-6} y={ys(v)+4} fill="var(--text-dim)" fontSize={11} textAnchor="end">{eur.format(v)}</text>
+              {(i % yLabelEvery === 0 || i === yTicks.length - 1 || v === 0) && (
+                <text x={P-6} y={ys(v)+4} fill="var(--text-dim)" fontSize={10} textAnchor="end">{eurShort.format(v)}</text>
+              )}
             </g>
           ))}
           {/* Area fill */}
@@ -237,12 +243,13 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
               // Check if multi-year range to include year in label
               const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
               const monthName = MONTH_NAMES[Math.max(0, Math.min(11, Number(String(m).slice(5)) - 1))] || String(m).slice(5)
-              label = yearSpan > 0 ? `${monthName} ${String(m).slice(0,4)}` : monthName
+              // Abbreviate year (e.g., 2025 -> 25) when multi-year
+              label = yearSpan > 0 ? `${monthName} ${String(m).slice(2,4)}` : monthName
             }
             return (
               <g key={m}>
                 <line x1={x} x2={x} y1={H-18} y2={H-14} stroke="var(--border)" />
-                <text x={x} y={H-4} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{label}</text>
+                <text x={x} y={H-4} fill="var(--text-dim)" fontSize={10} textAnchor="middle">{label}</text>
               </g>
             )
           })}

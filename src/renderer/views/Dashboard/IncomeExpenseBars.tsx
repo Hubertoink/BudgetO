@@ -9,6 +9,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const [rowsNet, setRowsNet] = useState<Bucket[]>([])
   const [loading, setLoading] = useState(false)
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+  const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
@@ -64,12 +65,13 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   )
 
   // Increase horizontal padding so all month labels can fit; distribute bars to avoid clipping.
-  // Increased P from 64 to 72 to prevent leftmost month labels (e.g., November) from overlapping with Y-axis
-  const W = 760, H = 220, P = 72
+  // Increased P from 64 to 100 to prevent leftmost month labels (e.g., November) from overlapping with Y-axis
+  const W = 760, H = 200, P = 100
+  // Center bars in segments so the first bar doesn't overlap the Y-axis
   const xs = (i: number, n: number) => {
     const usable = W - 2 * P
-    if (n <= 1) return P + usable / 2 // center single point
-    return P + (i * usable) / Math.max(1, n - 1)
+    const seg = usable / Math.max(1, n)
+    return P + seg / 2 + i * seg
   }
   const baseY = H - 28
   const maxH = baseY - 16
@@ -137,7 +139,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W-P/2} y1={yFor(v)} y2={yFor(v)} stroke="var(--border)" opacity={0.25} />
-              <text x={P-6} y={yFor(v)+4} fill="var(--text-dim)" fontSize={11} textAnchor="end">{eur.format(v)}</text>
+              <text x={P-6} y={yFor(v)+4} fill="var(--text-dim)" fontSize={10} textAnchor="end">{eurShort.format(v)}</text>
             </g>
           ))}
           {/* Bars */}
@@ -168,8 +170,8 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
               if (i % tickEvery !== 0 && i !== labels.length - 1) return null
               const x = xs(i, labels.length)
               const monthName = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
-              const label = yearSpan > 0 ? `${monthName} ${m.slice(0,4)}` : monthName
-              return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{label}</text>
+              const label = yearSpan > 0 ? `${monthName} ${m.slice(2,4)}` : monthName
+              return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={10} textAnchor="middle">{label}</text>
             })
           })()}
           {/* Hover guide */}
