@@ -2169,4 +2169,4 @@ function IconArrow({ size = 14 }: { size?: number }) {
             <path d="M13 8l6 4-6 4" />
         </svg>
     )
-}
+}
