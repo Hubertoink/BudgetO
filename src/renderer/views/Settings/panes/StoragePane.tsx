@@ -14,7 +14,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
   // Data management & security (moved from GeneralPane)
-  const [showImportConfirm, setShowImportConfirm] = React.useState(false)
+  const [importPick, setImportPick] = React.useState<null | { filePath: string; size?: number; mtime?: number; counts?: Record<string, number>; currentCounts?: Record<string, number> }>(null)
   const [busyImport, setBusyImport] = React.useState(false)
   const [showDeleteAll, setShowDeleteAll] = React.useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = React.useState('')
@@ -260,7 +260,19 @@ export function StoragePane({ notify }: StoragePaneProps) {
           >
             Exportieren
           </button>
-          <button className="btn danger" onClick={() => setShowImportConfirm(true)}>
+          <button className="btn danger" onClick={async () => {
+            try {
+              const picked = await window.api?.db?.import?.pick?.()
+              if (picked?.ok && picked.filePath) {
+                const cur = await loadCurrentCounts()
+                setImportPick({ filePath: picked.filePath, size: picked.size, mtime: picked.mtime, counts: picked.counts, currentCounts: cur })
+              }
+            } catch (e: any) {
+              const msg = e?.message || String(e)
+              if (/Abbruch/i.test(msg)) return
+              notify('error', msg)
+            }
+          }}>
             Importieren…
           </button>
         </div>
@@ -278,50 +290,83 @@ export function StoragePane({ notify }: StoragePaneProps) {
         </div>
       </section>
 
-      {/* Import Confirmation Modal */}
-      {showImportConfirm && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal" style={{ display: 'grid', gap: 12, maxWidth: 560 }}>
+      {/* Import comparison modal */}
+      {importPick && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyImport && setImportPick(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Datenbank importieren</h2>
-              <button className="btn ghost" onClick={() => setShowImportConfirm(false)}>
-                ✕
-              </button>
+              <h2 style={{ margin: 0 }}>Import vergleichen</h2>
+              <button className="btn ghost" onClick={() => setImportPick(null)}>✕</button>
             </div>
             <div className="helper" style={{ color: 'var(--danger)' }}>
-              Achtung: Die aktuelle Datenbank wird überschrieben. Erstelle vorher eine Sicherung, wenn du dir unsicher bist.
+              Die aktuelle Datenbank wird beim Import überschrieben. Prüfe die Tabellenstände, bevor du fortfährst.
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setShowImportConfirm(false)}>
-                Abbrechen
-              </button>
-              <button
-                className="btn danger"
-                disabled={busyImport}
-                onClick={async () => {
-                  try {
-                    setBusyImport(true)
-                    const res = await window.api?.db?.import?.()
-                    if (res?.ok) {
-                      notify('success', 'Datenbank importiert. Die App wird neu geladen …')
-                      window.dispatchEvent(new Event('data-changed'))
-                      window.setTimeout(() => window.location.reload(), 600)
-                    }
-                  } catch (e: any) {
-                    const msg = e?.message || String(e)
-                    if (/Abbruch/i.test(msg)) {
-                      // graceful cancel -> ignore
-                    } else {
-                      notify('error', msg)
-                    }
-                  } finally {
-                    setBusyImport(false)
-                    setShowImportConfirm(false)
+            <div className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, fontWeight: 600 }}>
+                <div>Tabelle</div>
+                <div style={{ background: 'var(--accent)', color: '#fff', padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>Aktuell</div>
+                <div style={{ textAlign: 'center' }}>Import</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8 }}>
+                {(() => {
+                  const currentCounts = importPick.currentCounts || {}
+                  const importCounts = importPick.counts || {}
+                  const tableNames: Record<string, string> = {
+                    'invoice_files': 'Rechnungsdateien',
+                    'invoices': 'Rechnungen',
+                    'members': 'Mitglieder',
+                    'tags': 'Tags',
+                    'voucher_files': 'Belegdateien',
+                    'vouchers': 'Buchungen',
+                    'budgets': 'Budgets',
+                    'bindings': 'Zweckbindungen',
+                    'member_payments': 'Mitgliedsbeiträge',
+                    'audit_log': 'Änderungsprotokoll',
+                    'settings': 'Einstellungen'
                   }
-                }}
-              >
-                Ja, fortfahren
-              </button>
+                  const all = Array.from(new Set([...Object.keys(currentCounts), ...Object.keys(importCounts)])).sort()
+                  return all.map(k => {
+                    const cur = currentCounts[k] ?? 0
+                    const imp = importCounts[k] ?? 0
+                    const diff = cur !== imp
+                    return (
+                      <React.Fragment key={k}>
+                        <div>{tableNames[k] || k}</div>
+                        <div style={{ padding: '4px 8px', textAlign: 'center', background: diff ? 'rgba(255,193,7,0.15)' : 'transparent', borderRadius: 4 }}>{cur}</div>
+                        <div style={{ padding: '4px 8px', textAlign: 'center', background: diff ? 'rgba(33,150,243,0.15)' : 'transparent', borderRadius: 4 }}>{imp}</div>
+                      </React.Fragment>
+                    )
+                  })
+                })()}
+                {(() => {
+                  const currentCounts = importPick.currentCounts || {}
+                  const importCounts = importPick.counts || {}
+                  if (!Object.keys(currentCounts).length && !Object.keys(importCounts).length) {
+                    return <div style={{ gridColumn: '1 / span 3' }} className="helper">Keine Tabellenstände verfügbar.</div>
+                  }
+                  return null
+                })()}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" disabled={busyImport} onClick={() => setImportPick(null)}>Abbrechen</button>
+              <button className="btn danger" disabled={busyImport} onClick={async () => {
+                try {
+                  setBusyImport(true)
+                  const res = await window.api?.db?.import?.fromPath?.(importPick.filePath)
+                  if (res?.ok) {
+                    notify('success', 'Datenbank importiert. Neu laden …')
+                    window.dispatchEvent(new Event('data-changed'))
+                    window.setTimeout(() => window.location.reload(), 600)
+                  }
+                } catch (e: any) {
+                  const msg = e?.message || String(e)
+                  notify('error', msg)
+                } finally {
+                  setBusyImport(false)
+                  setImportPick(null)
+                }
+              }}>Import bestätigen</button>
             </div>
           </div>
         </div>

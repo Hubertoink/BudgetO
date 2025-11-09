@@ -112,7 +112,10 @@ contextBridge.exposeInMainWorld('api', {
     },
     db: {
         export: () => ipcRenderer.invoke('db.export'),
-        import: () => ipcRenderer.invoke('db.import'),
+        import: {
+            pick: () => ipcRenderer.invoke('db.import.pick'),
+            fromPath: (filePath: string) => ipcRenderer.invoke('db.import.fromPath', { filePath })
+        },
         smartRestore: {
             preview: () => ipcRenderer.invoke('db.smartRestore.preview'),
             apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) => ipcRenderer.invoke('db.smartRestore.apply', payload)

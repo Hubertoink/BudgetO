@@ -635,6 +635,12 @@ export const DbImportOutput = z.object({ ok: z.boolean(), filePath: z.string().o
 export type TDbImportInput = z.infer<typeof DbImportInput>
 export type TDbImportOutput = z.infer<typeof DbImportOutput>
 
+// Import from provided path (renderer selects file first)
+export const DbImportFromPathInput = z.object({ filePath: z.string() })
+export const DbImportFromPathOutput = z.object({ ok: z.boolean(), filePath: z.string().optional() })
+export type TDbImportFromPathInput = z.infer<typeof DbImportFromPathInput>
+export type TDbImportFromPathOutput = z.infer<typeof DbImportFromPathOutput>
+
 // Dangerous action: delete all vouchers
 export const VouchersClearAllInput = z.object({ confirm: z.literal(true) })
 export const VouchersClearAllOutput = z.object({ deleted: z.number() })

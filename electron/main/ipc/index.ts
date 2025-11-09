@@ -15,7 +15,7 @@ import { getSetting, setSetting } from '../services/settings'
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
-import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput } from './schemas'
+import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
@@ -674,13 +674,27 @@ export function registerIpcHandlers() {
         return DbExportOutput.parse({ filePath: save.filePath })
     })
 
-    // Database: Import (replace current database.sqlite with selected file)
-    ipcMain.handle('db.import', async () => {
+    // Database: Import (file picker only, returns chosen file meta for comparison modal)
+    ipcMain.handle('db.import.pick', async () => {
         DbImportInput.parse({})
-        const open = await dialog.showOpenDialog({ title: 'Datenbank importieren …', filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }], properties: ['openFile'] })
-        // Graceful cancel
-        if (open.canceled || !open.filePaths?.[0]) return DbImportOutput.parse({ ok: false })
+        const open = await dialog.showOpenDialog({ title: 'Datenbank wählen …', filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }], properties: ['openFile'] })
+        if (open.canceled || !open.filePaths?.[0]) return { ok: false }
         const importPath = open.filePaths[0]
+        // Basic stats for comparison
+        try {
+            const stat = fs.statSync(importPath)
+            // Inspect counts using existing backup.inspect logic for uniformity
+            const counts = backup.inspectBackup(importPath)?.counts || {}
+            return { ok: true, filePath: importPath, size: stat.size, mtime: stat.mtimeMs, counts }
+        } catch {
+            return { ok: true, filePath: importPath }
+        }
+    })
+
+    // Database: Import from provided path after user confirms comparison
+    ipcMain.handle('db.import.fromPath', async (_e, payload) => {
+        const parsed = DbImportFromPathInput.parse(payload)
+        const importPath = parsed.filePath
         const { root } = getAppDataDir()
         const dbPath = path.join(root, 'database.sqlite')
         try {
@@ -695,7 +709,7 @@ export function registerIpcHandlers() {
             try { applyMigrations(d as any) } catch { /* ignore, handled by main on next start too */ }
             // optional: run a lightweight pragma to ensure file is valid
             d.pragma('foreign_keys = ON')
-            return DbImportOutput.parse({ ok: true, filePath: importPath })
+            return DbImportFromPathOutput.parse({ ok: true, filePath: importPath })
         } catch (e) {
             throw new Error('Import fehlgeschlagen: ' + (e as any)?.message)
         }
