@@ -44,6 +44,25 @@ export default function InvoicesView() {
   const [budgets, setBudgets] = useState<Array<{ id: number; name?: string | null; year: number }>>([])
   const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
 
+  // Column preferences
+  const [showColumnsModal, setShowColumnsModal] = useState(false)
+  const [colPrefs, setColPrefs] = useState<{ showTags: boolean; showBezahlt: boolean; showRest: boolean; showAttachments: boolean }>(() => {
+    try {
+      const raw = localStorage.getItem('invoices.columns')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        return {
+          showTags: parsed.showTags ?? true,
+          showBezahlt: parsed.showBezahlt ?? true,
+          showRest: parsed.showRest ?? true,
+          showAttachments: parsed.showAttachments ?? true
+        }
+      }
+    } catch {}
+    return { showTags: true, showBezahlt: true, showRest: true, showAttachments: true }
+  })
+  useEffect(() => { try { localStorage.setItem('invoices.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
+
   // Currency/date formatters (respect global date preference if set)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
@@ -273,7 +292,7 @@ export default function InvoicesView() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
           </button>
           {(dueFrom || dueTo) && (<span className="helper">{dueFrom || '—'} – {dueTo || '—'}</span>)}
-          <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => alert('Spalten-Auswahl: Noch nicht implementiert')}>
+          <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
           </button>
           {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
@@ -312,17 +331,17 @@ export default function InvoicesView() {
                 </th>
                 <th align="left">Nr.</th>
                 <th align="left">Partei</th>
-                <th align="left">Tags</th>
+                {colPrefs.showTags && <th align="left">Tags</th>}
                 <th align="right">
                   <button className="btn ghost" title="Nach Betrag sortieren" onClick={() => { setSortBy('amount'); setSortDir(prev => (sortBy === 'amount' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <span>Brutto</span>
                     <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'amount' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'amount' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
                   </button>
                 </th>
-                <th align="right">Bezahlt</th>
-                <th align="right">Rest</th>
+                {colPrefs.showBezahlt && <th align="right">Bezahlt</th>}
+                {colPrefs.showRest && <th align="right">Rest</th>}
                 <th align="left">Status</th>
-                <th align="center" title="Anhänge">📎</th>
+                {colPrefs.showAttachments && <th align="center" title="Anhänge">📎</th>}
                 <th align="center">Aktionen</th>
               </tr>
             </thead>
@@ -355,23 +374,25 @@ export default function InvoicesView() {
                     })()}
                     <td>{r.invoiceNo || '—'}</td>
                     <td>{r.party}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {(r.tags || []).map((t: string) => {
-                          const def = (tags || []).find(td => (td.name || '').toLowerCase() === (t || '').toLowerCase())
-                          const bg = def?.color || undefined
-                          const fg = bg ? contrastText(bg) : undefined
-                          return (
-                            <button key={t} className="chip" onClick={() => { setTag(t); setOffset(0) }} title={`Nach Tag "${t}" filtern`} style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>{t}</button>
-                          )
-                        })}
-                      </div>
-                    </td>
+                    {colPrefs.showTags && (
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {(r.tags || []).map((t: string) => {
+                            const def = (tags || []).find(td => (td.name || '').toLowerCase() === (t || '').toLowerCase())
+                            const bg = def?.color || undefined
+                            const fg = bg ? contrastText(bg) : undefined
+                            return (
+                              <button key={t} className="chip" onClick={() => { setTag(t); setOffset(0) }} title={`Nach Tag "${t}" filtern`} style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>{t}</button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    )}
                     <td align="right">{eurFmt.format(r.grossAmount)}</td>
-                    <td align="right" title={`Summe Zahlungen`}>{eurFmt.format(r.paidSum || 0)}</td>
-                    <td align="right" style={{ color: remaining > 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(remaining)}</td>
+                    {colPrefs.showBezahlt && <td align="right" title={`Summe Zahlungen`}>{eurFmt.format(r.paidSum || 0)}</td>}
+                    {colPrefs.showRest && <td align="right" style={{ color: remaining > 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(remaining)}</td>}
                     <td>{statusBadge(r.status)}</td>
-                    <td align="center">{(r.fileCount || 0) > 0 ? <span className="badge">📎 {r.fileCount}</span> : ''}</td>
+                    {colPrefs.showAttachments && <td align="center">{(r.fileCount || 0) > 0 ? <span className="badge">📎 {r.fileCount}</span> : ''}</td>}
                     <td align="center" style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
                       <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
@@ -762,6 +783,40 @@ export default function InvoicesView() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Column selection modal */}
+      {showColumnsModal && (
+        <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
+              <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
+            </header>
+            <div className="card" style={{ padding: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={colPrefs.showTags} onChange={(e) => setColPrefs(p => ({ ...p, showTags: e.target.checked }))} />
+                Tags anzeigen
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <input type="checkbox" checked={colPrefs.showBezahlt} onChange={(e) => setColPrefs(p => ({ ...p, showBezahlt: e.target.checked }))} />
+                Bezahlt anzeigen
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <input type="checkbox" checked={colPrefs.showRest} onChange={(e) => setColPrefs(p => ({ ...p, showRest: e.target.checked }))} />
+                Rest anzeigen
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <input type="checkbox" checked={colPrefs.showAttachments} onChange={(e) => setColPrefs(p => ({ ...p, showAttachments: e.target.checked }))} />
+                Anhänge (📎) anzeigen
+              </label>
+              <div className="helper" style={{ marginTop: 8 }}>Tipp: Blende Spalten aus, die du nicht benötigst, um die Übersicht zu verbessern.</div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setShowColumnsModal(false)}>Schließen</button>
+            </div>
           </div>
         </div>
       )}
