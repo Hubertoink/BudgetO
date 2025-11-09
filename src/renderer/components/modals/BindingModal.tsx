@@ -46,62 +46,62 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
         />
         <div className="row">
           <div className="field">
-            <label>Code</label>
-            <input className="input" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} />
+            <label htmlFor="binding-code">Code</label>
+            <input id="binding-code" className="input" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} placeholder="z.B. ZW01" />
           </div>
           <div className="field">
-            <label>Name</label>
-            <input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
+            <label htmlFor="binding-name">Name</label>
+            <input id="binding-name" className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="z.B. Sommerfest 2025" />
           </div>
-          <div className="field" style={{ gridColumn: '1 / span 2' }}>
-            <label>Beschreibung</label>
-            <input className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Von</label>
-            <input className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+          <div className="field field-full-width">
+            <label htmlFor="binding-description">Beschreibung</label>
+            <input id="binding-description" className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} placeholder="Optional" />
           </div>
           <div className="field">
-            <label>Bis</label>
-            <input className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+            <label htmlFor="binding-start-date">Von</label>
+            <input id="binding-start-date" className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
           </div>
           <div className="field">
-            <label>Status</label>
-            <select className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>
+            <label htmlFor="binding-end-date">Bis</label>
+            <input id="binding-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+          </div>
+          <div className="field">
+            <label htmlFor="binding-status">Status</label>
+            <select id="binding-status" className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>
               <option value="1">aktiv</option>
               <option value="0">inaktiv</option>
             </select>
           </div>
           <div className="field">
-            <label>Budget (€)</label>
-            <input className="input" type="number" step="0.01" value={(v.budget ?? '') as any}
+            <label htmlFor="binding-budget">Budget (€)</label>
+            <input id="binding-budget" className="input" type="number" step="0.01" value={(v.budget ?? '') as any}
               onChange={(e) => {
                 const val = e.target.value
                 setV({ ...v, budget: val === '' ? null : Number(val) })
-              }} />
+              }} placeholder="0.00" />
           </div>
-          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+          <div className="field field-full-width">
             <label>Farbe</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div className="color-picker-container">
               {EARMARK_PALETTE.map((c) => (
-                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
+                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ background: c }} aria-label={`Farbe ${c}`}>
                   <span aria-hidden="true" />
                 </button>
               ))}
-              <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
+              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
                 Eigene…
               </button>
-              <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
+              <button type="button" className="btn custom-color-btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe">Keine</button>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+        <div className="modal-footer">
           <div>
             {!!v.id && (
               <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="modal-actions">
             <button className="btn" onClick={onClose}>Abbrechen</button>
             <button className="btn primary" onClick={async () => { await (window as any).api?.bindings.upsert?.(v as any); onSaved(); onClose() }}>Speichern</button>
           </div>
@@ -109,14 +109,14 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
       </div>
       {askDelete && v.id && (
         <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Zweckbindung löschen</h3>
+          <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-header">
+              <h3 className="m-0">Zweckbindung löschen</h3>
               <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
             </div>
             <div>Möchtest du die Zweckbindung <strong>{v.code}</strong> – {v.name} wirklich löschen?</div>
             <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt erhalten; es wird nur die Zweckbindung entfernt.</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="delete-modal-actions">
               <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
               <button className="btn danger" onClick={async () => { await (window as any).api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
             </div>
@@ -125,27 +125,27 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
       )}
       {showColorPicker && (
         <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
+          <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="color-picker-header">
+              <h3 className="m-0">Eigene Farbe wählen</h3>
               <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
             </div>
             <div className="row">
               <div className="field">
-                <label>Picker</label>
-                <input type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} />
+                <label htmlFor="color-picker-native">Picker</label>
+                <input id="color-picker-native" className="color-input-native" type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} />
               </div>
               <div className="field">
-                <label>HEX</label>
-                <input className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
-                {draftError && <div className="helper" style={{ color: 'var(--danger)' }}>{draftError}</div>}
+                <label htmlFor="color-picker-hex">HEX</label>
+                <input id="color-picker-hex" className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
+                {draftError && <div className="helper error-text">{draftError}</div>}
               </div>
             </div>
-            <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} />
-              <div className="helper">Kontrast: <span style={{ background: draftColor, color: contrastText(draftColor), padding: '2px 6px', borderRadius: 6 }}>{contrastText(draftColor)}</span></div>
+            <div className="card color-preview-card">
+              <div className="color-preview-swatch" style={{ background: draftColor }} />
+              <div className="helper">Kontrast: <span className="contrast-sample" style={{ background: draftColor, color: contrastText(draftColor) }}>{contrastText(draftColor)}</span></div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="delete-modal-actions">
               <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
               <button className="btn primary" onClick={() => {
                 const hex = draftColor.trim()

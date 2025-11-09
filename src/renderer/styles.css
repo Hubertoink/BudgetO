@@ -1303,6 +1303,53 @@ textarea:focus {
 .icon-color-Reports { color: #F50057; }
 .icon-color-Einstellungen { color: #9C27B0; }
 
+/* ==========================
+   App layout shell helpers
+   ========================== */
+.app-root-grid {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+    overflow: hidden;
+}
+.app-header {
+    grid-area: top;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    background: color-mix(in oklab, var(--surface) 50%, transparent);
+}
+.app-header-top { grid-template-columns: 1fr auto 1fr 104px; }
+.app-header-left { grid-template-columns: 1fr 104px; }
+.no-drag { pointer-events: auto; }
+.header-left-group { display: inline-flex; align-items: center; gap: 6px; }
+.top-nav { display: inline-flex; align-items: center; gap: 6px; justify-self: center; }
+.nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+.nav-btn.is-active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
+.app-sidebar { grid-area: side; display: flex; flex-direction: column; padding: 8px; border-right: 1px solid var(--border); overflow-y: auto; }
+.side-nav-btn { text-align: left; display: flex; align-items: center; gap: 10px; }
+.app-main { grid-area: main; padding: 16px; overflow-y: auto; }
+.app-logo { border-radius: 4px; display: block; }
+.toast-row { display: flex; align-items: center; gap: 12px; }
+.modal-wide { width: min(96vw, 1200px); max-width: 1200px; display: grid; gap: 10px; }
+.inline-helpers-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.min-w-140 { min-width: 140px; }
+.tags-input-inline { flex: 1; min-width: 120px; border: none; outline: none; background: transparent; color: var(--text); }
+.suggestions-palette { padding: 6px; margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.tags-input { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 34px; }
+.col-span-2 { grid-column: 1 / span 2; }
+.timeline-scroll { margin-top: 8px; overflow-x: auto; }
+.desc-span { min-width: 160px; flex: 1 1 auto; }
+.badge-center { display: inline-grid; place-items: center; }
+
 /* Charts shared helpers */
 .chart-card {
     padding: 12px;
@@ -1509,4 +1556,395 @@ label .req-asterisk {
 
 /* Word Break */
 .word-break-all { word-break: break-all; }
-.user-select-all { user-select: all; }
+.user-select-all { -webkit-user-select: all; user-select: all; }
+
+/* ========================================
+   BindingModal - Specific CSS Classes
+   ======================================== */
+
+/* Field with full width span across two columns */
+.field-full-width {
+    grid-column: 1 / span 2;
+}
+
+/* Color picker container */
+.color-picker-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Color swatch button */
+.color-swatch-btn {
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+}
+
+.color-swatch-selected {
+    border: 2px solid var(--text);
+}
+
+.color-swatch-unselected {
+    border: 2px solid transparent;
+}
+
+/* Custom color button */
+.custom-color-btn {
+    height: 28px;
+}
+
+/* Modal footer actions */
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Delete confirmation modal */
+.delete-modal {
+    max-width: 520px;
+    display: grid;
+    gap: 12px;
+}
+
+.delete-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.delete-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Color picker modal */
+.color-picker-modal {
+    max-width: 420px;
+    display: grid;
+    gap: 12px;
+}
+
+.color-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.color-input-native {
+    width: 60px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+}
+
+.color-preview-card {
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-preview-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.contrast-sample {
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.error-text {
+    color: var(--danger);
+}
+
+/* ========================================
+   BudgetModal - Specific CSS Classes
+   ======================================== */
+
+/* Date range container spanning 2 columns */
+.date-range-container {
+    grid-column: 1 / span 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* Input with error state */
+.input-error {
+    border-color: var(--danger);
+}
+
+/* ========================================
+   Report Charts - Common CSS Classes
+   ======================================== */
+
+/* Chart card wrapper */
+.report-chart-card {
+    margin-top: 12px;
+    padding: 12px;
+}
+
+    /* Chart card with overflow hidden */
+    .chart-card-overflow {
+        padding: 12px;
+        overflow: hidden;
+    }
+
+    /* Helper with top margin */
+    .helper-mt-6 {
+        margin-top: 6px;
+    }
+
+        /* ========================================
+           Dashboard - Common CSS Classes
+           ======================================== */
+
+        /* Dashboard main card */
+        .dashboard-card {
+            padding: 12px;
+            display: grid;
+            gap: 12px;
+        }
+
+        /* Dashboard header flex */
+        .dashboard-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        /* Dashboard title */
+        .dashboard-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Quote section */
+        .dashboard-quote {
+            text-align: right;
+            max-width: 520px;
+        }
+
+        .dashboard-quote-text {
+            font-style: italic;
+        }
+
+        /* Auto-fit grid for cards */
+        .dashboard-grid-auto {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        /* Period selector row */
+        .dashboard-period-row {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Button with active state */
+        .btn-period-active {
+            background: color-mix(in oklab, var(--accent) 15%, transparent);
+        }
+
+        /* Summary card with padding */
+        .summary-card {
+            padding: 12px;
+        }
+
+        /* Summary value - bold */
+        .summary-value {
+            font-weight: 600;
+        }
+
+        /* Summary value with dynamic color */
+        .summary-value-overflow {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Invoice card with warning color */
+        .invoice-card-warning {
+            padding: 10px;
+            min-width: 0;
+        }
+
+        .invoice-card-danger {
+            padding: 10px;
+            border-left: 4px solid var(--danger);
+            min-width: 0;
+        }
+
+        /* Invoice list container */
+        .invoice-list-container {
+            margin-top: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            display: grid;
+            gap: 4px;
+        }
+
+        /* Invoice item row */
+        .invoice-item-row {
+            cursor: pointer;
+            display: grid;
+            grid-template-columns: 120px 1fr auto;
+            align-items: center;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+            /* Text utilities */
+            .text-right-bold {
+                text-align: right;
+                font-weight: 600;
+            }
+
+            .text-overflow-ellipsis {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+        /* Overflow container */
+        .overflow-container-mt {
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        /* Grid with wider items */
+        .dashboard-grid-wide {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+    /* Chart header with title and legend */
+.report-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Chart container with relative positioning for tooltip */
+.chart-container-relative {
+    position: relative;
+}
+
+/* Chart tooltip */
+.chart-tooltip {
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    pointer-events: none;
+    box-shadow: var(--shadow-1);
+    font-size: 12px;
+    z-index: 10;
+}
+
+.chart-tooltip-header {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.chart-tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/* Legend swatches - specific colors */
+.legend-swatch-in {
+    background: #2e7d32;
+}
+
+.legend-swatch-out {
+    background: #c62828;
+}
+
+/* Donut chart specific */
+.donut-chart-wrapper {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    position: relative;
+}
+
+.legend-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Chart header with baseline alignment */
+.chart-header-baseline {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+/* Chart overflow container */
+.chart-overflow-container {
+    position: relative;
+    overflow: hidden;
+}
+
+/* SVG chart max width */
+.chart-svg-responsive {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Loading overlay */
+.chart-loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+}
+
+/* Tooltip with dynamic positioning (left %) */
+.chart-tooltip-dynamic {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    pointer-events: none;
+    box-shadow: var(--shadow-1);
+    font-size: 12px;
+}

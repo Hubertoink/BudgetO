@@ -185,80 +185,80 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
   }, [])
 
   return (
-    <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+    <div className="card dashboard-card">
+      <div className="dashboard-header">
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Hallo{cashier ? ` ${cashier}` : ''}</div>
+          <div className="dashboard-title">Hallo{cashier ? ` ${cashier}` : ''}</div>
           <div className="helper">Willkommen zurück – hier ist dein Überblick.</div>
         </div>
-        <div style={{ textAlign: 'right', maxWidth: 520 }}>
+        <div className="dashboard-quote">
           <div className="helper">Satz der Woche</div>
-          <div style={{ fontStyle: 'italic' }}>{loading ? '…' : (quote?.text || '—')}</div>
+          <div className="dashboard-quote-text">{loading ? '…' : (quote?.text || '—')}</div>
           <div className="helper">{quote?.author || quote?.source || ''}</div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
-          <div className="btn-group" role="tablist" aria-label="Zeitraum">
-            <button className="btn ghost" onClick={() => setPeriod('MONAT')} style={{ background: period === 'MONAT' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Monat</button>
-            <button className="btn ghost" onClick={() => setPeriod('JAHR')} style={{ background: period === 'JAHR' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Jahr</button>
+        <div className="dashboard-grid-auto">
+          <div className="dashboard-period-row">
+          <div className="btn-group" role="group" aria-label="Zeitraum">
+              <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
+              <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
           </div>
           {period === 'JAHR' && yearsAvail.length > 1 && (
-            <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))}>
+            <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label="Jahr auswählen">
               {yearsAvail.map((y) => (
                 <option key={y} value={String(y)}>{y}</option>
               ))}
             </select>
           )}
         </div>
-        <div className="card card--success" style={{ padding: 12 }}>
+          <div className="card card--success summary-card">
           <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
-          <div style={{ fontWeight: 600 }}>{eur.format(sum?.inGross || 0)}</div>
+            <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
         </div>
-        <div className="card card--danger" style={{ padding: 12 }}>
+          <div className="card card--danger summary-card">
           <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
-          <div style={{ fontWeight: 600 }}>{eur.format(sum?.outGross || 0)}</div>
+            <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
         </div>
-        <div className="card card--accent" style={{ padding: 12 }}>
+          <div className="card card--accent summary-card">
           <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
-          <div style={{ fontWeight: 600, color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
+            <div className="summary-value" style={{ color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
         </div>
       </div>
-      <div className="card card--accent" style={{ padding: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="card card--accent chart-card-overflow">
+          <div className="chart-header-baseline">
+            <div className="legend-container">
             <strong>Offene Rechnungen</strong>
             <span className="chip" title="Summen berücksichtigen offene (OPEN+PARTIAL) Rechnungen. 'Fällig in ≤ 5 Tagen' bezieht sich auf heute bis +5 Tage, 'Überfällig' ist vor heute.">ⓘ</span>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 8, overflow: 'hidden' }}>
-          <div className="card" style={{ padding: 10, minWidth: 0 }}>
+          <div className="dashboard-grid-wide">
+            <div className="card invoice-card-warning">
             <div className="helper">Offen gesamt</div>
-            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
+              <div className="summary-value-overflow">{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
           </div>
-          <div className="card" style={{ padding: 10, minWidth: 0 }}>
+            <div className="card invoice-card-warning">
             <div className="helper">Fällig in ≤ 5 Tagen</div>
-            <div style={{ fontWeight: 600, color: '#f9a825', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
+              <div className="summary-value-overflow" style={{ color: '#f9a825' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
           </div>
-          <div className="card" style={{ padding: 10, borderLeft: '4px solid var(--danger)', minWidth: 0 }}>
+            <div className="card invoice-card-danger">
             <div className="helper">Überfällig</div>
-            <div style={{ fontWeight: 600, color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
+              <div className="summary-value-overflow" style={{ color: 'var(--danger)' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
           </div>
         </div>
-        <div style={{ marginTop: 10, overflow: 'hidden' }}>
+          <div className="overflow-container-mt">
           <div className="helper">Nächste Fälligkeiten</div>
           {invTopDue.length > 0 ? (
-            <div style={{ marginTop: 6, maxHeight: 180, overflowY: 'auto', display: 'grid', gap: 4 }}>
+              <div className="invoice-list-container">
               {invTopDue.map((r) => {
                 const onOpen = () => {
                   try { onGoToInvoices() } catch {}
                   window.setTimeout(() => { window.dispatchEvent(new CustomEvent('open-invoice-details', { detail: { id: r.id } })) }, 0)
                 }
                 return (
-                  <div key={r.id} onClick={onOpen} title="Details öffnen" style={{ cursor: 'pointer', display: 'grid', gridTemplateColumns: '120px 1fr auto', alignItems: 'center', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div key={r.id} onClick={onOpen} title="Details öffnen" className="invoice-item-row">
                     <div style={{ color: 'var(--text-dim)' }}>{r.dueDate || '—'}</div>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.party || '—'}</div>
-                    <div style={{ textAlign: 'right', fontWeight: 600 }}>{eur.format(r.remaining || 0)}</div>
+                <div className="text-overflow-ellipsis">{r.party || '—'}</div>
+                <div className="text-right-bold">{eur.format(r.remaining || 0)}</div>
                   </div>
                 )
               })}

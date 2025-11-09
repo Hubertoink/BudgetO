@@ -189,13 +189,13 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   
 
   return (
-    <section className="card" style={{ padding: 12, overflow: 'hidden' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+  <section className="card chart-card-overflow">
+      <header className="chart-header-baseline">
         <strong>{isDaily ? 'Kassenstand Entwicklung (Saldo kumuliert täglich)' : 'Kassenstand Entwicklung (Saldo kumuliert monatlich)'}</strong>
         <span className="helper">{from} → {to}</span>
       </header>
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
-  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatlicher Saldo">
+      <div className="chart-overflow-container">
+  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Monatlicher Saldo">
           {/* Zero/baseline axis */}
           {(yMin <= 0 && yMax >= 0) && (<line x1={P/2} x2={W-P/2} y1={ys(0)} y2={ys(0)} stroke="var(--border)" strokeWidth={1} />)}
           {/* Y axis */}
@@ -232,7 +232,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
           )}
         </svg>
         {hoverIdx != null && (
-          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
+          <div className="chart-tooltip-dynamic" style={{ left: `${(xs(hoverIdx, labels.length)/W)*100}%` }}>
             {(() => {
               const key = String(labels[hoverIdx])
               const isDailyLoc = (from && to && from.slice(0,7) === to.slice(0,7))
@@ -241,16 +241,16 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
               const color = val >= 0 ? 'var(--success)' : 'var(--danger)'
               return (
                 <>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{labelText}</div>
+                  <div className="chart-tooltip-header">{labelText}</div>
                   <div style={{ fontWeight: 700, color }}>{eur.format(val)}</div>
                 </>
               )
             })()}
           </div>
         )}
-        {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}
+        {loading && <div className="helper chart-loading-overlay">Laden…</div>}
       </div>
-      <div className="helper" style={{ marginTop: 6 }}>Kumulierte Differenz: IN positiv, OUT negativ. Monate ohne Bewegung tragen den letzten Saldo fort.</div>
+    <div className="helper helper-mt-6">Kumulierte Differenz: IN positiv, OUT negativ. Monate ohne Bewegung tragen den letzten Saldo fort.</div>
     </section>
   )
 }

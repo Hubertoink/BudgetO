@@ -52,27 +52,27 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
     return arr
   })()
   return (
-    <div className="card" style={{ marginTop: 12, padding: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="card report-chart-card">
+      <div className="report-chart-header">
         <strong>Nach Zahlweg (IN/OUT)</strong>
         <div className="legend">
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-in"></span>IN</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-out"></span>OUT</span>
         </div>
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div style={{ position: 'relative' }}>
+        <div className="chart-container-relative">
           {(() => {
             const idx = hoverIdx
             if (idx == null || !data[idx]) return null
             const r = data[idx]
             const label = r.key ?? '—'
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(r.inGross)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(r.outGross))}</strong></div>
+              <div className="chart-tooltip">
+                <div className="chart-tooltip-header">{label}</div>
+                <div className="chart-tooltip-row"><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(r.inGross)}</strong></div>
+                <div className="chart-tooltip-row"><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(r.outGross))}</strong></div>
               </div>
             )
           })()}

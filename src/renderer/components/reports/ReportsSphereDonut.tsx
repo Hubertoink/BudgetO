@@ -35,10 +35,10 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
     return { key: r.key, gross: r.gross, frac, start, end }
   })
   return (
-    <div className="card" style={{ marginTop: 12, padding: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="card report-chart-card">
+      <div className="report-chart-header">
         <strong>Nach Sphäre</strong>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="legend-container">
           <div className="legend">
             {rows.map(r => (
               <span key={r.key} className="legend-item"><span className="legend-swatch" style={{ background: colors[r.key] }}></span>{r.key}</span>
@@ -48,17 +48,17 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', position: 'relative' }}>
+        <div className="donut-chart-wrapper">
           {(() => {
             const idx = hoverIdx
             if (idx == null || !arcs[idx]) return null
             const a = arcs[idx]
             const pct = Math.round(a.frac * 100)
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{a.key}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Betrag</span> <strong style={{ color: colors[a.key] }}>{eurFmt.format(a.gross)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Anteil</span> <strong>{pct}%</strong></div>
+              <div className="chart-tooltip">
+                <div className="chart-tooltip-header">{a.key}</div>
+                <div className="chart-tooltip-row"><span>Betrag</span> <strong style={{ color: colors[a.key] }}>{eurFmt.format(a.gross)}</strong></div>
+                <div className="chart-tooltip-row"><span>Anteil</span> <strong>{pct}%</strong></div>
               </div>
             )
           })()}

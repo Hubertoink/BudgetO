@@ -122,13 +122,13 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   }
 
   return (
-    <section className="card" style={{ padding: 12, overflow: 'hidden' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+  <section className="card chart-card-overflow">
+      <header className="chart-header-baseline">
         <strong>Einnahmen vs. Ausgaben</strong>
         <span className="helper">{from} → {to}</span>
       </header>
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
-  <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Einnahmen vs Ausgaben">
+      <div className="chart-overflow-container">
+  <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Einnahmen vs Ausgaben">
           {/* Axes */}
           <line x1={P/2} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -170,14 +170,14 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
           )}
         </svg>
         {hoverIdx != null && (
-          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthNamesFull[Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))] || String(labels[hoverIdx]).slice(5)}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
+          <div className="chart-tooltip-dynamic" style={{ left: `${(xs(hoverIdx, labels.length)/W)*100}%` }}>
+            <div className="chart-tooltip-header">{monthNamesFull[Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))] || String(labels[hoverIdx]).slice(5)}</div>
+            <div className="chart-tooltip-row"><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
+            <div className="chart-tooltip-row"><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
+            <div className="chart-tooltip-row"><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
           </div>
         )}
-        {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}
+        {loading && <div className="helper chart-loading-overlay">Laden…</div>}
       </div>
     </section>
   )
