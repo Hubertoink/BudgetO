@@ -4,6 +4,7 @@ import ReportsView from './views/Reports/ReportsView'
 import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
 import InvoicesView from './views/InvoicesView'
+import MembersView from './views/Mitglieder/MembersView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
 import { createPortal } from 'react-dom'
@@ -272,9 +273,6 @@ export default function App() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    // For edit-mode attachments (invoices)
-    const editInvoiceFileInputRef = useRef<HTMLInputElement | null>(null)
-    const [editInvoiceFiles, setEditInvoiceFiles] = useState<Array<{ id: number; fileName: string; size?: number | null; createdAt?: string | null }>>([])
     const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles } = useQuickAdd(
         today, 
         async (p: any) => {
