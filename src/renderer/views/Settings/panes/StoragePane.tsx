@@ -273,20 +273,63 @@ export function StoragePane({ notify }: StoragePaneProps) {
             <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, fontWeight: 600 }}>
                 <div>Tabelle</div>
-                <div>Aktuell</div>
-                <div>{compareModal.mode === 'folder' ? 'Gewählt' : 'Standard'}</div>
+                <div style={{ background: 'var(--accent)', color: '#fff', padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>Aktuell</div>
+                <div style={{ textAlign: 'center' }}>{compareModal.mode === 'folder' ? 'Gewählt' : 'Standard'}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8 }}>
-                {Array.from(new Set([
-                  ...Object.keys(compareModal.currentCounts || {}),
-                  ...Object.keys(compareModal.targetCounts || {} || {})
-                ])).sort().map(k => (
-                  <React.Fragment key={k}>
-                    <div>{k}</div>
-                    <div>{compareModal.currentCounts[k] ?? '—'}</div>
-                    <div>{(compareModal.targetCounts || {})[k] ?? '—'}</div>
-                  </React.Fragment>
-                ))}
+                {(() => {
+                  // Map technical table names to German
+                  const tableNames: Record<string, string> = {
+                    'invoice_files': 'Rechnungsdateien',
+                    'invoices': 'Rechnungen',
+                    'members': 'Mitglieder',
+                    'tags': 'Tags',
+                    'voucher_files': 'Belegdateien',
+                    'vouchers': 'Buchungen',
+                    'budgets': 'Budgets',
+                    'bindings': 'Zweckbindungen',
+                    'member_payments': 'Mitgliedsbeiträge',
+                    'audit_log': 'Änderungsprotokoll',
+                    'settings': 'Einstellungen'
+                  }
+                  
+                  const allTables = Array.from(new Set([
+                    ...Object.keys(compareModal.currentCounts || {}),
+                    ...Object.keys(compareModal.targetCounts || {})
+                  ])).sort()
+                  
+                  return allTables.map(k => {
+                    const current = compareModal.currentCounts[k] ?? 0
+                    const target = (compareModal.targetCounts || {})[k] ?? 0
+                    const isDifferent = current !== target
+                    const germanName = tableNames[k] || k
+                    
+                    return (
+                      <React.Fragment key={k}>
+                        <div>{germanName}</div>
+                        <div style={{ 
+                          background: isDifferent ? 'rgba(255, 193, 7, 0.15)' : 'transparent',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          textAlign: 'center',
+                          fontWeight: 600,
+                          border: isDifferent ? '1px solid rgba(255, 193, 7, 0.3)' : 'none'
+                        }}>
+                          {current}
+                        </div>
+                        <div style={{ 
+                          background: isDifferent ? 'rgba(33, 150, 243, 0.15)' : 'transparent',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          textAlign: 'center',
+                          border: isDifferent ? '1px solid rgba(33, 150, 243, 0.3)' : 'none'
+                        }}>
+                          {target || '0'}
+                        </div>
+                      </React.Fragment>
+                    )
+                  })
+                })()}
                 {Object.keys(compareModal.currentCounts).length === 0 && Object.keys(compareModal.targetCounts || {}).length === 0 && (
                   <div style={{ gridColumn: '1 / span 3' }} className="helper">Keine Tabellenstände verfügbar.</div>
                 )}

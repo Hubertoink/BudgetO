@@ -290,7 +290,7 @@ function AppInner() {
         async function load() {
             try {
                 if (!quickAdd) return
-                const res = await window.api?.vouchers?.recent?.({ limit: 100 })
+                const res = await window.api?.vouchers?.recent?.({ limit: 50 })
                 const uniq = new Set<string>()
                 for (const r of (res?.rows || [])) {
                     const d = (r.description || '').trim()
@@ -406,7 +406,7 @@ function AppInner() {
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
         if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
-        if (filterSphere) list.push({ key: 'sphere', label: `Sph?re: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
         if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
         if (filterEarmark != null) {
@@ -450,7 +450,7 @@ function AppInner() {
             case 'date': return 'Datum'
             case 'voucherNo': return 'Nr.'
             case 'type': return 'Art'
-            case 'sphere': return 'Sph?re'
+            case 'sphere': return 'Sphäre'
             case 'description': return 'Beschreibung'
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'
@@ -566,7 +566,7 @@ function AppInner() {
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
-    // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten ?ffnen)
+    // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten öffnen)
     useEffect(() => {
         if (editRow?.id) {
             setEditRowFilesLoading(true)
@@ -699,7 +699,7 @@ function AppInner() {
                     <button className="btn ghost icon-btn" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
                     </button>
-                    <button className="btn danger icon-btn" title="Schlie?en" aria-label="Schlie?en" onClick={() => window.api?.window?.close?.()}>
+                    <button className="btn danger icon-btn" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
                     </button>
                 </div>
@@ -897,7 +897,7 @@ function AppInner() {
                 to={to}
                 onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt) }}
             />
-            {/* Meta Filter Modal (Sph?re, Zweckbindung, Budget) */}
+            {/* Meta Filter Modal (Sphäre, Zweckbindung, Budget) */}
             <MetaFilterModal
                 open={activePage === 'Buchungen' && showMetaFilter}
                 onClose={() => setShowMetaFilter(false)}
@@ -949,6 +949,8 @@ function AppInner() {
                     setAmountMode={setExportAmountMode}
                     sortDir={exportSortDir}
                     setSortDir={setExportSortDir}
+                    dateFrom={from}
+                    dateTo={to}
                     onExport={async (fmt) => {
                         try {
                             const res = await window.api?.reports.export?.({
@@ -966,7 +968,7 @@ function AppInner() {
                             if (res) {
                                 const dir = res.filePath?.replace(/\\[^\\/]+$/,'').replace(/\/[^^/]+$/, '') || ''
                                 notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
-                                    label: 'Ordner ?ffnen',
+                                    label: 'Ordner öffnen',
                                     onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
                                 })
                             }
@@ -980,7 +982,7 @@ function AppInner() {
         </div>
     )
 }
-// Meta Filter Modal: groups Sph?re, Zweckbindung, Budget
+// Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
 // MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
 
 // Time Filter Modal: controls date range and quick year selection
@@ -1169,7 +1171,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                 try {
                                     const addr = memberData?.address || null
                                     const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
-                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht ?ffnen')
+                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Mitglied anschreiben</button>
                         </div>
@@ -1198,7 +1200,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                             </table>
                         </div>
                         <div className="flex justify-end">
-                            <button className="btn" onClick={()=>setOpen(false)}>Schlie?en</button>
+                            <button className="btn" onClick={()=>setOpen(false)}>Schließen</button>
                         </div>
                     </div>
                 </div>
@@ -1542,7 +1544,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} className="cursor-pointer">Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sph?re</th>
+                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sphäre</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
                                     : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>

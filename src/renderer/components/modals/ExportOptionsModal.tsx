@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -12,6 +12,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   sortDir: 'ASC' | 'DESC'
   setSortDir: (v: 'ASC' | 'DESC') => void
   onExport: (fmt: 'CSV' | 'XLSX' | 'PDF') => Promise<void>
+  dateFrom?: string
+  dateTo?: string
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -31,17 +33,61 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     else set.add(k)
     setFields(Array.from(set) as any)
   }
+  
+  const applyJournalColumns = () => {
+    try {
+      const stored = localStorage.getItem('journalCols')
+      if (!stored) return
+      const cols = JSON.parse(stored)
+      const mapping: Record<string, any> = {
+        'date': 'date',
+        'voucherNo': 'voucherNo',
+        'type': 'type',
+        'sphere': 'sphere',
+        'description': 'description',
+        'paymentMethod': 'paymentMethod',
+        'net': 'netAmount',
+        'vat': 'vatAmount',
+        'gross': 'grossAmount'
+      }
+      const newFields: any[] = []
+      Object.entries(cols).forEach(([key, visible]) => {
+        if (visible && mapping[key]) {
+          newFields.push(mapping[key])
+        }
+      })
+      if (newFields.length > 0) {
+        setFields(newFields as any)
+      }
+    } catch (e) {
+      console.error('Failed to apply journal columns:', e)
+    }
+  }
+  
   if (!open) return null
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Export Optionen</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ margin: 0 }}>Export Optionen</h2>
+            {(dateFrom || dateTo) && (
+              <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <span>📅</span>
+                <span>{dateFrom || '…'} – {dateTo || '…'}</span>
+              </div>
+            )}
+          </div>
           <button className="btn danger" onClick={onClose}>Schließen</button>
         </header>
         <div className="row">
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
-            <label>Felder</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label>Felder</label>
+              <button className="btn" onClick={applyJournalColumns} title="Übernimmt die aktuelle Spaltenauswahl aus der Buchungsansicht">
+                📋 Aus Buchungsansicht übernehmen
+              </button>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {all.map(f => (
                 <label key={f.key} className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -50,7 +96,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </label>
               ))}
             </div>
-            <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags“ gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
+            <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags" gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
           </div>
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Organisationsname (optional)</label>

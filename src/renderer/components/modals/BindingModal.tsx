@@ -31,14 +31,42 @@ export type BindingModalValue = {
 
 export default function BindingModal({ value, onClose, onSaved }: { value: BindingModalValue; onClose: () => void; onSaved: () => void }) {
   const [v, setV] = useState(value)
+  const [requiredTouched, setRequiredTouched] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
-  useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+  useEffect(() => { setV(value); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+
+  async function save() {
+    setRequiredTouched(true)
+    const name = (v.name || '').trim()
+    if (!name) return
+    await (window as any).api?.bindings.upsert?.({
+      id: v.id as any,
+      code: v.code,
+      name,
+      description: v.description ?? null,
+      startDate: v.startDate ?? null,
+      endDate: v.endDate ?? null,
+      isActive: v.isActive ?? true,
+      color: v.color ?? null,
+      budget: v.budget ?? null
+    })
+    onSaved()
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { onClose(); e.preventDefault(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { save(); e.preventDefault(); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [v])
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="modal-overlay" role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <ModalHeader 
           title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
@@ -50,8 +78,18 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <input id="binding-code" className="input" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} placeholder="z.B. ZW01" />
           </div>
           <div className="field">
-            <label htmlFor="binding-name">Name</label>
-            <input id="binding-name" className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="z.B. Sommerfest 2025" />
+            <label htmlFor="binding-name">Name<span className="req-asterisk">*</span></label>
+            <input 
+              id="binding-name" 
+              className="input" 
+              value={v.name} 
+              onChange={(e) => setV({ ...v, name: e.target.value })} 
+              placeholder="z.B. Sommerfest 2025"
+              style={requiredTouched && !v.name.trim() ? { borderColor: 'var(--danger)' } : undefined}
+            />
+            {requiredTouched && !v.name.trim() && (
+              <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
+            )}
           </div>
           <div className="field field-full-width">
             <label htmlFor="binding-description">Beschreibung</label>
@@ -96,14 +134,13 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           </div>
         </div>
         <div className="modal-footer">
-          <div>
+          <div className="helper" style={{ margin: 0 }}>Ctrl+S = Speichern · Esc = Abbrechen</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
             {!!v.id && (
               <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
-          </div>
-          <div className="modal-actions">
             <button className="btn" onClick={onClose}>Abbrechen</button>
-            <button className="btn primary" onClick={async () => { await (window as any).api?.bindings.upsert?.(v as any); onSaved(); onClose() }}>Speichern</button>
+            <button className="btn primary" onClick={() => save()}>Speichern</button>
           </div>
         </div>
       </div>

@@ -179,7 +179,37 @@ export default function MembersView() {
     useEffect(() => {
         if (!form) return
         if (form.mode === 'create') { setRequiredTouched(false); setMissingRequired([]); setFormTab('PERSON'); setAddrStreet(''); setAddrZip(''); setAddrCity('') }
-    }, [form?.mode])
+        // Keyboard shortcuts: Ctrl+S to save, Esc to close
+        function onKey(e: KeyboardEvent) {
+            if (e.key === 'Escape') { setForm(null); e.preventDefault(); return }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                // Trigger save
+                ;(async () => {
+                    try {
+                        setRequiredTouched(true)
+                        const missing: string[] = []
+                        if (!form.draft.name || !form.draft.name.trim()) missing.push('Name')
+                        if (form.mode === 'create') {
+                            if (!form.draft.memberNo || !String(form.draft.memberNo).trim()) missing.push('Mitglieds-Nr.')
+                            if (!form.draft.join_date || !String(form.draft.join_date).trim()) missing.push('Eintritt')
+                        }
+                        if (missing.length) { setMissingRequired(missing); return }
+                        const addrCombined = [addrStreet, [addrZip, addrCity].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+                        const payload = { ...form.draft, address: addrCombined || form.draft.address || null }
+                        if (form.mode === 'create') {
+                            await (window as any).api?.members?.create?.(payload)
+                        } else {
+                            await (window as any).api?.members?.update?.(payload)
+                        }
+                        setForm(null); setRequiredTouched(false); setMissingRequired([]); await load()
+                    } catch (e: any) { alert(e?.message || String(e)) }
+                })()
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [form?.mode, form?.draft, addrStreet, addrZip, addrCity])
 
     const pages = Math.max(1, Math.ceil(total / Math.max(1, limit)))
     const page = Math.floor(offset / Math.max(1, limit)) + 1
@@ -491,14 +521,15 @@ export default function MembersView() {
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                            {form.mode === 'edit' ? (
-                                <button className="btn danger" onClick={() => {
-                                    if (!form?.draft?.id) return
-                                    const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
-                                    setDeleteConfirm({ id: form.draft.id, label })
-                                }}>🗑 Löschen</button>
-                            ) : <span />}
+                            <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
                             <div style={{ display: 'flex', gap: 8 }}>
+                                {form.mode === 'edit' && (
+                                    <button className="btn danger" onClick={() => {
+                                        if (!form?.draft?.id) return
+                                        const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
+                                        setDeleteConfirm({ id: form.draft.id, label })
+                                    }}>🗑 Löschen</button>
+                                )}
                                 <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
                                 <button className="btn primary" onClick={async () => {
                                 try {

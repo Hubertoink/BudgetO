@@ -44,7 +44,7 @@ export default function QuickAddModal({
     descSuggest
 }: QuickAddModalProps) {
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 <header className="modal-header-flex">
                     <h2>+ Buchung</h2>
@@ -268,11 +268,8 @@ export default function QuickAddModal({
                     </div>
                     
                     <div className="modal-footer-actions">
-                        <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
-                        <div className="flex-gap-8">
-                            <button type="button" className="btn" onClick={() => { onClose(); setFiles([]) }}>Abbrechen</button>
-                            <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
-                        </div>
+                        <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
+                        <button type="submit" className="btn primary">Speichern</button>
                     </div>
                 </form>
             </div>

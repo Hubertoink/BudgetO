@@ -35,15 +35,47 @@ export type BudgetModalValue = {
 export default function BudgetModal({ value, onClose, onSaved }: { value: BudgetModalValue; onClose: () => void; onSaved: () => void }) {
   const [v, setV] = useState(value)
   const [nameError, setNameError] = useState<string>('')
+  const [requiredTouched, setRequiredTouched] = useState(false)
   const nameRef = useRef<HTMLInputElement | null>(null)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
-  useEffect(() => { setV(value); setNameError(''); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+  useEffect(() => { setV(value); setNameError(''); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+
+  async function save() {
+    setRequiredTouched(true)
+    const name = (v.name || '').trim()
+    if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
+    await (window as any).api?.budgets.upsert?.({
+      id: v.id as any,
+      year: v.year,
+      sphere: v.sphere,
+      amountPlanned: v.amountPlanned,
+      name: name || null,
+      categoryName: (v.categoryName || '').trim() || null,
+      projectName: (v.projectName || '').trim() || null,
+      startDate: v.startDate || null,
+      endDate: v.endDate || null,
+      color: v.color || null,
+      categoryId: v.categoryId || null,
+      projectId: v.projectId || null,
+      earmarkId: v.earmarkId || null
+    })
+    onSaved()
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { onClose(); e.preventDefault(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { save(); e.preventDefault(); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [v])
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <ModalHeader 
           title={v.id ? 'Budget bearbeiten' : 'Budget anlegen'}
@@ -51,15 +83,15 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
         />
         <div className="row">
           <div className="field">
-            <label htmlFor="budget-year">Jahr</label>
+            <label htmlFor="budget-year">Jahr <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input id="budget-year" className="input" type="number" value={v.year} onChange={(e) => setV({ ...v, year: Number(e.target.value) })} placeholder="2025" />
           </div>
           <div className="field">
-            <label htmlFor="budget-amount">Budget (€)</label>
+            <label htmlFor="budget-amount">Budget (€) <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input id="budget-amount" className="input" type="number" step="0.01" value={v.amountPlanned} onChange={(e) => setV({ ...v, amountPlanned: Number(e.target.value) })} placeholder="0.00" />
           </div>
           <div className="field">
-            <label htmlFor="budget-name">Name</label>
+            <label htmlFor="budget-name">Name <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="budget-name"
               ref={nameRef}
@@ -67,9 +99,10 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
               value={v.name ?? ''}
               onChange={(e) => { const nv = e.target.value; setV({ ...v, name: nv }); if (nameError && nv.trim()) setNameError('') }}
               placeholder="z. B. Jugendfreizeit"
+              style={requiredTouched && !(v.name || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
             />
-            {nameError && (
-              <div className="helper error-text">{nameError}</div>
+            {requiredTouched && !(v.name || '').trim() && (
+              <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
             )}
           </div>
           <div className="field">
@@ -106,33 +139,13 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
           </div>
         </div>
         <div className="modal-footer">
-          <div>
+          <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
+          <div style={{ display: 'flex', gap: 8 }}>
             {!!v.id && (
               <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
-          </div>
-          <div className="modal-actions">
             <button className="btn" onClick={onClose}>Abbrechen</button>
-            <button className="btn primary" onClick={async () => {
-              const name = (v.name || '').trim()
-              if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
-              await (window as any).api?.budgets.upsert?.({
-                id: v.id as any,
-                year: v.year,
-                sphere: v.sphere,
-                amountPlanned: v.amountPlanned,
-                name,
-                categoryName: v.categoryName ?? null,
-                projectName: v.projectName ?? null,
-                startDate: v.startDate ?? null,
-                endDate: v.endDate ?? null,
-                color: v.color ?? null,
-                categoryId: v.categoryId ?? null,
-                projectId: v.projectId ?? null,
-                earmarkId: v.earmarkId ?? null
-              } as any)
-              onSaved(); onClose()
-            }}>Speichern</button>
+            <button className="btn primary" onClick={save}>Speichern</button>
           </div>
         </div>
       </div>

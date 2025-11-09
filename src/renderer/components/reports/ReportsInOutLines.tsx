@@ -123,8 +123,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
             const m = months[idx]
             const inn = inBuckets.find(b => b.month === m)?.gross || 0
             const out = outBuckets.find(b => b.month === m)?.gross || 0
+            const gx = xFor(idx)
+            const tooltipX = (gx / width) * 100
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
+              <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabel(m, true)}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(inn)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(out))}</strong></div>

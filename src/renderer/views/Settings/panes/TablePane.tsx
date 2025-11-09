@@ -23,8 +23,38 @@ export function TablePane({
 }: TablePaneProps) {
   // Preset configurations
   const presetStandard = () => {
-    setCols(defaultCols)
-    setOrder(defaultOrder)
+    const standardCols: Record<string, boolean> = {
+      actions: true,
+      date: true,
+      voucherNo: false,
+      type: true,
+      sphere: true,
+      description: true,
+      earmark: true,
+      budget: true,
+      paymentMethod: true,
+      attachments: true,
+      net: false,
+      vat: false,
+      gross: true,
+    }
+    const standardOrder: ColKey[] = [
+      'actions',
+      'date',
+      'type',
+      'sphere',
+      'description',
+      'earmark',
+      'budget',
+      'paymentMethod',
+      'attachments',
+      'gross',
+      'voucherNo',
+      'net',
+      'vat',
+    ]
+    setCols(standardCols as any)
+    setOrder(standardOrder)
   }
 
   const presetMinimal = () => {

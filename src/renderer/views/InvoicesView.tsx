@@ -203,11 +203,13 @@ export default function InvoicesView() {
   const editInvoiceFileInputRef = useRef<HTMLInputElement | null>(null)
   const [editInvoiceFiles, setEditInvoiceFiles] = useState<Array<{ id: number; fileName: string; size?: number | null; createdAt?: string | null }>>([])
   const [formError, setFormError] = useState<string>('')
-  function openCreate() { const today = new Date().toISOString().slice(0, 10); setForm({ mode: 'create', draft: { date: today, dueDate: null, invoiceNo: '', party: '', description: '', grossAmount: '', paymentMethod: 'BANK', sphere: 'IDEELL', earmarkId: '', budgetId: '', autoPost: true, voucherType: 'OUT', tags: [] } }); setFormFiles([]); setFormError('') }
-  function openEdit(row: any) { setForm({ mode: 'edit', draft: { id: row.id, date: row.date, dueDate: row.dueDate ?? null, invoiceNo: row.invoiceNo ?? '', party: row.party, description: row.description ?? '', grossAmount: String(row.grossAmount ?? ''), paymentMethod: (row.paymentMethod ?? '') as any, sphere: row.sphere, earmarkId: (typeof row.earmarkId === 'number' ? row.earmarkId : '') as any, budgetId: (typeof row.budgetId === 'number' ? row.budgetId : '') as any, autoPost: !!(row.autoPost ?? 0), voucherType: row.voucherType, tags: (row.tags || []) as string[] }, sourceRow: row }); setFormFiles([]); setFormError('') }
+  const [requiredTouched, setRequiredTouched] = useState(false)
+  function openCreate() { const today = new Date().toISOString().slice(0, 10); setForm({ mode: 'create', draft: { date: today, dueDate: null, invoiceNo: '', party: '', description: '', grossAmount: '', paymentMethod: 'BANK', sphere: 'IDEELL', earmarkId: '', budgetId: '', autoPost: true, voucherType: 'OUT', tags: [] } }); setFormFiles([]); setFormError(''); setRequiredTouched(false) }
+  function openEdit(row: any) { setForm({ mode: 'edit', draft: { id: row.id, date: row.date, dueDate: row.dueDate ?? null, invoiceNo: row.invoiceNo ?? '', party: row.party, description: row.description ?? '', grossAmount: String(row.grossAmount ?? ''), paymentMethod: (row.paymentMethod ?? '') as any, sphere: row.sphere, earmarkId: (typeof row.earmarkId === 'number' ? row.earmarkId : '') as any, budgetId: (typeof row.budgetId === 'number' ? row.budgetId : '') as any, autoPost: !!(row.autoPost ?? 0), voucherType: row.voucherType, tags: (row.tags || []) as string[] }, sourceRow: row }); setFormFiles([]); setFormError(''); setRequiredTouched(false) }
   function parseAmount(input: string): number | null { if (!input) return null; const s = input.replace(/\./g, '').replace(',', '.'); const n = Number(s); return isFinite(n) ? Math.round(n * 100) / 100 : null }
   async function saveForm() {
     if (!form) return
+    setRequiredTouched(true)
     setFormError('')
     const d = form.draft
     if (!d.date) { setFormError('Bitte Datum angeben'); return }
@@ -243,7 +245,8 @@ export default function InvoicesView() {
       const tagName = (target?.tagName || '').toLowerCase()
       const inEditable = !!(target && ((target as any).isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'))
       if (e.key === 'Escape') { setForm(null); e.preventDefault(); return }
-      if (e.key === 'Enter' && !e.shiftKey && inEditable && tagName !== 'textarea') { saveForm(); e.preventDefault(); return }
+      // Ctrl+S to save (no Enter save)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { saveForm(); e.preventDefault(); return }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (form.mode === 'create') fileInputRef.current?.click(); else editInvoiceFileInputRef.current?.click(); e.preventDefault(); return }
     }
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
@@ -399,9 +402,8 @@ export default function InvoicesView() {
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
                       <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
                       {remaining > 0 && r.status !== 'PAID' && (
-                        <button className="btn" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>
+                        <button className="btn" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }} style={{ background: 'var(--success)', color: '#fff' }}>{'€+'}</button>
                       )}
-                      <button className="btn danger" title="Löschen" onClick={() => setDeleteConfirm({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null })}>🗑</button>
                     </td>
                   </tr>
                 )
@@ -418,9 +420,10 @@ export default function InvoicesView() {
                 <option value={20}>20</option>
                 <option value={50}>50</option>
               </select>
-              <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))}>Zurück</button>
               <span className="helper">Seite {page} / {pages}</span>
-              <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)}>Weiter</button>
+              <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">⏮</button>
+              <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück">‹</button>
+              <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter">›</button>
             </div>
           </div>
         </>
@@ -460,25 +463,8 @@ export default function InvoicesView() {
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
-            <ModalHeader 
-              title="Rechnung löschen" 
-              subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`}
-              onClose={() => setDeleteConfirm(null)} 
-            />
-            <div>Diese Rechnung wirklich löschen?</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
-              <button className="btn danger" disabled={busyAction} onClick={() => deleteInvoice(deleteConfirm.id)}>Ja, löschen</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {form && createPortal(
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setForm(null)}>
+        <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal invoice-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10, width: 'min(1100px, 96vw)', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="card" style={{ padding: 10, display: 'grid', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -489,7 +475,6 @@ export default function InvoicesView() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {(() => { const missing: string[] = []; if (!form.draft.date) missing.push('Datum'); if (!form.draft.party?.trim()) missing.push('Partei'); const a = parseAmount(form.draft.grossAmount); if (a == null || a <= 0) missing.push('Betrag'); return missing.length ? (<span className="helper" style={{ whiteSpace: 'nowrap' }}>Fehlende Felder: {missing.join(', ')}</span>) : null })()}
                   {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
                   <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
                 </div>
@@ -513,7 +498,8 @@ export default function InvoicesView() {
                 </div>
                 <div className="field">
                   <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" />
+                  <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                  {requiredTouched && (!form.draft.party?.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Partei angeben</div>)}
                 </div>
                 <div className="field">
                   <label>Beschreibung</label>
@@ -521,8 +507,14 @@ export default function InvoicesView() {
                 </div>
                 <div className="field">
                   <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} aria-label="Rechnungsbetrag in Euro" />
-                  <div className="helper">{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : 'Bitte Betrag eingeben' })()}</div>
+                  <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label="Rechnungsbetrag in Euro" />
+                  {(() => {
+                    const a = parseAmount(form.draft.grossAmount)
+                    if (a != null && a > 0) {
+                      return <div className="helper">{eurFmt.format(a)}</div>
+                    }
+                    return null
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <div className="field" style={{ minWidth: 160 }}>
@@ -674,9 +666,15 @@ export default function InvoicesView() {
               const a = parseAmount(form!.draft.grossAmount)
               if (a == null || a <= 0) missing.push('Betrag')
               return (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-                  <button className="btn" onClick={() => setForm(null)}>Abbrechen (Esc)</button>
-                  <button className="btn primary" onClick={saveForm} disabled={missing.length > 0}>Speichern (Enter)</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {form.mode === 'edit' && form.draft.id && (
+                      <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
+                    )}
+                    <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
+                    <button className="btn primary" onClick={() => { setRequiredTouched(true); saveForm() }} disabled={missing.length > 0}>Speichern</button>
+                  </div>
                 </div>
               )
             })()}
@@ -821,6 +819,22 @@ export default function InvoicesView() {
           </div>
         </div>
       )}
+
+      {deleteConfirm && createPortal(
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+            <ModalHeader 
+              title="Rechnung löschen" 
+              subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`}
+              onClose={() => setDeleteConfirm(null)} 
+            />
+            <div>Diese Rechnung wirklich löschen?</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
+              <button className="btn danger" disabled={busyAction} onClick={() => { deleteInvoice(deleteConfirm.id); setForm(null) }}>Ja, löschen</button>
+            </div>
+          </div>
+        </div>, document.body)}
     </div>
   )
 }
