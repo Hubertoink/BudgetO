@@ -230,7 +230,15 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
           {labels.map((m, i) => {
             if (i % tickEvery !== 0 && i !== labels.length - 1) return null
             const x = xs(i, labels.length)
-            const label = isDaily ? String(m).slice(8,10) : (MONTH_NAMES[Math.max(0, Math.min(11, Number(String(m).slice(5)) - 1))] || String(m).slice(5))
+            let label: string
+            if (isDaily) {
+              label = String(m).slice(8,10)
+            } else {
+              // Check if multi-year range to include year in label
+              const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
+              const monthName = MONTH_NAMES[Math.max(0, Math.min(11, Number(String(m).slice(5)) - 1))] || String(m).slice(5)
+              label = yearSpan > 0 ? `${monthName} ${String(m).slice(0,4)}` : monthName
+            }
             return (
               <g key={m}>
                 <line x1={x} x2={x} y1={H-18} y2={H-14} stroke="var(--border)" />

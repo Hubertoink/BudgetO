@@ -232,7 +232,15 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           {/* X labels */}
           {labels.map((m,i)=>{
             if (i % tickEvery !== 0 && i !== labels.length - 1) return null
-            const label = isDaily ? m.slice(8, 10) : (MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5))
+            let label: string
+            if (isDaily) {
+              label = m.slice(8, 10)
+            } else {
+              // Check if multi-year range to include year in label
+              const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
+              const monthName = MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5)
+              label = yearSpan > 0 ? `${monthName} ${m.slice(0,4)}` : monthName
+            }
             return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{label}</text>
           })}
           {/* Hover guide only (tooltip rendered as HTML overlay) */}

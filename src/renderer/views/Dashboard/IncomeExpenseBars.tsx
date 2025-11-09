@@ -162,11 +162,14 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
             if (total > 48) tickEvery = 12
             else if (total > 24) tickEvery = 6
             else if (total > 12) tickEvery = 3
+            // Check if multi-year range to include year in label
+            const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
             return labels.map((m, i) => {
               if (i % tickEvery !== 0 && i !== labels.length - 1) return null
               const x = xs(i, labels.length)
-              const mon = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
-              return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
+              const monthName = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
+              const label = yearSpan > 0 ? `${monthName} ${m.slice(0,4)}` : monthName
+              return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{label}</text>
             })
           })()}
           {/* Hover guide */}
