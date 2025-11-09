@@ -114,7 +114,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const maxLine = Math.max(0, ...cumSeries)
   // Use the same scale for both bars and line
   const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
-  const W = 900, H = 260, P = 90
+  const W = 760, H = 260, P = 90
   const baseY = H - 28
   const maxH = baseY - 24
   const xs = (i: number, n: number) => {
@@ -190,14 +190,26 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     setHoverIdx(foundIdx)
   }
 
+  // Determine x-axis label thinning similar to BalanceAreaChart
+  let tickEvery = 1
+  if (isDaily) {
+    tickEvery = Math.max(1, Math.ceil(labels.length / 6))
+  } else {
+    const totalMonths = labels.length
+    if (totalMonths > 48) tickEvery = 12
+    else if (totalMonths > 24) tickEvery = 6
+    else if (totalMonths > 12) tickEvery = 3
+    else tickEvery = 1
+  }
+
   return (
-    <div className="card chart-card" style={{ overflow: 'hidden' }}>
-      <div className="chart-head">
+    <section className="card chart-card-overflow">
+      <header className="chart-header-baseline">
         <strong>{isDaily ? 'Tagesverlauf' : 'Monatsverlauf'} (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <span className="helper">{from} → {to}</span>
-      </div>
-      <div className="chart-canvas" style={{ overflow: 'hidden', position: 'relative' }}>
-  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatsverlauf">
+      </header>
+      <div className="chart-overflow-container">
+  <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Monatsverlauf">
           {/* Axes */}
           <line x1={P} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -219,18 +231,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
           {/* X labels */}
           {labels.map((m,i)=>{
-            if (isDaily) {
-              // Show every n-th day for daily view
-              const showEvery = labels.length > 15 ? Math.ceil(labels.length / 10) : labels.length > 7 ? 2 : 1
-              if (i % showEvery !== 0 && i !== labels.length - 1) return null
-              const day = m.slice(8, 10)
-              return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{day}</text>
-            } else {
-              // Show months for year view
-              if (labels.length > 24 && i % 2 !== 0) return null
-              const mon = MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5)
-              return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
-            }
+            if (i % tickEvery !== 0 && i !== labels.length - 1) return null
+            const label = isDaily ? m.slice(8, 10) : (MONTH_NAMES[Math.max(0, Math.min(11, Number(m.slice(5))-1))] || m.slice(5))
+            return <text key={m} x={xs(i, labels.length)} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{label}</text>
           })}
           {/* Hover guide only (tooltip rendered as HTML overlay) */}
           {hoverIdx != null && labels[hoverIdx] && (
@@ -272,8 +275,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             </div>
           )
         })()}
-        {loading && <div className="helper chart-loading">Laden…</div>}
+        {loading && <div className="helper chart-loading-overlay">Laden…</div>}
       </div>
-    </div>
+    </section>
   )
 }

@@ -68,6 +68,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const W = 760, H = 220, P = 72
   const xs = (i: number, n: number) => {
     const usable = W - 2 * P
+    if (n <= 1) return P + usable / 2 // center single point
     return P + (i * usable) / Math.max(1, n - 1)
   }
   const baseY = H - 28
@@ -154,14 +155,20 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
               </g>
             )
           })}
-          {/* X labels */}
-          {labels.map((m, i) => {
-            // Always show all months when <=12; if more (unlikely yearly) then thin out
-            if (labels.length > 14 && i % 2 !== 0) return null
-            const x = xs(i, labels.length)
-            const mon = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
-            return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
-          })}
+          {/* X labels with dynamic thinning (align with BalanceAreaChart) */}
+          {(() => {
+            let tickEvery = 1
+            const total = labels.length
+            if (total > 48) tickEvery = 12
+            else if (total > 24) tickEvery = 6
+            else if (total > 12) tickEvery = 3
+            return labels.map((m, i) => {
+              if (i % tickEvery !== 0 && i !== labels.length - 1) return null
+              const x = xs(i, labels.length)
+              const mon = monthNames[Math.max(0, Math.min(11, Number(m.slice(5)) - 1))] || m.slice(5)
+              return <text key={m} x={x} y={H-6} fill="var(--text-dim)" fontSize={11} textAnchor="middle">{mon}</text>
+            })
+          })()}
           {/* Hover guide */}
           {hoverIdx != null && labels[hoverIdx] && (
             <g>
