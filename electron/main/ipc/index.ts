@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
@@ -287,74 +287,187 @@ export function registerIpcHandlers() {
         </div>
     </div>
     <div class="card" style="margin-top:16px;">
-        <div class="title">Monatsverlauf (Saldo: IN − OUT)</div>
-        <div class="chart">
+        <div class="title">Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</div>
+        <div style="height:240px;">
             ${(() => {
-                    const max = Math.max(1, ...buckets.map((b: any) => Math.abs(b.gross)))
-                    const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                    return buckets.map((b: any) => {
-                        const frac = Math.abs(b.gross) / max
-                        const h = Math.max(10, Math.round(frac * 120))
-                        const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
-                        const mon = m[monIdx] || String(b.month).slice(5)
-                        const val = `${Number(b.gross).toFixed(2)} €`
-                        return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-                            <div class="small" style="color:#333">${val}</div>
-                            <div class=bar style="width:22px;height:${h}px" title="${mon} ${val}"></div>
-                            <div class=small>${mon}</div>
-                        </div>`
-                    }).join('')
-                })()}
+                // Dashboard-style chart with IN/OUT bars and cumulative saldo line
+                const W = 760, H = 220, P = 100
+                const baseY = H - 28
+                const maxH = baseY - 24
+                const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+                
+                // Build cumulative saldo
+                const cumSaldo: number[] = []
+                let run = 0
+                for (const b of detailed) { run += (Number(b.saldo) || 0); cumSaldo.push(run) }
+                
+                // Scale by max of bars and cumulative line
+                const maxBar = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
+                const minLine = Math.min(0, ...cumSaldo)
+                const maxLine = Math.max(0, ...cumSaldo)
+                const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
+                
+                const xs = (i: number, n: number) => {
+                    const usable = W - 2 * P
+                    const seg = usable / Math.max(1, n)
+                    return P + seg / 2 + i * seg
+                }
+                const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
+                const yLine = (v: number) => {
+                    const range = maxValue - (-maxValue)
+                    return 16 + ((maxValue - v) / range) * (baseY - 16)
+                }
+                
+                const barW = 12, gap = 8
+                
+                // Y-axis ticks
+                function niceStep(max: number) {
+                    if (max <= 0) return 1
+                    const exp = Math.floor(Math.log10(max))
+                    const base = Math.pow(10, exp)
+                    const m = max / base
+                    let step = base
+                    if (m <= 2) step = base / 5
+                    else if (m <= 5) step = base / 2
+                    const target = Math.max(1, Math.round(max / step))
+                    if (target > 8) step *= 2
+                    return step
+                }
+                const yStep = niceStep(maxValue)
+                const yTicks: number[] = []
+                for (let v = 0; v <= maxValue + 1e-9; v += yStep) yTicks.push(Math.round(v))
+                
+                const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
+                
+                // Bars
+                const bars = detailed.map((b: any, i: number) => {
+                    const xCenter = xs(i, detailed.length)
+                    const inV = Number(b.inGross) || 0
+                    const outV = Number(b.outGross) || 0
+                    const hIn = inV ? (baseY - yBar(inV)) : 0
+                    const hOut = outV ? (baseY - yBar(outV)) : 0
+                    return `<rect x="${xCenter - barW - gap/2}" y="${yBar(inV)}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
+                            <rect x="${xCenter + gap/2}" y="${yBar(outV)}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
+                }).join('')
+                
+                // Cumulative line
+                const linePts = cumSaldo.map((v, i) => `${xs(i, detailed.length)},${yLine(v)}`).join(' ')
+                
+                // X labels (thinned out for readability)
+                let tickEvery = 1
+                const total = detailed.length
+                if (total > 48) tickEvery = 12
+                else if (total > 24) tickEvery = 6
+                else if (total > 12) tickEvery = 3
+                
+                const xLabels = detailed.map((b: any, i: number) => {
+                    if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
+                    const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
+                    const mon = m[monIdx] || String(b.month).slice(5)
+                    return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
+                }).join('')
+                
+                // Y grid + labels
+                const yGrid = yTicks.map(v => {
+                    return `<line x1="${P}" x2="${W-P/2}" y1="${yBar(v)}" y2="${yBar(v)}" stroke="#ddd" opacity="0.5"/>
+                            <text x="${P-6}" y="${yBar(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
+                }).join('')
+                
+                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+                    <line x1="${P}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
+                    <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
+                    ${yGrid}
+                    ${bars}
+                    <polyline points="${linePts}" fill="none" stroke="#f9a825" stroke-width="2"/>
+                    ${xLabels}
+                </svg>`
+            })()}
         </div>
     </div>
 
     <div class="card" style="margin-top:16px;">
-        <div class="title">Verlaufslinie (IN / OUT / Saldo)</div>
-        <div class="line-wrap">
+        <div class="title">Einnahmen vs. Ausgaben</div>
+        <div style="height:220px;">
             ${(() => {
-                // Accurate line chart from detailed series
-                const W = 760, H = 220, P = 28
-                const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
-                const maxAbs = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0, Math.abs(Number(b.saldo)||0))))
-                const ys = (v: number) => H/2 - (v / maxAbs) * (H/2 - 16)
-                const ptsIn: string[] = []
-                const ptsOut: string[] = []
-                const ptsNet: string[] = []
+                // Dashboard-style Income vs Expense chart
+                const W = 760, H = 200, P = 100
+                const baseY = H - 28
+                const maxH = baseY - 16
                 const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                const labels: string[] = []
-                detailed.forEach((b: any, i: number) => {
-                    const x = xs(i, detailed.length)
-                    const inV = Number(b.inGross)||0
-                    const outV = Number(b.outGross)||0
-                    const netV = Number(b.saldo)||0
-                    const yIn = ys(inV)
-                    const yOut = ys(-outV)
-                    const yNet = ys(netV)
-                    ptsIn.push(`${x},${yIn}`)
-                    ptsOut.push(`${x},${yOut}`)
-                    ptsNet.push(`${x},${yNet}`)
+                
+                const maxVal = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
+                
+                const xs = (i: number, n: number) => {
+                    const usable = W - 2 * P
+                    const seg = usable / Math.max(1, n)
+                    return P + seg / 2 + i * seg
+                }
+                const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
+                
+                const barW = 10, gap = 5
+                
+                // Y-axis ticks
+                function niceStep(max: number) {
+                    if (max <= 0) return 1
+                    const exp = Math.floor(Math.log10(max))
+                    const base = Math.pow(10, exp)
+                    const m = max / base
+                    let step = base
+                    if (m <= 2) step = base / 5
+                    else if (m <= 5) step = base / 2
+                    const target = Math.max(1, Math.round(max / step))
+                    if (target > 8) step *= 2
+                    return step
+                }
+                const yStep = niceStep(maxVal)
+                const yTicks: number[] = []
+                for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
+                
+                const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
+                
+                // Bars
+                const bars = detailed.map((b: any, i: number) => {
+                    const xCenter = xs(i, detailed.length)
+                    const inV = Number(b.inGross) || 0
+                    const outV = Number(b.outGross) || 0
+                    const hIn = Math.round((inV / maxVal) * maxH)
+                    const hOut = Math.round((outV / maxVal) * maxH)
+                    return `<rect x="${xCenter - barW * 1.5 - gap}" y="${baseY - hIn}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
+                            <rect x="${xCenter - barW / 2}" y="${baseY - hOut}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
+                }).join('')
+                
+                // X labels (thinned out for readability)
+                let tickEvery = 1
+                const total = detailed.length
+                if (total > 48) tickEvery = 12
+                else if (total > 24) tickEvery = 6
+                else if (total > 12) tickEvery = 3
+                
+                const xLabels = detailed.map((b: any, i: number) => {
+                    if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
                     const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
                     const mon = m[monIdx] || String(b.month).slice(5)
-                    labels.push(`
-                        <text class="lbl" x="${x}" y="${H-6}" text-anchor="middle">${mon}</text>
-                        <text class="lbl" x="${x}" y="${yIn - 6}" text-anchor="middle" fill="#4CC38A">${inV.toFixed(0)}€</text>
-                        <text class="lbl" x="${x}" y="${yOut + 12}" text-anchor="middle" fill="#F06A6A">${outV.toFixed(0)}€</text>
-                        <text class="lbl" x="${x}" y="${yNet - 6}" text-anchor="middle" fill="#6AA6FF">${netV.toFixed(0)}€</text>
-                    `)
-                })
-                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
-                    <line class="axis" x1="0" y1="${H/2}" x2="${W}" y2="${H/2}"/>
-                    <polyline class="stroke-in" points="${ptsIn.join(' ')}"/>
-                    <polyline class="stroke-out" points="${ptsOut.join(' ')}"/>
-                    <polyline class="stroke-net" points="${ptsNet.join(' ')}"/>
-                    ${labels.join('')}
+                    return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
+                }).join('')
+                
+                // Y grid + labels
+                const yGrid = yTicks.map(v => {
+                    return `<line x1="${P}" x2="${W-P/2}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#ddd" opacity="0.5"/>
+                            <text x="${P-6}" y="${yFor(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
+                }).join('')
+                
+                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+                    <line x1="${P/2}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
+                    <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
+                    ${yGrid}
+                    ${bars}
+                    ${xLabels}
                 </svg>`
             })()}
         </div>
-        <div class="legend" style="margin-top:8px;">
-            <span class="legend-item"><span class="sw" style="background:#4CC38A"></span>IN</span>
-            <span class="legend-item"><span class="sw" style="background:#F06A6A"></span>OUT</span>
-            <span class="legend-item"><span class="sw" style="background:#6AA6FF"></span>SALDO</span>
+        <div style="margin-top:8px; font-size:12px; color:#666;">
+            <span style="display:inline-block; margin-right:12px;"><span style="display:inline-block; width:10px; height:10px; background:#2e7d32; border-radius:2px; margin-right:4px;"></span>Einnahmen</span>
+            <span style="display:inline-block; margin-right:12px;"><span style="display:inline-block; width:10px; height:10px; background:#c62828; border-radius:2px; margin-right:4px;"></span>Ausgaben</span>
         </div>
     </div>
 
@@ -458,6 +571,22 @@ export function registerIpcHandlers() {
             fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
             return ReportsExportOutput.parse({ filePath })
         }
+    })
+
+    ipcMain.handle('reports.exportFiscal', async (_e, payload) => {
+        const parsed = FiscalReportInput.parse(payload)
+        const { generateFiscalReportPDF } = await import('../services/fiscalReport')
+        const from = `${parsed.fiscalYear}-01-01`
+        const to = `${parsed.fiscalYear}-12-31`
+        const result = await generateFiscalReportPDF({
+            fiscalYear: parsed.fiscalYear,
+            from,
+            to,
+            includeBindings: parsed.includeBindings ?? false,
+            includeVoucherList: parsed.includeVoucherList ?? false,
+            orgName: parsed.orgName
+        })
+        return FiscalReportOutput.parse(result)
     })
 
     ipcMain.handle('vouchers.list', async (_e, payload) => {

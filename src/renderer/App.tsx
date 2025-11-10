@@ -199,6 +199,10 @@ function AppInner() {
     const [exportOrgName, setExportOrgName] = useState<string>('')
     const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
     const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
+    const [exportType, setExportType] = useState<'standard' | 'fiscal'>('standard')
+    const [fiscalYear, setFiscalYear] = useState<number>(new Date().getFullYear())
+    const [includeBindings, setIncludeBindings] = useState<boolean>(false)
+    const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -1019,26 +1023,50 @@ function AppInner() {
                     setSortDir={setExportSortDir}
                     dateFrom={from}
                     dateTo={to}
+                    exportType={exportType}
+                    setExportType={setExportType}
+                    fiscalYear={fiscalYear}
+                    setFiscalYear={setFiscalYear}
+                    includeBindings={includeBindings}
+                    setIncludeBindings={setIncludeBindings}
+                    includeVoucherList={includeVoucherList}
+                    setIncludeVoucherList={setIncludeVoucherList}
                     onExport={async (fmt) => {
                         try {
-                            const res = await window.api?.reports.export?.({
-                                type: 'JOURNAL',
-                                format: fmt,
-                                from: from || '',
-                                to: to || '',
-                                filters: { paymentMethod: filterPM || undefined, sphere: filterSphere || undefined, type: filterType || undefined },
-                                fields: exportFields,
-                                orgName: exportOrgName || undefined,
-                                amountMode: exportAmountMode,
-                                sort: exportSortDir,
-                                sortBy: 'date'
-                            } as any)
-                            if (res) {
-                                const dir = res.filePath?.replace(/\\[^\\/]+$/,'').replace(/\/[^^/]+$/, '') || ''
-                                notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
-                                    label: 'Ordner öffnen',
-                                    onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                            if (fmt === 'PDF_FISCAL') {
+                                // Fiscal year report for tax office
+                                const res = await (window as any).api?.reports?.exportFiscal?.({
+                                    fiscalYear,
+                                    includeBindings,
+                                    includeVoucherList,
+                                    orgName: exportOrgName || undefined
                                 })
+                                if (res) {
+                                    notify('success', `Finanzamt-Report exportiert: ${res.filePath}`, 6000, {
+                                        label: 'Ordner öffnen',
+                                        onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                                    })
+                                }
+                            } else {
+                                // Standard export
+                                const res = await window.api?.reports.export?.({
+                                    type: 'JOURNAL',
+                                    format: fmt,
+                                    from: from || '',
+                                    to: to || '',
+                                    filters: { paymentMethod: filterPM || undefined, sphere: filterSphere || undefined, type: filterType || undefined },
+                                    fields: exportFields,
+                                    orgName: exportOrgName || undefined,
+                                    amountMode: exportAmountMode,
+                                    sort: exportSortDir,
+                                    sortBy: 'date'
+                                } as any)
+                                if (res) {
+                                    notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
+                                        label: 'Ordner öffnen',
+                                        onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                                    })
+                                }
                             }
                             setShowExportOptions(false)
                         } catch (e: any) {

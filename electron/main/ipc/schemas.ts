@@ -81,6 +81,17 @@ export const ReportsExportInput = z.object({
 
 export const ReportsExportOutput = z.object({ filePath: z.string() })
 
+// Fiscal report for tax office (Finanzamt)
+export const FiscalReportInput = z.object({
+    fiscalYear: z.number(),
+    includeBindings: z.boolean().optional(),
+    includeVoucherList: z.boolean().optional(),
+    orgName: z.string().optional()
+})
+export const FiscalReportOutput = z.object({ filePath: z.string() })
+export type TFiscalReportInput = z.infer<typeof FiscalReportInput>
+export type TFiscalReportOutput = z.infer<typeof FiscalReportOutput>
+
 // Years with vouchers present
 export const ReportsYearsOutput = z.object({ years: z.array(z.number()) })
 export type TReportsYearsOutput = z.infer<typeof ReportsYearsOutput>
