@@ -164,7 +164,32 @@ export default function QuickAddModal({
                                         <div className="field">
                                             <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <div className="flex-gap-8">
-                                                <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })} aria-label="Netto oder Brutto Modus">
+                                                <select
+                                                    className="input"
+                                                    value={(qa as any).mode ?? 'NET'}
+                                                    onChange={(e) => {
+                                                        const newMode = e.target.value as 'NET' | 'GROSS'
+                                                        const next = { ...qa, mode: newMode } as any
+                                                        if (newMode === 'NET') {
+                                                            // Falls kein Netto gesetzt ist, aus Brutto übernehmen
+                                                            if (next.netAmount == null || isNaN(next.netAmount)) {
+                                                                if (typeof next.grossAmount === 'number') next.netAmount = next.grossAmount
+                                                                else next.netAmount = 0
+                                                            }
+                                                            // Wenn bisher vatRate=0 (vom Brutto-Modus), setze Standard auf 19%
+                                                            if (Number(next.vatRate) === 0) next.vatRate = 19
+                                                        } else if (newMode === 'GROSS') {
+                                                            // Wechsel zu Brutto: vatRate immer 0, Brutto ggf. aus Netto berechnen
+                                                            if (typeof next.netAmount === 'number' && (next.grossAmount == null || isNaN(next.grossAmount))) {
+                                                                const rate = Number(next.vatRate) || 0
+                                                                next.grossAmount = Math.round((next.netAmount * (1 + rate / 100)) * 100) / 100
+                                                            }
+                                                            next.vatRate = 0
+                                                        }
+                                                        setQa(next)
+                                                    }}
+                                                    aria-label="Netto oder Brutto Modus"
+                                                >
                                                     <option value="NET">Netto</option>
                                                     <option value="GROSS">Brutto</option>
                                                 </select>
@@ -184,7 +209,16 @@ export default function QuickAddModal({
                                         {(qa as any).mode === 'NET' && (
                                             <div className="field">
                                                 <label>USt %</label>
-                                                <input className="input" type="number" step="0.1" value={qa.vatRate} onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })} aria-label="Umsatzsteuer Prozentsatz" />
+                                                <select
+                                                    className="input"
+                                                    value={String(qa.vatRate)}
+                                                    onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })}
+                                                    aria-label="Umsatzsteuer Prozentsatz"
+                                                >
+                                                    <option value="0">0% (steuerfrei)</option>
+                                                    <option value="7">7%</option>
+                                                    <option value="19">19%</option>
+                                                </select>
                                             </div>
                                         )}
                                     </>

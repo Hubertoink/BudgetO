@@ -34,11 +34,12 @@ export function useQuickAdd(
         date: today, 
         type: 'IN', 
         sphere: 'IDEELL', 
-        grossAmount: 100, 
-        vatRate: 19, 
+        // Standard = BRUTTO laut Anforderung
+        mode: 'GROSS',
+        grossAmount: 100,
+        vatRate: 0, 
         description: '', 
-        paymentMethod: 'BAR', 
-        mode: 'GROSS' 
+        paymentMethod: 'BAR'
     })
     const [files, setFiles] = useState<File[]>([])
 
@@ -76,8 +77,15 @@ export function useQuickAdd(
             payload.transferTo = undefined
         }
         
-        if (qa.mode === 'GROSS') payload.grossAmount = qa.grossAmount ?? 0
-        else payload.netAmount = qa.netAmount ?? 0
+        if (qa.mode === 'GROSS') {
+            payload.grossAmount = qa.grossAmount ?? 0
+            payload.vatRate = 0 // Brutto immer ohne Aufteilung
+            delete payload.netAmount
+        } else {
+            payload.netAmount = qa.netAmount ?? 0
+            // vatRate bleibt (0/7/19)
+            delete payload.grossAmount
+        }
         
         if (typeof (qa as any).earmarkId === 'number') payload.earmarkId = (qa as any).earmarkId
         if (typeof (qa as any).budgetId === 'number') payload.budgetId = (qa as any).budgetId
@@ -107,11 +115,11 @@ export function useQuickAdd(
                 date: today, 
                 type: 'IN', 
                 sphere: 'IDEELL', 
-                grossAmount: 100, 
-                vatRate: 19, 
+                mode: 'GROSS',
+                grossAmount: 100,
+                vatRate: 0, 
                 description: '', 
-                paymentMethod: 'BAR', 
-                mode: 'GROSS' 
+                paymentMethod: 'BAR'
             })
         }
     }

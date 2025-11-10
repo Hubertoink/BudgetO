@@ -470,7 +470,8 @@ export default function JournalView({
                         fmtDate={fmtDate}
                         onEdit={(r) => setEditRow({
                             ...r,
-                            mode: (r as any).grossAmount != null ? 'GROSS' : 'NET',
+                            // Modus-Inferenz: Wenn Netto-Betrag gespeichert wurde (>0) => NETTO, sonst BRUTTO
+                            mode: ((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS',
                             netAmount: (r as any).netAmount ?? null,
                             grossAmount: (r as any).grossAmount ?? null,
                             vatRate: (r as any).vatRate ?? 0
@@ -573,7 +574,7 @@ export default function JournalView({
                                     }
                                     if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
                                         payload.grossAmount = Number((editRow as any).grossAmount)
-                                        if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
+                                        payload.vatRate = 0 // Bei Brutto keine MwSt-Aufschlüsselung
                                     } else if ((editRow as any).mode === 'NET' && (editRow as any).netAmount != null && (editRow as any).netAmount !== '') {
                                         payload.netAmount = Number((editRow as any).netAmount)
                                         if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
@@ -710,7 +711,11 @@ export default function JournalView({
                                                     {(editRow as any).mode === 'NET' && (
                                                         <div className="field">
                                                             <label>USt %</label>
-                                                            <input className="input" type="number" step="0.1" value={(editRow as any).vatRate ?? 0} onChange={(e) => setEditRow({ ...(editRow as any), vatRate: Number(e.target.value) } as any)} />
+                                                            <select className="input" value={(editRow as any).vatRate ?? 19} onChange={(e) => setEditRow({ ...(editRow as any), vatRate: Number(e.target.value) } as any)}>
+                                                                <option value="0">0% (steuerfrei)</option>
+                                                                <option value="7">7% (ermäßigt)</option>
+                                                                <option value="19">19% (Regelsteuersatz)</option>
+                                                            </select>
                                                         </div>
                                                     )}
                                                 </>

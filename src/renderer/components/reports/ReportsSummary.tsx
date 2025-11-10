@@ -62,21 +62,17 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                   <div style={{ fontWeight: 600, color: '#c62828' }}>{eurFmt.format(outSum)}</div>
                 </div>
                 <div className="card" style={{ padding: 10 }}>
-                  <div className="helper">Netto</div>
+                  <div className="helper">Saldo</div>
                   <div style={{ fontWeight: 600, color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
                 </div>
                 <div className="card" style={{ padding: 10 }}>
-                  <div className="helper">Ø Netto/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
+                  <div className="helper">Ø Saldo/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
                   <div style={{ fontWeight: 600 }}>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
                 </div>
               </div>
             )
           })()}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <div><div className="helper">Netto</div><div>{eurFmt.format(data.totals.net)}</div></div>
-            <div><div className="helper">MwSt</div><div>{eurFmt.format(data.totals.vat)}</div></div>
-            <div><div className="helper">Brutto</div><div>{eurFmt.format(data.totals.gross)}</div></div>
-          </div>
+          {/* Netto/MwSt/Brutto totals row intentionally removed per UI simplification */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div>
               <strong>Nach Sphäre</strong>
