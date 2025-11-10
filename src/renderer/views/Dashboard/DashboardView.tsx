@@ -365,6 +365,24 @@ function DashboardRecentActivity() {
     const a = String(row.action || '').toUpperCase()
     const e = String(row.entity || '')
     const d = row.diff || {}
+    
+    // Handle batch assignments
+    if (a === 'BATCH_ASSIGN_EARMARK') {
+      const count = d.count || 0
+      const earmarkLabel = d.earmarkCode ? `${d.earmarkCode} – ${d.earmarkName || ''}` : `#${d.earmarkId}`
+      return { title: `Batch-Zuweisung: ${count} Buchung(en)`, details: `Zweckbindung: ${earmarkLabel}`, tone: 'ok' }
+    }
+    if (a === 'BATCH_ASSIGN_BUDGET') {
+      const count = d.count || 0
+      const budgetLabel = d.budgetLabel || `#${d.budgetId}`
+      return { title: `Batch-Zuweisung: ${count} Buchung(en)`, details: `Budget: ${budgetLabel}`, tone: 'ok' }
+    }
+    if (a === 'BATCH_ASSIGN_TAGS') {
+      const count = d.count || 0
+      const tags = Array.isArray(d.tags) ? d.tags.join(', ') : String(d.tags || '')
+      return { title: `Batch-Zuweisung: ${count} Buchung(en)`, details: `Tags: ${tags}`, tone: 'ok' }
+    }
+    
     if (e === 'vouchers') {
       if (a === 'CREATE') {
         const v = d.data || {}
@@ -380,20 +398,43 @@ function DashboardRecentActivity() {
           const f = fmt ? fmt(from) : String(from ?? '—')
           const t = fmt ? fmt(to) : String(to ?? '—')
           if (f === t) return
-          const nameMap: Record<string,string> = { grossAmount: 'Brutto', netAmount: 'Netto', vatRate: 'USt%', paymentMethod: 'Zahlweg', description: 'Beschreibung', date: 'Datum', sphere: 'Sphäre', type: 'Art', earmarkId: 'Zweckbindung', budgetId: 'Budget' }
+          const nameMap: Record<string,string> = { 
+            grossAmount: 'Brutto', 
+            netAmount: 'Netto', 
+            vatRate: 'USt%', 
+            paymentMethod: 'Zahlweg', 
+            description: 'Beschreibung', 
+            date: 'Datum', 
+            sphere: 'Sphäre', 
+            type: 'Art', 
+            earmarkId: 'Zweckbindung', 
+            budgetId: 'Budget',
+            tags: 'Tags'
+          }
           const nm = nameMap[k] || k
           changes.push(`${nm}: ${f} → ${t}`)
         }
-  // Prioritize description so it shows up in the first 1-3 details
-  add('description', d.before?.description, d.after?.description)
-  add('date', d.before?.date, d.after?.date)
-  add('type', d.before?.type, d.after?.type)
+        // Prioritize description so it shows up in the first 1-3 details
+        add('description', d.before?.description, d.after?.description)
+        add('date', d.before?.date, d.after?.date)
+        add('type', d.before?.type, d.after?.type)
         add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod)
         add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
         add('sphere', d.before?.sphere, d.after?.sphere)
         add('earmarkId', d.before?.earmarkId, d.after?.earmarkId)
         add('budgetId', d.before?.budgetId, d.after?.budgetId)
+        
+        // Handle tags changes
+        if (d.before?.tags || d.after?.tags) {
+          const tagsB = Array.isArray(d.before?.tags) ? d.before.tags : []
+          const tagsA = Array.isArray(d.after?.tags) ? d.after.tags : []
+          const added = tagsA.filter((t: string) => !tagsB.includes(t))
+          const removed = tagsB.filter((t: string) => !tagsA.includes(t))
+          if (added.length > 0) changes.push(`Tags hinzugefügt: ${added.join(', ')}`)
+          if (removed.length > 0) changes.push(`Tags entfernt: ${removed.join(', ')}`)
+        }
+        
         if (changes.length === 0) changes.push('Felder aktualisiert')
         return { title: `Beleg #${row.entityId} geändert`, details: changes.slice(0, 3).join(' · '), tone: 'ok' }
       }
@@ -459,7 +500,14 @@ function DashboardRecentActivity() {
       <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
         {rows.map((r: any) => {
           const info = describe(r)
-          const tsAct = r.createdAt ? String(r.createdAt).replace('T', ' ').slice(0, 16) : '—'
+          // Convert UTC timestamp to local time
+          const tsAct = r.createdAt ? new Date(r.createdAt).toLocaleString('de-DE', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }).replace(',', '') : '—'
           const recDateRaw = r.recordDate ? String(r.recordDate).slice(0, 10) : null
           const color = info.tone === 'err' ? 'var(--danger)' : info.tone === 'warn' ? '#f9a825' : 'var(--accent)'
           return (

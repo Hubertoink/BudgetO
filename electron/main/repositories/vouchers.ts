@@ -423,7 +423,22 @@ export function batchAssignEarmark(params: {
     if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
 
     const res = d.prepare(`UPDATE vouchers SET earmark_id = ?${whereSql}`).run(params.earmarkId, ...args)
-    return { updated: Number(res.changes || 0) }
+    const updated = Number(res.changes || 0)
+    
+    // Log batch assignment to audit
+    if (updated > 0) {
+        const earmarkInfo = d.prepare('SELECT code, name FROM earmarks WHERE id=?').get(params.earmarkId) as any
+        writeAudit(
+            d,
+            null,
+            'VOUCHER',
+            0,
+            'BATCH_ASSIGN_EARMARK',
+            { earmarkId: params.earmarkId, earmarkCode: earmarkInfo?.code, earmarkName: earmarkInfo?.name, count: updated, filters: params }
+        )
+    }
+    
+    return { updated }
 }
 
 // Batch-assign a budgetId to vouchers matching filters
@@ -457,7 +472,22 @@ export function batchAssignBudget(params: {
     const b = d.prepare('SELECT id FROM budgets WHERE id=?').get(params.budgetId) as any
     if (!b) throw new Error('Budget nicht gefunden')
     const res = d.prepare(`UPDATE vouchers SET budget_id = ?${whereSql}`).run(params.budgetId, ...args)
-    return { updated: Number(res.changes || 0) }
+    const updated = Number(res.changes || 0)
+    
+    // Log batch assignment to audit
+    if (updated > 0) {
+        const budgetInfo = d.prepare('SELECT label FROM budgets WHERE id=?').get(params.budgetId) as any
+        writeAudit(
+            d,
+            null,
+            'VOUCHER',
+            0,
+            'BATCH_ASSIGN_BUDGET',
+            { budgetId: params.budgetId, budgetLabel: budgetInfo?.label, count: updated, filters: params }
+        )
+    }
+    
+    return { updated }
 }
 
 // Batch-assign tags to vouchers matching filters (adds tags, does not remove existing)
@@ -514,6 +544,19 @@ export function batchAssignTags(params: {
     }
     // updated = number of vouchers touched (approximate: unique vids with at least one insert)
     const updated = ids.length
+    
+    // Log batch assignment to audit
+    if (updated > 0) {
+        writeAudit(
+            d,
+            null,
+            'VOUCHER',
+            0,
+            'BATCH_ASSIGN_TAGS',
+            { tags: params.tags, count: updated, filters: params }
+        )
+    }
+    
     return { updated }
 }
 

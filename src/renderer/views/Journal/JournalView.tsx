@@ -514,12 +514,15 @@ export default function JournalView({
                         tagDefs={tagDefs}
                         budgets={budgetsForEdit}
                         currentFilters={{
-                            paymentMethod: filterPM || undefined,
-                            sphere: filterSphere || undefined,
-                            type: filterType || undefined,
-                            from: from || undefined,
-                            to: to || undefined,
-                            q: q || undefined,
+                            paymentMethod: activeFilterPM || undefined,
+                            sphere: activeFilterSphere || undefined,
+                            type: activeFilterType || undefined,
+                            from: activeFrom || undefined,
+                            to: activeTo || undefined,
+                            q: activeQ || undefined,
+                            earmarkId: activeFilterEarmark || undefined,
+                            budgetId: activeFilterBudgetId || undefined,
+                            tag: activeFilterTag || undefined,
                         }}
                         onApplied={async (updated) => {
                             notify('success', `${updated} Buchung(en) aktualisiert`)
