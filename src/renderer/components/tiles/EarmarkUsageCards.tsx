@@ -95,7 +95,9 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                 <span title="Zeitraum">🗓 {fmtDate(startDate)} – {fmtDate(endDate)}</span>
               )}
               {(totalCount != null) && (
-                <span title="Zugeordnete Buchungen">📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
+                <span title="Zugeordnete Buchungen">
+                  📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · (außerhalb: ${outsideCount})` : ''}
+                </span>
               )}
             </div>
             {budget > 0 && (

@@ -61,8 +61,9 @@ export function createVoucher(input: {
             const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate FROM earmarks WHERE id=?').get(input.earmarkId) as any
             if (!em) throw new Error('Zweckbindung nicht gefunden')
             if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-            if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-            if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+            // Zeitraum-Prüfung entfernt - User kann außerhalb liegende Buchungen zuordnen
+            // if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+            // if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
 
             // Negative-balance protection
             const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
@@ -765,8 +766,9 @@ export function updateVoucher(input: {
         const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, budget FROM earmarks WHERE id=?').get(newEarmarkId) as any
         if (!em) throw new Error('Zweckbindung nicht gefunden')
         if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-        if (em.startDate && newDate < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-        if (em.endDate && newDate > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+        // Zeitraum-Prüfung entfernt - User kann außerhalb liegende Buchungen zuordnen
+        // if (em.startDate && newDate < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+        // if (em.endDate && newDate > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
 
         const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
         if (!cfg.allowNegative && newType === 'OUT') {

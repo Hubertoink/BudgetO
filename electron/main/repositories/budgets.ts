@@ -80,19 +80,17 @@ export function deleteBudget(id: number) {
 
 export function budgetUsage(input: { budgetId: number; from?: string; to?: string }) {
     const d = getDb()
-    const wh: string[] = ['budget_id = ?']
-    const vals: any[] = [input.budgetId]
-    if (input.from) { wh.push('date >= ?'); vals.push(input.from) }
-    if (input.to) { wh.push('date <= ?'); vals.push(input.to) }
-    const whereSql = ' WHERE ' + wh.join(' AND ')
+    // Berechnung: ALLE Buchungen mit diesem Budget (unabhängig von from/to Parameter)
+    // Der from/to Parameter wird nur für Dashboard-Zeitfilter verwendet, aber
+    // Budget-Ausgaben sollen IMMER alle zugeordneten Buchungen einbeziehen
     const row = d.prepare(`
         SELECT
           IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END), 0) as spent,
           IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END), 0) as inflow,
           COUNT(1) as count,
           MAX(date) as lastDate
-        FROM vouchers${whereSql}
-    `).get(...vals) as any
+        FROM vouchers WHERE budget_id = ?
+    `).get(input.budgetId) as any
     // Counts inside/outside relative to budget's own date range
     const meta = d.prepare(`SELECT start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
     const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE budget_id=?`).get(input.budgetId) as any

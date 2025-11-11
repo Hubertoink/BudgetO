@@ -92,7 +92,9 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                   <span title="Zeitraum">🗓 {fmtDate(startDate)} – {fmtDate(endDate)}</span>
                 )}
                 {(totalCount > 0 || usage[b.id]?.count != null) && (
-                  <span title="Zugeordnete Buchungen">📄 {totalCount || usage[b.id]?.count || 0}{outsideCount > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
+                  <span title="Zugeordnete Buchungen">
+                    📄 {totalCount || usage[b.id]?.count || 0}{outsideCount > 0 ? ` · (außerhalb: ${outsideCount})` : ''}
+                  </span>
                 )}
               </div>
               {plan > 0 && (
