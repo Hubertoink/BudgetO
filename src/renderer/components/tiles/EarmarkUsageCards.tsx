@@ -25,6 +25,7 @@ export interface EarmarkUsageCardBinding {
   budget?: number | null
   startDate?: string | null
   endDate?: string | null
+  enforceTimeRange?: number
 }
 
 export interface EarmarkUsageCardsProps {
@@ -77,7 +78,10 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
               <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-              <span className="helper" style={{ fontWeight: 600 }}>{b.name}</span>
+              <span className="helper" style={{ fontWeight: 600, flex: 1 }}>{b.name}</span>
+              {!!b.enforceTimeRange && (
+                <span title="Strikter Zeitraum aktiv" style={{ fontSize: '1.2em' }}>🔒</span>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
               <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>

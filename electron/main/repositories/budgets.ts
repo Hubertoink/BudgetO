@@ -11,12 +11,12 @@ export type BudgetKey = {
     earmarkId?: number | null
 }
 
-export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amountPlanned: number } & { name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null }) {
+export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amountPlanned: number } & { name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: boolean }) {
     return withTransaction((d: DB) => {
         if (input.id != null) {
             // Update by explicit id
             d.prepare(
-                `UPDATE budgets SET year=?, sphere=?, category_id=?, project_id=?, earmark_id=?, amount_planned=?, name=?, category_name=?, project_name=?, start_date=?, end_date=?, color=? WHERE id=?`
+                `UPDATE budgets SET year=?, sphere=?, category_id=?, project_id=?, earmark_id=?, amount_planned=?, name=?, category_name=?, project_name=?, start_date=?, end_date=?, color=?, enforce_time_range=? WHERE id=?`
             ).run(
                 input.year,
                 input.sphere,
@@ -30,6 +30,7 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
                 input.startDate ?? null,
                 input.endDate ?? null,
                 input.color ?? null,
+                (input.enforceTimeRange ?? false) ? 1 : 0,
                 input.id
             )
             return { id: input.id, updated: true }
@@ -37,7 +38,7 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
             // Insert a new budget row
             const info = d
                 .prepare(
-                    `INSERT INTO budgets(year, sphere, category_id, project_id, earmark_id, amount_planned, name, category_name, project_name, start_date, end_date, color) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+                    `INSERT INTO budgets(year, sphere, category_id, project_id, earmark_id, amount_planned, name, category_name, project_name, start_date, end_date, color, enforce_time_range) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
                 )
                 .run(
                     input.year,
@@ -51,7 +52,8 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
                     input.projectName ?? null,
                     input.startDate ?? null,
                     input.endDate ?? null,
-                    input.color ?? null
+                    input.color ?? null,
+                    (input.enforceTimeRange ?? false) ? 1 : 0
                 )
             return { id: Number(info.lastInsertRowid), created: true }
         }
@@ -67,7 +69,7 @@ export function listBudgets(params: { year?: number; sphere?: 'IDEELL' | 'ZWECK'
     if (params.earmarkId !== undefined) { wh.push('IFNULL(earmark_id,-1) = IFNULL(?, -1)'); vals.push(params.earmarkId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const rows = d.prepare(`SELECT id, year, sphere, category_id as categoryId, project_id as projectId, earmark_id as earmarkId, amount_planned as amountPlanned,
-        name, category_name as categoryName, project_name as projectName, start_date as startDate, end_date as endDate, color
+        name, category_name as categoryName, project_name as projectName, start_date as startDate, end_date as endDate, color, enforce_time_range as enforceTimeRange
         FROM budgets${whereSql} ORDER BY year DESC, sphere`).all(...vals) as any[]
     return rows
 }

@@ -16,6 +16,7 @@ type Budget = {
   startDate?: string | null
   endDate?: string | null
   color?: string | null
+  enforceTimeRange?: number
 }
 
 type BudgetEdit = {
@@ -32,6 +33,7 @@ type BudgetEdit = {
   startDate?: string | null
   endDate?: string | null
   color?: string | null
+  enforceTimeRange?: number
 }
 
 export default function BudgetsView({
@@ -78,7 +80,8 @@ export default function BudgetsView({
                 amountPlanned: 0,
                 categoryId: null,
                 projectId: null,
-                earmarkId: null
+                earmarkId: null,
+                enforceTimeRange: 0
               })
             }
           >
@@ -144,7 +147,8 @@ export default function BudgetsView({
                         projectName: b.projectName ?? null,
                         startDate: b.startDate ?? null,
                         endDate: b.endDate ?? null,
-                        color: b.color ?? null
+                        color: b.color ?? null,
+                        enforceTimeRange: b.enforceTimeRange ?? 0
                       })
                     }
                   >
@@ -182,7 +186,8 @@ export default function BudgetsView({
             projectName: b.projectName ?? null,
             startDate: b.startDate ?? null,
             endDate: b.endDate ?? null,
-            color: b.color ?? null
+            color: b.color ?? null,
+            enforceTimeRange: b.enforceTimeRange ?? 0
           })
         }
         onGoToBookings={onGoToBookings}

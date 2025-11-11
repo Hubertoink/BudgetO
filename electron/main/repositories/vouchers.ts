@@ -58,12 +58,15 @@ export function createVoucher(input: {
 
         // Earmark validations (if provided)
         if (input.earmarkId != null) {
-            const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate FROM earmarks WHERE id=?').get(input.earmarkId) as any
+            const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(input.earmarkId) as any
             if (!em) throw new Error('Zweckbindung nicht gefunden')
             if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-            // Zeitraum-Prüfung entfernt - User kann außerhalb liegende Buchungen zuordnen
-            // if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-            // if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+            
+            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+            if (em.enforceTimeRange) {
+                if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+                if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+            }
 
             // Negative-balance protection
             const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
@@ -83,6 +86,18 @@ export function createVoucher(input: {
                 if (wouldBe < 0) {
                     warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
                 }
+            }
+        }
+
+        // Budget validations (if provided)
+        if (input.budgetId != null) {
+            const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(input.budgetId) as any
+            if (!budget) throw new Error('Budget nicht gefunden')
+            
+            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+            if (budget.enforceTimeRange) {
+                if (budget.startDate && input.date < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
+                if (budget.endDate && input.date > budget.endDate) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${budget.endDate})`)
             }
         }
 
@@ -763,12 +778,15 @@ export function updateVoucher(input: {
 
     // Earmark validations if earmark set
     if (newEarmarkId != null) {
-        const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, budget FROM earmarks WHERE id=?').get(newEarmarkId) as any
+        const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, budget, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(newEarmarkId) as any
         if (!em) throw new Error('Zweckbindung nicht gefunden')
         if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-        // Zeitraum-Prüfung entfernt - User kann außerhalb liegende Buchungen zuordnen
-        // if (em.startDate && newDate < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-        // if (em.endDate && newDate > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+        
+        // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+        if (em.enforceTimeRange) {
+            if (em.startDate && newDate < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+            if (em.endDate && newDate > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+        }
 
         const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
         if (!cfg.allowNegative && newType === 'OUT') {
@@ -784,6 +802,18 @@ export function updateVoucher(input: {
             const remaining = Math.round(((budget + balance) * 100)) / 100
             const wouldBe = Math.round(((remaining - (current.grossAmount || 0)) * 100)) / 100
             if (wouldBe < 0) warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
+        }
+    }
+
+    // Budget validations if budget set
+    if (newBudgetId != null) {
+        const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(newBudgetId) as any
+        if (!budget) throw new Error('Budget nicht gefunden')
+        
+        // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+        if (budget.enforceTimeRange) {
+            if (budget.startDate && newDate < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
+            if (budget.endDate && newDate > budget.endDate) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${budget.endDate})`)
         }
     }
 

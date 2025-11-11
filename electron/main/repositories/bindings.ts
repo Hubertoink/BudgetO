@@ -13,6 +13,7 @@ export type Binding = {
     isActive: number
     color?: string | null
     budget?: number | null
+    enforceTimeRange?: number
 }
 
 export function listBindings(params?: { activeOnly?: boolean }) {
@@ -21,20 +22,20 @@ export function listBindings(params?: { activeOnly?: boolean }) {
     const vals: any[] = []
     if (params?.activeOnly) { wh.push('is_active = 1') }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-    const rows = d.prepare(`SELECT id, code, name, description, start_date as startDate, end_date as endDate, is_active as isActive, color, budget FROM earmarks${whereSql} ORDER BY code`).all(...vals) as any[]
+    const rows = d.prepare(`SELECT id, code, name, description, start_date as startDate, end_date as endDate, is_active as isActive, color, budget, enforce_time_range as enforceTimeRange FROM earmarks${whereSql} ORDER BY code`).all(...vals) as any[]
     return rows
 }
 
-export function upsertBinding(input: { id?: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive?: boolean; color?: string | null; budget?: number | null }) {
+export function upsertBinding(input: { id?: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive?: boolean; color?: string | null; budget?: number | null; enforceTimeRange?: boolean }) {
     return withTransaction((d: DB) => {
         if (input.id) {
-            d.prepare(`UPDATE earmarks SET code=?, name=?, description=?, start_date=?, end_date=?, is_active=?, color=?, budget=? WHERE id=?`).run(
-                input.code, input.name, input.description ?? null, input.startDate ?? null, input.endDate ?? null, (input.isActive ?? true) ? 1 : 0, input.color ?? null, input.budget ?? null, input.id
+            d.prepare(`UPDATE earmarks SET code=?, name=?, description=?, start_date=?, end_date=?, is_active=?, color=?, budget=?, enforce_time_range=? WHERE id=?`).run(
+                input.code, input.name, input.description ?? null, input.startDate ?? null, input.endDate ?? null, (input.isActive ?? true) ? 1 : 0, input.color ?? null, input.budget ?? null, (input.enforceTimeRange ?? false) ? 1 : 0, input.id
             )
             return { id: input.id, updated: true }
         }
-        const info = d.prepare(`INSERT INTO earmarks(code, name, description, start_date, end_date, is_active, color, budget) VALUES (?,?,?,?,?,?,?,?)`).run(
-            input.code, input.name, input.description ?? null, input.startDate ?? null, input.endDate ?? null, (input.isActive ?? true) ? 1 : 0, input.color ?? null, input.budget ?? null
+        const info = d.prepare(`INSERT INTO earmarks(code, name, description, start_date, end_date, is_active, color, budget, enforce_time_range) VALUES (?,?,?,?,?,?,?,?,?)`).run(
+            input.code, input.name, input.description ?? null, input.startDate ?? null, input.endDate ?? null, (input.isActive ?? true) ? 1 : 0, input.color ?? null, input.budget ?? null, (input.enforceTimeRange ?? false) ? 1 : 0
         )
         return { id: Number(info.lastInsertRowid), created: true }
     })

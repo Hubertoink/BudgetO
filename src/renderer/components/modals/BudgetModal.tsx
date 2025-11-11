@@ -30,6 +30,7 @@ export type BudgetModalValue = {
   categoryId?: number | null
   projectId?: number | null
   earmarkId?: number | null
+  enforceTimeRange?: number
 }
 
 export default function BudgetModal({ value, onClose, onSaved }: { value: BudgetModalValue; onClose: () => void; onSaved: () => void }) {
@@ -41,7 +42,9 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
-  useEffect(() => { setV(value); setNameError(''); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+  useEffect(() => { 
+    setV(value); setNameError(''); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) 
+  }, [value])
 
   async function save() {
     setRequiredTouched(true)
@@ -60,7 +63,8 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
       color: v.color || null,
       categoryId: v.categoryId || null,
       projectId: v.projectId || null,
-      earmarkId: v.earmarkId || null
+      earmarkId: v.earmarkId || null,
+      enforceTimeRange: v.enforceTimeRange ? true : false
     })
     onSaved()
   }
@@ -123,6 +127,21 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
               <input id="budget-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
             </div>
           </div>
+          {(v.startDate || v.endDate) && (
+            <div className="field field-full-width">
+              <label htmlFor="budget-enforce-range" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input 
+                  id="budget-enforce-range" 
+                  type="checkbox" 
+                  checked={!!v.enforceTimeRange} 
+                  onChange={(e) => setV({ ...v, enforceTimeRange: e.target.checked ? 1 : 0 })} 
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
+              </label>
+              <div className="helper">Wenn aktiviert, können Buchungen nur im Zeitraum {v.startDate || '...'} bis {v.endDate || '...'} diesem Budget zugeordnet werden.</div>
+            </div>
+          )}
           <div className="field field-full-width">
             <label>Farbe</label>
             <div className="color-picker-container">

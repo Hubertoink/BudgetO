@@ -12,6 +12,7 @@ type Binding = {
   isActive: number
   color?: string | null
   budget?: number | null
+  enforceTimeRange?: number
 }
 
 type BindingEdit = {
@@ -24,6 +25,7 @@ type BindingEdit = {
   isActive?: boolean
   color?: string | null
   budget?: number | null
+  enforceTimeRange?: number
 }
 
 export default function EarmarksView({
@@ -141,7 +143,8 @@ export default function EarmarksView({
                         endDate: b.endDate ?? null,
                         isActive: !!b.isActive,
                         color: b.color ?? null,
-                        budget: b.budget ?? null
+                        budget: b.budget ?? null,
+                        enforceTimeRange: b.enforceTimeRange ?? 0
                       })
                     }
                   >
@@ -181,7 +184,8 @@ export default function EarmarksView({
             endDate: b.endDate ?? null,
             isActive: !!b.isActive,
             color: b.color ?? null,
-            budget: b.budget ?? null
+            budget: b.budget ?? null,
+            enforceTimeRange: b.enforceTimeRange ?? 0
           })
         }
         onGoToBookings={onGoToBookings}

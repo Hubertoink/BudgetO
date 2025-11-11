@@ -30,6 +30,7 @@ export interface BudgetTileBudget {
   categoryId?: number | null
   projectId?: number | null
   earmarkId?: number | null
+  enforceTimeRange?: number
 }
 
 export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
@@ -78,7 +79,10 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
             <div key={b.id} className="card" style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                 <span className="badge" style={{ background: bg, color: fg }}>{b.year}</span>
-                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{title}</span>
+                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={title}>{title}</span>
+                {!!b.enforceTimeRange && (
+                  <span title="Strikter Zeitraum aktiv" style={{ fontSize: '1.2em' }}>🔒</span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                 <span className="badge in">IN: {eurFmt.format(inflow)}</span>

@@ -503,13 +503,14 @@ export const BindingUpsertInput = z.object({
     endDate: z.string().nullable().optional(),
     isActive: z.boolean().optional(),
     color: z.string().nullable().optional(),
-    budget: z.number().nullable().optional()
+    budget: z.number().nullable().optional(),
+    enforceTimeRange: z.boolean().optional()
 })
 export const BindingUpsertOutput = z.object({ id: z.number() })
 export const BindingListInput = z.object({ activeOnly: z.boolean().optional() }).optional()
 export const BindingListOutput = z.object({
     rows: z.array(z.object({
-        id: z.number(), code: z.string(), name: z.string(), description: z.string().nullable().optional(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(), isActive: z.number(), color: z.string().nullable().optional(), budget: z.number().nullable().optional()
+        id: z.number(), code: z.string(), name: z.string(), description: z.string().nullable().optional(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(), isActive: z.number(), color: z.string().nullable().optional(), budget: z.number().nullable().optional(), enforceTimeRange: z.number().optional()
     }))
 })
 export const BindingDeleteInput = z.object({ id: z.number() })
@@ -548,11 +549,12 @@ export const BudgetUpsertInput = z.object({
     projectName: z.string().nullable().optional(),
     startDate: z.string().nullable().optional(),
     endDate: z.string().nullable().optional(),
-    color: z.string().nullable().optional()
+    color: z.string().nullable().optional(),
+    enforceTimeRange: z.boolean().optional()
 })
 export const BudgetUpsertOutput = z.object({ id: z.number() })
 export const BudgetListInput = z.object({ year: z.number().optional(), sphere: Sphere.optional(), earmarkId: z.number().nullable().optional() }).optional()
-export const BudgetListOutput = z.object({ rows: z.array(z.object({ id: z.number(), year: z.number(), sphere: Sphere, categoryId: z.number().nullable(), projectId: z.number().nullable(), earmarkId: z.number().nullable(), amountPlanned: z.number(), name: z.string().nullable().optional(), categoryName: z.string().nullable().optional(), projectName: z.string().nullable().optional(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(), color: z.string().nullable().optional() })) })
+export const BudgetListOutput = z.object({ rows: z.array(z.object({ id: z.number(), year: z.number(), sphere: Sphere, categoryId: z.number().nullable(), projectId: z.number().nullable(), earmarkId: z.number().nullable(), amountPlanned: z.number(), name: z.string().nullable().optional(), categoryName: z.string().nullable().optional(), projectName: z.string().nullable().optional(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(), color: z.string().nullable().optional(), enforceTimeRange: z.number().optional() })) })
 export const BudgetUsageInput = z.object({ budgetId: z.number(), from: z.string().optional(), to: z.string().optional() })
 export const BudgetUsageOutput = z.object({
     spent: z.number(),

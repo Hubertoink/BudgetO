@@ -415,6 +415,15 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE members ADD COLUMN board_role TEXT CHECK(board_role IN ('V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'));
     `
   }
+  ,
+  {
+    version: 20,
+    up: `
+    -- Optional strict time range enforcement for budgets and earmarks
+    ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

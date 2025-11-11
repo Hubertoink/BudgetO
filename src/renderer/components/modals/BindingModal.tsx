@@ -27,6 +27,7 @@ export type BindingModalValue = {
   isActive?: boolean
   color?: string | null
   budget?: number | null
+  enforceTimeRange?: number
 }
 
 export default function BindingModal({ value, onClose, onSaved }: { value: BindingModalValue; onClose: () => void; onSaved: () => void }) {
@@ -52,7 +53,8 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
       endDate: v.endDate ?? null,
       isActive: v.isActive ?? true,
       color: v.color ?? null,
-      budget: v.budget ?? null
+      budget: v.budget ?? null,
+      enforceTimeRange: v.enforceTimeRange ? true : false
     })
     onSaved()
   }
@@ -112,6 +114,21 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <label htmlFor="binding-end-date">Bis</label>
             <input id="binding-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
           </div>
+          {(v.startDate || v.endDate) && (
+            <div className="field field-full-width">
+              <label htmlFor="binding-enforce-range" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input 
+                  id="binding-enforce-range" 
+                  type="checkbox" 
+                  checked={!!v.enforceTimeRange} 
+                  onChange={(e) => setV({ ...v, enforceTimeRange: e.target.checked ? 1 : 0 })} 
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
+              </label>
+              <div className="helper">Wenn aktiviert, können Buchungen nur im Zeitraum {v.startDate || '...'} bis {v.endDate || '...'} dieser Zweckbindung zugeordnet werden.</div>
+            </div>
+          )}
           <div className="field">
             <label htmlFor="binding-status">Status</label>
             <select id="binding-status" className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>

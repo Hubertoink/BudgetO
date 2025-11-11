@@ -1,5 +1,18 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// Helper to clean up error messages from IPC
+function cleanInvoke(channel: string, ...args: any[]): Promise<any> {
+    return ipcRenderer.invoke(channel, ...args).catch((error) => {
+        // Remove "Error invoking remote method 'channel': " prefix
+        const msg = String(error?.message || error)
+        const match = msg.match(/Error invoking remote method '[^']+': (.+)/)
+        if (match) {
+            throw new Error(match[1])
+        }
+        throw error
+    })
+}
+
 contextBridge.exposeInMainWorld('api', {
     window: {
         minimize: () => ipcRenderer.invoke('window.minimize'),
@@ -21,11 +34,11 @@ contextBridge.exposeInMainWorld('api', {
     },
     ping: () => 'pong',
     vouchers: {
-        create: (payload: any) => ipcRenderer.invoke('vouchers.create', payload),
-        reverse: (payload: any) => ipcRenderer.invoke('vouchers.reverse', payload),
+        create: (payload: any) => cleanInvoke('vouchers.create', payload),
+        reverse: (payload: any) => cleanInvoke('vouchers.reverse', payload),
         list: (payload?: any) => ipcRenderer.invoke('vouchers.list', payload),
         recent: (payload?: any) => ipcRenderer.invoke('vouchers.recent', payload),
-        update: (payload: any) => ipcRenderer.invoke('vouchers.update', payload),
+        update: (payload: any) => cleanInvoke('vouchers.update', payload),
         delete: (payload: any) => ipcRenderer.invoke('vouchers.delete', payload),
         batchAssignEarmark: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignEarmark', payload),
         batchAssignBudget: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignBudget', payload),
