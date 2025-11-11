@@ -146,6 +146,7 @@ export default function InvoicesView() {
   const [payAmount, setPayAmount] = useState<string>('')
   const [busyAction, setBusyAction] = useState<boolean>(false)
   const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; party?: string; invoiceNo?: string | null }>(null)
+  const [postToVoucherModal, setPostToVoucherModal] = useState<null | { id: number; party: string; invoiceNo?: string | null }>(null)
   // Detail modal
   const [detailId, setDetailId] = useState<number | null>(null)
   const [detail, setDetail] = useState<null | { id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; payments: Array<{ id: number; date: string; amount: number }>; files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>; tags: string[]; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID' }>(null)
@@ -414,9 +415,14 @@ export default function InvoicesView() {
                     {colPrefs.showAttachments && <td align="center">{(r.fileCount || 0) > 0 ? <span className="badge">📎 {r.fileCount}</span> : ''}</td>}
                     <td align="center" className="invoices-actions-nowrap">
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
-                      <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
+                      {r.status !== 'PAID' && (
+                        <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
+                      )}
                       {remaining > 0 && r.status !== 'PAID' && (
                         <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>
+                      )}
+                      {r.status === 'PAID' && !r.autoPost && !r.postedVoucherId && (
+                        <button className="btn primary" title="Als Buchung hinzufügen" onClick={() => setPostToVoucherModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo })}>📝</button>
                       )}
                     </td>
                   </tr>
@@ -737,7 +743,6 @@ export default function InvoicesView() {
             <div className="invoices-detail-header">
               <h2 style={{ margin: 0 }}>Rechnung {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
               <div className="invoices-detail-header-actions">
-                {detail && <button className="btn" onClick={() => { const d = detail as any; setDetailId(null); setDetail(null); setTimeout(() => openEdit(d), 0) }}>✎ Bearbeiten</button>}
                 <button className="btn ghost" onClick={() => { setDetailId(null); setDetail(null) }}>✕</button>
               </div>
             </div>
@@ -880,6 +885,47 @@ export default function InvoicesView() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
               <button className="btn danger" disabled={busyAction} onClick={() => { deleteInvoice(deleteConfirm.id); setForm(null) }}>Ja, löschen</button>
+            </div>
+          </div>
+        </div>, document.body)}
+
+      {postToVoucherModal && createPortal(
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setPostToVoucherModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+            <ModalHeader
+              title="Als Buchung hinzufügen"
+              subtitle={`${postToVoucherModal.invoiceNo ? `Rechnung ${postToVoucherModal.invoiceNo}` : `Rechnung #${postToVoucherModal.id}`}`}
+              onClose={() => setPostToVoucherModal(null)} 
+            />
+            <div style={{ marginBottom: 16 }}>
+              <strong>{postToVoucherModal.party}</strong>
+            </div>
+            <div className="helper" style={{ marginBottom: 16 }}>
+              Diese bezahlte Rechnung als Buchung hinzufügen?
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setPostToVoucherModal(null)}>Abbrechen</button>
+              <button className="btn primary" disabled={busyAction} onClick={async () => {
+                setBusyAction(true)
+                try {
+                  const result = await (window as any).api?.invoices?.postToVoucher?.({ invoiceId: postToVoucherModal.id })
+                  if (result?.voucherId) {
+                    // Update the row in state immediately
+                    setRows(prev => prev.map(r => 
+                      r.id === postToVoucherModal.id 
+                        ? { ...r, postedVoucherId: result.voucherId } 
+                        : r
+                    ))
+                  }
+                  notify?.('success', 'Rechnung wurde als Buchung hinzugefügt')
+                  setPostToVoucherModal(null)
+                  await Promise.all([load(), loadSummary()])
+                } catch (e: any) {
+                  notify?.('error', e?.message || String(e))
+                } finally {
+                  setBusyAction(false)
+                }
+              }}>OK</button>
             </div>
           </div>
         </div>, document.body)}

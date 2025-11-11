@@ -371,6 +371,11 @@ export const InvoiceByIdOutput = z.object({
 export const InvoiceAddPaymentInput = z.object({ invoiceId: z.number(), date: z.string(), amount: z.number() })
 export const InvoiceAddPaymentOutput = z.object({ id: z.number(), status: InvoiceStatus, paidSum: z.number(), voucherId: z.number().nullable().optional() })
 
+export const InvoicePostToVoucherInput = z.object({ invoiceId: z.number() })
+export const InvoicePostToVoucherOutput = z.object({ id: z.number(), voucherId: z.number() })
+export type TInvoicePostToVoucherInput = z.infer<typeof InvoicePostToVoucherInput>
+export type TInvoicePostToVoucherOutput = z.infer<typeof InvoicePostToVoucherOutput>
+
 // Invoice files (attachments for invoices)
 export const InvoiceFilesListInput = z.object({ invoiceId: z.number() })
 export const InvoiceFilesListOutput = z.object({ files: z.array(z.object({ id: z.number(), fileName: z.string(), mimeType: z.string().nullable().optional(), size: z.number().nullable().optional(), createdAt: z.string().nullable().optional() })) })

@@ -395,3 +395,42 @@ export function markPaid(invoiceId: number) {
     return { id: invoiceId, status: 'PAID' as InvoiceStatus, voucherId }
   })
 }
+
+// Manual post invoice to voucher (for PAID invoices without auto-post)
+export function postInvoiceToVoucher(invoiceId: number) {
+  return withTransaction((d: DB) => {
+    const inv = d.prepare('SELECT * FROM invoices WHERE id=?').get(invoiceId) as any
+    if (!inv) throw new Error('Rechnung nicht gefunden')
+    if (inv.posted_voucher_id) throw new Error('Rechnung wurde bereits als Buchung hinzugefügt')
+    
+    const paidRow = d.prepare('SELECT IFNULL(SUM(amount),0) as s FROM invoice_payments WHERE invoice_id = ?').get(invoiceId) as any
+    const paid = Number(paidRow?.s || 0)
+    const gross = Number(inv.gross_amount || 0)
+    
+    if (paid < gross) throw new Error('Rechnung ist noch nicht vollständig bezahlt')
+    
+    const vDate = new Date().toISOString().slice(0, 10)
+    const desc = (inv.description && String(inv.description).trim())
+      ? String(inv.description).trim()
+      : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
+    
+    const res = createVoucher({
+      date: vDate,
+      type: inv.voucher_type,
+      sphere: inv.sphere,
+      description: desc,
+      grossAmount: clamp2(paid),
+      vatRate: 0,
+      paymentMethod: inv.payment_method ?? null,
+      earmarkId: inv.earmark_id ?? null,
+      budgetId: inv.budget_id ?? null,
+      tags: (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
+    } as any)
+    
+    const voucherId = res.id
+    d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
+    
+    return { id: invoiceId, voucherId }
+  })
+}
+

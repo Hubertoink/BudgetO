@@ -75,7 +75,8 @@ contextBridge.exposeInMainWorld('api', {
         summary: (payload?: any) => ipcRenderer.invoke('invoices.summary', payload),
         get: (payload: any) => ipcRenderer.invoke('invoices.get', payload),
         addPayment: (payload: any) => ipcRenderer.invoke('invoices.addPayment', payload),
-        markPaid: (payload: any) => ipcRenderer.invoke('invoices.markPaid', payload)
+        markPaid: (payload: any) => ipcRenderer.invoke('invoices.markPaid', payload),
+        postToVoucher: (payload: any) => ipcRenderer.invoke('invoices.postToVoucher', payload)
     },
     members: {
         list: (payload?: any) => ipcRenderer.invoke('members.list', payload),
