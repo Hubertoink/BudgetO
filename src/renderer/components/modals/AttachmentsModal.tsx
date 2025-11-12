@@ -100,7 +100,7 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
                                 }
                             }}
                         >Herunterladen</button>
-                        <input ref={fileInputRef} type="file" multiple hidden onChange={async (e) => {
+                        <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
                             const list = e.target.files
                             if (!list || !list.length) return
                             try {
@@ -119,7 +119,14 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
                             }
                         }} />
                         <button className="btn" onClick={() => fileInputRef.current?.click?.()}>+ Datei(en)</button>
-                        <button className="btn danger" disabled={!selected} onClick={() => selected && setConfirmDelete({ id: selected.id, fileName: selected.fileName })}>🗑 Löschen</button>
+                        <button 
+                            className="btn danger" 
+                            disabled={!selected} 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (selected) setConfirmDelete({ id: selected.id, fileName: selected.fileName })
+                            }}
+                        >🗑 Löschen</button>
                     </div>
                 </header>
                 {error && <div style={{ color: 'var(--danger)', margin: '0 8px 8px' }}>{error}</div>}

@@ -281,7 +281,7 @@ export default function QuickAddModal({
                                     <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
                                 </div>
                                 <div className="flex-gap-8">
-                                    <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
+                                    <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
                                     <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
                                     {files.length > 0 && (
                                         <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>

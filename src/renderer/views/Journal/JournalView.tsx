@@ -202,7 +202,7 @@ export default function JournalView({
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
-    const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
+    const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
 
     // ==================== TAG COUNTS ====================
     const tagCounts = useMemo(() => {
@@ -819,7 +819,7 @@ export default function JournalView({
                                                 <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
                                             </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                <input ref={editFileInputRef} type="file" multiple hidden onChange={async (e) => {
+                                                <input ref={editFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
                                                     const list = e.target.files
                                                     if (!list || !list.length || !editRow) return
                                                     try {
@@ -855,7 +855,18 @@ export default function JournalView({
                                                                     notify('error', 'Speichern fehlgeschlagen: ' + m)
                                                                 }
                                                             }}>Herunterladen</button>
-                                                            <button className="btn danger" title="Löschen" onClick={() => setConfirmDeleteAttachment({ id: f.id, fileName: f.fileName })}>🗑</button>
+                                                            <button 
+                                                                type="button"
+                                                                className="btn danger" 
+                                                                title="Löschen" 
+                                                                onClick={(e) => {
+                                                                    e.preventDefault()
+                                                                    e.stopPropagation()
+                                                                    if (editRow) {
+                                                                        setConfirmDeleteAttachment({ id: f.id, fileName: f.fileName, voucherId: editRow.id })
+                                                                    }
+                                                                }}
+                                                            >🗑</button>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -865,12 +876,15 @@ export default function JournalView({
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Confirmation Modal for Attachment Deletion */}
                                 {confirmDeleteAttachment && (
                                     <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
                                         <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <h3 style={{ margin: 0 }}>Anhang löschen</h3>
                                                 <button
+                                                    type="button"
                                                     className="btn ghost"
                                                     onClick={() => setConfirmDeleteAttachment(null)}
                                                     aria-label="Schließen"
@@ -888,14 +902,16 @@ export default function JournalView({
                                             </div>
                                             <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
                                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                                <button className="btn" onClick={() => setConfirmDeleteAttachment(null)}>Abbrechen</button>
-                                                <button className="btn danger" onClick={async () => {
-                                                    if (!editRow) { setConfirmDeleteAttachment(null); return }
+                                                <button type="button" className="btn" onClick={() => setConfirmDeleteAttachment(null)}>Abbrechen</button>
+                                                <button type="button" className="btn danger" onClick={async () => {
                                                     try {
                                                         await window.api?.attachments.delete?.({ fileId: confirmDeleteAttachment.id })
-                                                        const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
+                                                        const res = await window.api?.attachments.list?.({ voucherId: confirmDeleteAttachment.voucherId })
                                                         setEditRowFiles(res?.files || [])
                                                         setConfirmDeleteAttachment(null)
+                                                        notify('success', 'Anhang gelöscht')
+                                                        // Refresh the table to update attachment count
+                                                        await loadRecent()
                                                     } catch (e: any) {
                                                         notify('error', e?.message || String(e))
                                                     }

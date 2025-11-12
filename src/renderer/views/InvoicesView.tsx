@@ -764,7 +764,7 @@ export default function InvoicesView() {
                     <label>Dateien</label>
                     <div onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const fl = e.dataTransfer?.files; if (fl && fl.length) setFormFiles(prev => [...prev, ...Array.from(fl)]) }} className="card" style={{ padding: 10, border: '1px dashed var(--muted)', background: 'color-mix(in oklab, var(--accent) 10%, transparent)' }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => { const f = Array.from(e.target.files || []); if (f.length) setFormFiles(prev => [...prev, ...f]); if (fileInputRef.current) fileInputRef.current.value = '' }} />
+                        <input ref={fileInputRef} type="file" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => { const f = Array.from(e.target.files || []); if (f.length) setFormFiles(prev => [...prev, ...f]); if (fileInputRef.current) fileInputRef.current.value = '' }} />
                         <button className="btn" onClick={() => fileInputRef.current?.click()}>+ Dateien auswählen</button>
                         <span className="helper">oder hierher ziehen</span>
                       </div>
@@ -803,7 +803,7 @@ export default function InvoicesView() {
                       }
                     }} className="card" style={{ padding: 10, border: '1px dashed var(--muted)', background: 'color-mix(in oklab, var(--accent) 10%, transparent)' }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input ref={editInvoiceFileInputRef} type="file" multiple hidden onChange={async (e) => {
+                        <input ref={editInvoiceFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
                           const files = Array.from(e.target.files || [])
                           try {
                             if (files.length && (form.draft as any).id) {
