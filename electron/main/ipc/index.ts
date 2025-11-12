@@ -281,7 +281,7 @@ export function registerIpcHandlers() {
             <table class="small">
                 <thead><tr><th>Zahlweg</th><th class="right">Brutto</th></tr></thead>
                 <tbody>
-                    ${(summary.byPaymentMethod as any[]).map(p => `<tr><td>${p.key ?? '—'}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
+                    ${(summary.byPaymentMethod as any[]).map(p => `<tr><td>${p.key === null ? 'TRANSFER' : (p.key ?? 'TRANSFER')}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
                 </tbody>
             </table>
         </div>

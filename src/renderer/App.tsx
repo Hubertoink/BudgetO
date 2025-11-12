@@ -696,7 +696,7 @@ function AppInner() {
                             className="btn ghost icon-btn"
                             title={sidebarCollapsed ? 'Seitenleiste erweitern' : 'Seitenleiste komprimieren'}
                             aria-label="Seitenleiste umschalten"
-                            onClick={() => setSidebarCollapsed(v => !v)}
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                         >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                 <rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -745,10 +745,10 @@ function AppInner() {
                     
                     {activePage === 'Reports' && (
                         <ReportsView
-                            from={from}
-                            to={to}
-                            setFrom={setFrom}
-                            setTo={setTo}
+                            from={reportsFrom}
+                            to={reportsTo}
+                            setFrom={setReportsFrom}
+                            setTo={setReportsTo}
                             yearsAvail={yearsAvail}
                             filterSphere={reportsFilterSphere}
                             setFilterSphere={setReportsFilterSphere}
@@ -1021,8 +1021,8 @@ function AppInner() {
                     setAmountMode={setExportAmountMode}
                     sortDir={exportSortDir}
                     setSortDir={setExportSortDir}
-                    dateFrom={from}
-                    dateTo={to}
+                    dateFrom={reportsFrom}
+                    dateTo={reportsTo}
                     exportType={exportType}
                     setExportType={setExportType}
                     fiscalYear={fiscalYear}
@@ -1052,9 +1052,9 @@ function AppInner() {
                                 const res = await window.api?.reports.export?.({
                                     type: 'JOURNAL',
                                     format: fmt,
-                                    from: from || '',
-                                    to: to || '',
-                                    filters: { paymentMethod: filterPM || undefined, sphere: filterSphere || undefined, type: filterType || undefined },
+                                    from: reportsFrom || '',
+                                    to: reportsTo || '',
+                                    filters: { paymentMethod: reportsFilterPM || undefined, sphere: reportsFilterSphere || undefined, type: reportsFilterType || undefined },
                                     fields: exportFields,
                                     orgName: exportOrgName || undefined,
                                     amountMode: exportAmountMode,
