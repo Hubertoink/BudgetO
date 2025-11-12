@@ -19,10 +19,10 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
   
   const total = (balance?.bar || 0) + (balance?.bank || 0)
   const maxVal = Math.max(100, Math.abs(balance?.bar || 0), Math.abs(balance?.bank || 0))
-  // Compact layout - reduced width and right padding for tighter visualization
-  const W = 600, H = 160, P = { top: 18, right: 12, bottom: 16, left: 96 }
-  const barH = 20
-  const gap = 14
+  // Compact layout - reduced width and height for tighter visualization
+  const W = 600, H = 80, P = { top: 12, right: 12, bottom: 8, left: 96 }
+  const barH = 18
+  const gap = 10
   const xFor = (v: number) => P.left + Math.round((Math.abs(v) / Math.max(1e-9, maxVal)) * (W - P.left - P.right))
   
   return (
