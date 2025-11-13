@@ -116,37 +116,61 @@ export function SettingsView(props: SettingsProps) {
         )}
       </div>
 
-      {/* Developer Badge - Cookie-Banner style with hover expand */}
+      {/* Developer Badge - edge anchored handle; panel retracts on mouse leave */}
+      <DevBadge appVersion={appVersion} />
+    </div>
+  )
+}
+
+function DevBadge({ appVersion }: { appVersion: string }) {
+  const [open, setOpen] = React.useState(false)
+  const panelRef = React.useRef<HTMLDivElement | null>(null)
+  const [panelHeight, setPanelHeight] = React.useState<number>(0)
+
+  React.useEffect(() => {
+    if (panelRef.current) {
+      setPanelHeight(panelRef.current.offsetHeight)
+    }
+  }, [open, appVersion])
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 16,
+        right: 0,
+        display: 'flex',
+        alignItems: 'stretch',
+        fontSize: 11.5,
+        color: 'var(--text)',
+        zIndex: 10,
+        userSelect: 'none'
+      }}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {/* Sliding panel */}
       <div
-        className="dev-badge-tab"
+        aria-hidden={!open}
+        ref={panelRef}
         style={{
-          position: 'fixed',
-          bottom: 16,
-          right: -195,
-          padding: '10px 14px',
-          paddingLeft: 20,
           background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: '1px solid color-mix(in oklab, var(--accent) 20%, transparent)',
+          borderRight: 'none',
           borderRadius: '8px 0 0 8px',
-          fontSize: 11.5,
-          color: 'var(--text)',
+          padding: '10px 16px 10px 18px',
           display: 'flex',
           flexDirection: 'column',
           gap: 3,
+          minWidth: 200,
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 0,
-          transition: 'right 0.3s ease-in-out',
-          cursor: 'pointer',
-          minWidth: 200
+          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          opacity: open ? 1 : 0,
+          transition: 'transform .25s cubic-bezier(.4,0,.2,1), opacity .2s ease',
+          pointerEvents: open ? 'auto' : 'none'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.right = '0px'}
-        onMouseLeave={(e) => e.currentTarget.style.right = '-180px'}
       >
-        <div style={{ fontWeight: 600, fontSize: 12 }}>
-          VereinO {appVersion && `(v${appVersion})`}
-        </div>
+        <div style={{ fontWeight: 600, fontSize: 12 }}>VereinO {appVersion && `(v${appVersion})`}</div>
         <div style={{ opacity: 0.85 }}>
           erstellt von{' '}
           <a
@@ -157,10 +181,34 @@ export function SettingsView(props: SettingsProps) {
             Hubertoink
           </a>
         </div>
-        <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>
-          © 2025
-        </div>
+        <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>© 2025</div>
       </div>
+      {/* Handle */}
+      <button
+        type="button"
+        aria-label={open ? 'Schließen' : 'Info anzeigen'}
+        aria-expanded={open}
+        onMouseEnter={() => setOpen(true)}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(!open)}
+        style={{
+          background: 'color-mix(in oklab, var(--accent) 40%, var(--surface))',
+          color: 'var(--surface)',
+          width: 34,
+          height: panelHeight || 54,
+          border: '1px solid color-mix(in oklab, var(--accent) 35%, transparent)',
+          borderRadius: '0 8px 8px 0',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+          fontWeight: 700,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          outline: 'none'
+        }}
+      >
+        {open ? '×' : '<'}
+      </button>
     </div>
   )
 }
