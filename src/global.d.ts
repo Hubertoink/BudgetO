@@ -31,7 +31,7 @@ declare global {
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
