@@ -729,6 +729,41 @@ export type TSettingsGetOutput = z.infer<typeof SettingsGetOutput>
 export type TSettingsSetInput = z.infer<typeof SettingsSetInput>
 export type TSettingsSetOutput = z.infer<typeof SettingsSetOutput>
 
+// Tax Exemption Certificate
+export const TaxExemptionGetOutput = z.object({
+    certificate: z.object({
+        fileName: z.string(),
+        uploadDate: z.string(),
+        validFrom: z.string().optional(),
+        validUntil: z.string().optional(),
+        fileData: z.string(),
+        mimeType: z.string(),
+        fileSize: z.number()
+    }).nullable()
+})
+export const TaxExemptionSaveInput = z.object({
+    fileName: z.string(),
+    fileData: z.string(), // base64
+    mimeType: z.string(),
+    fileSize: z.number(),
+    validFrom: z.string().optional(),
+    validUntil: z.string().optional()
+})
+export const TaxExemptionSaveOutput = z.object({ ok: z.boolean() })
+export const TaxExemptionDeleteOutput = z.object({ ok: z.boolean() })
+export const TaxExemptionUpdateValidityInput = z.object({
+    validFrom: z.string().optional(),
+    validUntil: z.string().optional()
+})
+export const TaxExemptionUpdateValidityOutput = z.object({ ok: z.boolean() })
+
+export type TTaxExemptionGetOutput = z.infer<typeof TaxExemptionGetOutput>
+export type TTaxExemptionSaveInput = z.infer<typeof TaxExemptionSaveInput>
+export type TTaxExemptionSaveOutput = z.infer<typeof TaxExemptionSaveOutput>
+export type TTaxExemptionDeleteOutput = z.infer<typeof TaxExemptionDeleteOutput>
+export type TTaxExemptionUpdateValidityInput = z.infer<typeof TaxExemptionUpdateValidityInput>
+export type TTaxExemptionUpdateValidityOutput = z.infer<typeof TaxExemptionUpdateValidityOutput>
+
 // Audit: recent actions
 export const AuditRecentInput = z.object({ limit: z.number().min(1).max(100).default(20) }).optional()
 export const AuditRecentOutput = z.object({

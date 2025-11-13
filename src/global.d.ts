@@ -128,6 +128,32 @@ declare global {
                 get: (payload: { key: string }) => Promise<{ value: any }>
                 set: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>
             }
+            taxExemption: {
+                get: () => Promise<{ 
+                    certificate: {
+                        fileName: string
+                        uploadDate: string
+                        validFrom?: string
+                        validUntil?: string
+                        fileData: string
+                        mimeType: string
+                        fileSize: number
+                    } | null 
+                }>
+                save: (payload: { 
+                    fileName: string
+                    fileData: string
+                    mimeType: string
+                    fileSize: number
+                    validFrom?: string
+                    validUntil?: string
+                }) => Promise<{ ok: boolean }>
+                delete: () => Promise<{ ok: boolean }>
+                updateValidity: (payload: { 
+                    validFrom?: string
+                    validUntil?: string 
+                }) => Promise<{ ok: boolean }>
+            }
             quotes: {
                 weekly: (payload?: { date?: string }) => Promise<{ text: string; author?: string; source?: string; id?: number }>
             }

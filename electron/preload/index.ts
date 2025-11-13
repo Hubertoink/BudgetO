@@ -157,6 +157,12 @@ contextBridge.exposeInMainWorld('api', {
         get: (payload: any) => ipcRenderer.invoke('settings.get', payload),
         set: (payload: any) => ipcRenderer.invoke('settings.set', payload)
     },
+    taxExemption: {
+        get: () => ipcRenderer.invoke('taxExemption.get'),
+        save: (payload: any) => ipcRenderer.invoke('taxExemption.save', payload),
+        delete: () => ipcRenderer.invoke('taxExemption.delete'),
+        updateValidity: (payload: any) => ipcRenderer.invoke('taxExemption.updateValidity', payload)
+    },
     backup: {
         make: (reason?: string) => ipcRenderer.invoke('backup.make', { reason }),
         list: () => ipcRenderer.invoke('backup.list'),
