@@ -81,13 +81,14 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return () => { cancelled = true }
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
 
-  // Ensure we show all months in range, even when there is no data
-  // If from/to are not provided, derive the range from actual data
+  // Build the X-axis months based on filters
+  // - With explicit from/to: show full continuous range (all months)
+  // - Without from/to (default): show only months that actually have data
   const months = (() => {
     if (props.from && props.to) {
       return monthKeys(props.from, props.to)
     }
-    // No date filter: use all months from the data
+    // No date filter: use only months that have buckets
     const allMonths = new Set<string>()
     inBuckets.forEach(b => allMonths.add(String(b.month)))
     outBuckets.forEach(b => allMonths.add(String(b.month)))
@@ -100,9 +101,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
         new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
       )
     }
-    const sorted = Array.from(allMonths).sort()
-    // Build complete range from first to last month
-    return monthKeys(sorted[0] + '-01', sorted[sorted.length - 1] + '-28')
+    return Array.from(allMonths).sort()
   })()
   const inMap = new Map(inBuckets.map(b => [String(b.month), Number(b.gross) || 0]))
   const outMap = new Map(outBuckets.map(b => [String(b.month), Math.abs(Number(b.gross) || 0)]))
@@ -230,7 +229,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             const tooltipX = (gx / width) * 100
             return (
               <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)}</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)} {s.month.slice(0, 4)}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>
