@@ -655,8 +655,9 @@ td {
     background: var(--table-row-alt);
 }
 
-tbody tr:hover {
-    background: color-mix(in oklab, var(--muted) 20%, transparent);
+tbody tr:hover,
+tbody tr:nth-child(even):hover {
+    background: color-mix(in oklab, var(--accent) 12%, transparent) !important;
 }
 
 /* Row layout toggles for Buchungen (journal) via root data attributes */

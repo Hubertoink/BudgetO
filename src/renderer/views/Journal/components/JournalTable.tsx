@@ -69,6 +69,7 @@ interface JournalTableProps {
     onBudgetClick?: (id: number) => void
     highlightId?: number | null
     lockedUntil?: string | null
+    onRowDoubleClick?: (row: any) => void
 }
 
 export default function JournalTable({
@@ -89,7 +90,8 @@ export default function JournalTable({
     onEarmarkClick,
     onBudgetClick,
     highlightId,
-    lockedUntil
+    lockedUntil,
+    onRowDoubleClick
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
@@ -174,7 +176,7 @@ export default function JournalTable({
                                 className="chip"
                                 style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
                                 title={`Nach Tag "${t}" filtern`}
-                                onClick={() => onTagClick?.(t)}
+                                onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
                             >
                                 {t}
                             </button>
@@ -193,7 +195,7 @@ export default function JournalTable({
                         className="badge-earmark"
                         title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
                         style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                        onClick={() => { if (id != null) onEarmarkClick?.(id) }}
+                        onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
                     >
                         {r.earmarkCode}
                     </button>
@@ -233,7 +235,7 @@ export default function JournalTable({
                             className="badge-budget"
                             title={`Nach Budget ${r.budgetLabel} filtern`}
                             style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                            onClick={() => { if (id != null) onBudgetClick?.(id) }}
+                            onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
                         >
                             {r.budgetLabel}
                         </button>
@@ -259,7 +261,11 @@ export default function JournalTable({
             </thead>
             <tbody>
                 {rows.map((r) => (
-                    <tr key={r.id} className={highlightId === r.id ? 'row-flash' : undefined}>
+                    <tr 
+                        key={r.id} 
+                        className={highlightId === r.id ? 'row-flash' : undefined}
+                        onDoubleClick={() => onRowDoubleClick?.(r)}
+                    >
                         {visibleOrder.map((k) => tdFor(k, r))}
                     </tr>
                 ))}

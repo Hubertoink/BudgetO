@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
 import BatchEarmarkModal from '../../components/modals/BatchEarmarkModal'
+import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
 
 // Type für Voucher-Zeilen
@@ -197,6 +198,7 @@ export default function JournalView({
 
     // Modal states
     const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
+    const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
     const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -532,6 +534,7 @@ export default function JournalView({
                             activeSetPage(1)
                             await loadRecent()
                         }}
+                        onRowDoubleClick={(row) => setInfoVoucher(row)}
                     />
                 </div>
 
@@ -971,6 +974,20 @@ export default function JournalView({
                             </div>
                         </div>
                     </div>
+                )}
+
+                {/* Voucher Info Modal */}
+                {infoVoucher && (
+                    <VoucherInfoModal
+                        voucher={infoVoucher}
+                        onClose={() => setInfoVoucher(null)}
+                        eurFmt={eurFmt}
+                        fmtDate={fmtDate}
+                        notify={notify}
+                        earmarks={earmarks}
+                        budgets={budgetsForEdit}
+                        tagDefs={tagDefs}
+                    />
                 )}
             </div>
         </>
