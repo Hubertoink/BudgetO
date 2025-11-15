@@ -669,7 +669,7 @@ function AppInner() {
     const navIconPalette: Record<string, string> = {
         'Dashboard': '#7C4DFF',
         'Buchungen': '#2962FF',
-        'Rechnungen': '#00B8D4',
+        'Verbindlichkeiten': '#00B8D4',
         'Mitglieder': '#26A69A',
         'Budgets': '#00C853',
         'Zweckbindungen': '#FFD600',
@@ -764,7 +764,7 @@ function AppInner() {
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
                     {activePage === 'Dashboard' && (
-                        <DashboardView today={today} onGoToInvoices={() => setActivePage('Rechnungen')} />
+                        <DashboardView today={today} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} />
                     )}
                     {activePage === 'Buchungen' && (
                         <JournalView
@@ -904,7 +904,7 @@ function AppInner() {
                         <MembersView />
                     )}
 
-                    {activePage === 'Rechnungen' && (
+                    {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
                     )}
             </main>
@@ -931,7 +931,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>

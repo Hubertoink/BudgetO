@@ -38,7 +38,7 @@ interface JournalViewProps {
     notify: (type: 'info' | 'success' | 'error', text: string, duration?: number, action?: { label: string; onClick: () => void }) => void
     bumpDataVersion: () => void
     fmtDate: (d: string) => string
-    setActivePage: (page: 'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen') => void
+    setActivePage: (page: 'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Verbindlichkeiten' | 'Mitglieder' | 'Einstellungen') => void
     setShowTimeFilter: (show: boolean) => void
     setShowMetaFilter: (show: boolean) => void
     // Shared global state
@@ -965,7 +965,7 @@ export default function JournalView({
                                         const raw = String(e?.message || e || '')
                                         // If delete is blocked due to linked invoice, show an explanatory toast
                                         if (/FOREIGN KEY|constraint|invoice|posted_voucher_id/i.test(raw)) {
-                                            notify('info', 'Diese Buchung ist mit einer Rechnung verknüpft und kann nicht gelöscht werden. Bitte zuerst die Rechnung löschen – danach ist die Buchung löschbar.')
+                                            notify('info', 'Diese Buchung ist mit einer Verbindlichkeit verknüpft und kann nicht gelöscht werden. Bitte zuerst die Verbindlichkeit löschen – danach ist die Buchung löschbar.')
                                         } else {
                                             notify('error', friendlyError(e))
                                         }

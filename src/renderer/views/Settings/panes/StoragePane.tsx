@@ -313,8 +313,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
                   const currentCounts = importPick.currentCounts || {}
                   const importCounts = importPick.counts || {}
                   const tableNames: Record<string, string> = {
-                    'invoice_files': 'Rechnungsdateien',
-                    'invoices': 'Rechnungen',
+                    'invoice_files': 'Verbindlichkeitsdateien',
+                    'invoices': 'Verbindlichkeiten',
                     'members': 'Mitglieder',
                     'tags': 'Tags',
                     'voucher_files': 'Belegdateien',
@@ -472,8 +472,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
                 {(() => {
                   // Map technical table names to German
                   const tableNames: Record<string, string> = {
-                    'invoice_files': 'Rechnungsdateien',
-                    'invoices': 'Rechnungen',
+                    'invoice_files': 'Verbindlichkeitsdateien',
+                    'invoices': 'Verbindlichkeiten',
                     'members': 'Mitglieder',
                     'tags': 'Tags',
                     'voucher_files': 'Belegdateien',

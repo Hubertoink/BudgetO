@@ -693,7 +693,7 @@ tbody tr:nth-child(even):hover {
 :root[data-journal-row-density="compact"] .journal-table th,
 :root[data-journal-row-density="compact"] .journal-table td { padding-top: 2px; padding-bottom: 2px; }
 
-/* Sticky headers for Buchungen (journal) and Rechnungen tables */
+/* Sticky headers for Buchungen (journal) and Verbindlichkeiten tables */
 .journal-table thead th,
 .invoices-table thead th {
     position: sticky;
@@ -773,9 +773,8 @@ svg text {
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    padding-top: 10vh;
     /* Ensure overlay sits above header (z-index: 1000), FAB (3000), and most overlays */
     z-index: 5000; /* below toasts (9999) */
 }
@@ -1380,6 +1379,22 @@ textarea:focus {
 .invoice-modal .party-input { max-width: 500px; }
 .invoice-modal .amount-input { max-width: 360px; }
 .invoice-modal .tags-editor .input { max-width: 680px; }
+.invoice-modal { width: min(1150px, 96vw); }
+
+/* File name truncation in invoice modal */
+.invoices-file-name {
+    max-width: 340px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Attachment icon in invoice table */
+.invoices-attachment-icon {
+    margin-left: 6px;
+    opacity: 0.7;
+    font-size: 14px;
+}
 
 /* Responsive tweaks for the invoice modal at minimal widths */
 @media (max-width: 1040px) {
@@ -1510,7 +1525,7 @@ textarea:focus {
 /* Icon color classes (used when navIconColorMode === 'color') */
 .icon-color-Dashboard { color: #7C4DFF; }
 .icon-color-Buchungen { color: #2962FF; }
-.icon-color-Rechnungen { color: #00B8D4; }
+.icon-color-Verbindlichkeiten { color: #00B8D4; }
 .icon-color-Mitglieder { color: #26A69A; }
 .icon-color-Budgets { color: #00C853; }
 .icon-color-Zweckbindungen { color: #FFD600; }

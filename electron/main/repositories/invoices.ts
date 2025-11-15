@@ -217,7 +217,7 @@ export function summarizeInvoices(filters: {
   dueFrom?: string
   dueTo?: string
   tag?: string
-}): { count: number; gross: number; paid: number; remaining: number } {
+}): { count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number } {
   const d = getDb()
   const { status, sphere, budgetId, q, dueFrom, dueTo, tag } = filters || {}
   const params: any[] = []
@@ -239,21 +239,27 @@ export function summarizeInvoices(filters: {
   const rows = d.prepare(`
     SELECT i.id,
            i.gross_amount as grossAmount,
+           i.voucher_type as voucherType,
            IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum
     ${base}
     GROUP BY i.id
   `).all(...params) as any[]
-  const mapped = rows.map(r => ({ gross: Number(r.grossAmount || 0), paid: Number(r.paidSum || 0) }))
+  const mapped = rows.map(r => ({ gross: Number(r.grossAmount || 0), paid: Number(r.paidSum || 0), voucherType: r.voucherType }))
   const withStatus = mapped.map(r => ({ ...r, status: computeStatus(r.gross, r.paid) }))
   const filtered = (status && status !== 'ALL') ? withStatus.filter(r => r.status === status) : withStatus
   const agg = filtered.reduce((acc, r) => {
     acc.count += 1
     acc.gross += r.gross
     acc.paid += r.paid
+    if (r.voucherType === 'IN') {
+      acc.grossIn += r.gross
+    } else if (r.voucherType === 'OUT') {
+      acc.grossOut += r.gross
+    }
     return acc
-  }, { count: 0, gross: 0, paid: 0 })
+  }, { count: 0, gross: 0, paid: 0, grossIn: 0, grossOut: 0 })
   const remaining = clamp2(Math.max(0, Math.round((agg.gross - agg.paid) * 100) / 100))
-  return { count: agg.count, gross: clamp2(agg.gross), paid: clamp2(agg.paid), remaining }
+  return { count: agg.count, gross: clamp2(agg.gross), paid: clamp2(agg.paid), remaining, grossIn: clamp2(agg.grossIn), grossOut: clamp2(agg.grossOut) }
 }
 
 export function getInvoiceById(id: number) {

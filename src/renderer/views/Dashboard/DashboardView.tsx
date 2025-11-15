@@ -153,7 +153,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       const overTot = sumTwo(sOverOpen, sOverPart)
       setInvOverdueCount(overTot.count)
       setInvOverdueRemaining(overTot.remaining)
-      // Nächste Fälligkeiten: Alle offenen Rechnungen sortiert nach Fälligkeitsdatum (älteste zuerst)
+      // Nächste Fälligkeiten: Alle offenen Verbindlichkeiten sortiert nach Fälligkeitsdatum (älteste zuerst)
       const listOpen = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN' })
       const listPart = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL' })
       const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
@@ -271,7 +271,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
         <div className="card card--accent chart-card-overflow">
           <div className="chart-header-baseline">
             <div className="legend-container">
-            <strong>Offene Rechnungen</strong>
+            <strong>Offene Verbindlichkeiten</strong>
           </div>
         </div>
           <div className="dashboard-grid-wide">

@@ -32,7 +32,7 @@ export default function InvoicesView() {
   const [limit, setLimit] = useState<number>(20)
   const [offset, setOffset] = useState<number>(0)
   const [total, setTotal] = useState<number>(0)
-  const [summary, setSummary] = useState<{ count: number; gross: number; paid: number; remaining: number } | null>(null)
+  const [summary, setSummary] = useState<{ count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number } | null>(null)
   // Sorting (persist to localStorage)
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
   const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount') || 'due') } catch { return 'due' } })
@@ -153,6 +153,7 @@ export default function InvoicesView() {
   const [detail, setDetail] = useState<null | { id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; payments: Array<{ id: number; date: string; amount: number }>; files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>; tags: string[]; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID' }>(null)
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false)
   async function openDetails(id: number) { setDetailId(id) }
+  
   useEffect(() => {
     let cancelled = false
     async function fetchDetail() {
@@ -161,6 +162,19 @@ export default function InvoicesView() {
       try { const d = await window.api?.invoices?.get?.({ id: detailId }); if (!cancelled) setDetail(d || null) } catch { if (!cancelled) setDetail(null) } finally { if (!cancelled) setLoadingDetail(false) }
     }
     fetchDetail(); return () => { cancelled = true }
+  }, [detailId])
+
+  // ESC key handler for detail modal
+  useEffect(() => {
+    if (detailId == null) return
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDetailId(null)
+        setDetail(null)
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
   }, [detailId])
 
   useEffect(() => {
@@ -178,7 +192,7 @@ export default function InvoicesView() {
     
     // Check if invoice has paymentMethod and autoPost - if no paymentMethod and invoice will be auto-posted, ask user
     const invoiceRow = rows.find(r => r.id === showPayModal.id)
-    if (!invoiceRow) { alert('Rechnung nicht gefunden'); return }
+    if (!invoiceRow) { alert('Verbindlichkeit nicht gefunden'); return }
     
     const hasAutoPost = !!(invoiceRow.autoPost ?? 0)
     const hasPaymentMethod = !!(invoiceRow.paymentMethod && invoiceRow.paymentMethod !== '')
@@ -208,7 +222,7 @@ export default function InvoicesView() {
           const row = rows.find(r => r.id === showPayModal.id)
           const autoPostEnabled = !!(row?.autoPost)
           if (res.status === 'PAID' && autoPostEnabled) {
-            const invLabel = row?.invoiceNo ? `Rechnung ${row.invoiceNo}` : `Rechnung #${row?.id}`
+            const invLabel = row?.invoiceNo ? `Verbindlichkeit ${row.invoiceNo}` : `Verbindlichkeit #${row?.id}`
             notify('success', `${invLabel} wurde automatisch als Buchung erstellt.`)
           }
         } catch {}
@@ -225,7 +239,7 @@ export default function InvoicesView() {
     try {
       // Update invoice payment method first
       const invoiceRow = rows.find(r => r.id === showPaymentMethodModal.invoiceId)
-      if (!invoiceRow) throw new Error('Rechnung nicht gefunden')
+      if (!invoiceRow) throw new Error('Verbindlichkeit nicht gefunden')
       
       await window.api?.invoices?.update?.({
         id: showPaymentMethodModal.invoiceId,
@@ -268,7 +282,7 @@ export default function InvoicesView() {
           
           if (res.status === 'PAID') {
             const invoiceLabel = showPaymentMethodModal.invoiceNo || `#${showPaymentMethodModal.invoiceId}`
-            notify('success', `Rechnung ${invoiceLabel} wurde automatisch als Buchung gebucht`)
+            notify('success', `Verbindlichkeit ${invoiceLabel} wurde automatisch als Buchung gebucht`)
           }
           
           setShowPaymentMethodModal(null)
@@ -327,7 +341,7 @@ export default function InvoicesView() {
     const d = form.draft
     const missing: string[] = []
     if (!d.date) missing.push('Datum')
-    if (!(d.invoiceNo || '').trim()) missing.push('Rechnungsnummer')
+    if (!(d.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
     if (!d.party || !d.party.trim()) missing.push('Partei')
     const amt = parseAmount(d.grossAmount)
     if (amt == null || amt <= 0) missing.push('Betrag')
@@ -384,9 +398,9 @@ export default function InvoicesView() {
   return (
     <div className="card invoices-container">
       <div className="invoices-header">
-        <h1>Rechnungen</h1>
+        <h1>Verbindlichkeiten</h1>
         <div className="invoices-filters">
-          <input className="input invoices-search" placeholder="Suche Rechnungen (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} aria-label="Rechnungen durchsuchen" />
+          <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
           <select className="input" value={status} onChange={e => { setStatus(e.target.value as any); setOffset(0) }} aria-label="Status filtern">
             <option value="ALL">Alle</option>
             <option value="OPEN">Offen</option>
@@ -423,14 +437,14 @@ export default function InvoicesView() {
       </div>
       {error && <div className="invoices-text-danger">{error}</div>}
       {loading ? (
-        <LoadingState message="Lade Rechnungen…" />
+        <LoadingState message="Lade Verbindlichkeiten…" />
       ) : (
         <>
           {summary && (
             <div className="helper invoices-summary">
               Offen gesamt: <strong>{eurFmt.format(Math.max(0, Math.round((summary.remaining || 0) * 100) / 100))}</strong>
               <span className="summary-remaining">
-                ({summary.count} Rechnungen; Brutto {eurFmt.format(summary.gross || 0)}, Bezahlt {eurFmt.format(summary.paid || 0)})
+                ({summary.count} gesamt; Forderungen (IN): {eurFmt.format(summary.grossIn || 0)}, Verbindlichkeiten (OUT): {eurFmt.format(summary.grossOut || 0)})
               </span>
             </div>
           )}
@@ -493,7 +507,10 @@ export default function InvoicesView() {
                       }
                       return (<td style={style} title={title}>{fmtDateLocal(due)}</td>)
                     })()}
-                    <td>{r.invoiceNo || '—'}</td>
+                    <td>
+                      {r.invoiceNo || '—'}
+                      {(r.fileCount || 0) > 0 && <span className="invoices-attachment-icon" title={`${r.fileCount} Anhang${r.fileCount > 1 ? 'e' : ''}`}>📎</span>}
+                    </td>
                     <td>{r.party}</td>
                     {colPrefs.showTags && (
                       <td>
@@ -544,7 +561,7 @@ export default function InvoicesView() {
                   </tr>
                 )
               })}
-              {rows.length === 0 && (<tr><td colSpan={12} className="helper">Keine Rechnungen gefunden.</td></tr>)}
+              {rows.length === 0 && (<tr><td colSpan={12} className="helper">Keine Verbindlichkeiten gefunden.</td></tr>)}
             </tbody>
           </table>
           <div className="invoices-pagination">
@@ -567,14 +584,18 @@ export default function InvoicesView() {
 
       <TimeFilterModal open={showDueFilter} onClose={() => setShowDueFilter(false)} yearsAvail={yearsAvail} from={dueFrom} to={dueTo} onApply={({ from: nf, to: nt }) => { setDueFrom(nf); setDueTo(nt); setOffset(0) }} />
 
-      {showPayModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
-          <div className="modal payment-modal-grid" onClick={e => e.stopPropagation()}>
-            <ModalHeader 
-              title="Zahlung hinzufügen" 
-              subtitle={`${showPayModal.invoiceNo ? `Rechnung ${showPayModal.invoiceNo}` : `Rechnung #${showPayModal.id}`} · ${showPayModal.party || ''}`}
-              onClose={() => setShowPayModal(null)} 
-            />
+      {showPayModal && createPortal((() => {
+        const rowData = rows.find(r => r.id === showPayModal.id)
+        const isIN = rowData?.voucherType === 'IN'
+        const typeName = isIN ? 'Forderung' : 'Verbindlichkeit'
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
+            <div className="modal payment-modal-grid" onClick={e => e.stopPropagation()}>
+              <ModalHeader 
+                title="Zahlung hinzufügen" 
+                subtitle={`${showPayModal.invoiceNo ? `${typeName} ${showPayModal.invoiceNo}` : `${typeName} #${showPayModal.id}`} · ${showPayModal.party || ''}`}
+                onClose={() => setShowPayModal(null)} 
+              />
             {typeof showPayModal.remaining === 'number' && (<div className="helper">Offener Rest: <strong>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.max(0, Math.round(showPayModal.remaining * 100) / 100))}</strong></div>)}
             <div className="row">
               <div className="field">
@@ -591,24 +612,25 @@ export default function InvoicesView() {
                 }} placeholder="z. B. 199,90" />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setShowPayModal(null)}>Abbrechen</button>
-              <button className="btn primary" disabled={busyAction} onClick={addPayment}>Speichern</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn" onClick={() => setShowPayModal(null)}>Abbrechen</button>
+                <button className="btn primary" disabled={busyAction} onClick={addPayment}>Speichern</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })(), document.body)}
 
       {showPaymentMethodModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPaymentMethodModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500, textAlign: 'center' }}>
             <ModalHeader 
               title="Zahlweg festlegen" 
-              subtitle={`Rechnung #${showPaymentMethodModal.invoiceId}`}
+              subtitle={`Verbindlichkeit #${showPaymentMethodModal.invoiceId}`}
               onClose={() => setShowPaymentMethodModal(null)} 
             />
             <div className="helper" style={{ marginBottom: 24 }}>
-              Die Rechnung wird automatisch verbucht. Bitte wählen Sie den Zahlweg:
+              Die Verbindlichkeit wird automatisch verbucht. Bitte wählen Sie den Zahlweg:
             </div>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
               <button 
@@ -641,7 +663,10 @@ export default function InvoicesView() {
             <div className="card invoices-form-header">
               <div className="invoices-form-header-top">
                 <div className="invoices-form-header-info">
-                  <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Rechnung anlegen' : 'Rechnung bearbeiten'}</h2>
+                  <h2 style={{ margin: 0 }}>{(() => {
+                    const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
+                    return form.mode === 'create' ? `${type} anlegen` : `${type} bearbeiten`
+                  })()}</h2>
                 </div>
                 <div className="invoices-form-header-actions">
                   {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
@@ -679,24 +704,24 @@ export default function InvoicesView() {
                     <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                     {requiredTouched && (!form.draft.party?.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Partei angeben</div>)}
                   </div>
-                  {/* Reihe 3: Rechnungsnummer + Betrag */}
+                  {/* Reihe 3: Verbindlichkeitsnummer/Forderungsnummer + Betrag */}
                   <div className="field">
-                    <label>Rechnungsnummer <span className="req-asterisk" aria-hidden="true">*</span></label>
+                    <label>{form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                     <input
                       className="input"
                       value={form.draft.invoiceNo || ''}
                       onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))}
                       placeholder="z. B. 2025-001"
                       style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
-                      aria-label="Rechnungsnummer"
+                      aria-label={form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'}
                     />
                     {requiredTouched && !(form.draft.invoiceNo || '').trim() && (
-                      <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Rechnungsnummer angeben</div>
+                      <div className="helper" style={{ color: 'var(--danger)' }}>Bitte {form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'} angeben</div>
                     )}
                   </div>
                   <div className="field">
                     <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                    <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label="Rechnungsbetrag in Euro" />
+                    <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label={`${form.draft.voucherType === 'IN' ? 'Forderungs' : 'Verbindlichkeits'}betrag in Euro`} />
                     {/* Entfernte Helfer-Ausgabe des formatierten Betrags unter dem Eingabefeld (Duplikat) */}
                   </div>
                   {/* Reihe 4: Beschreibung (volle Breite) */}
@@ -772,9 +797,16 @@ export default function InvoicesView() {
                         <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
                           <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="center">Aktion</th></tr></thead>
                           <tbody>
-                            {formFiles.map((f, i) => (
-                              <tr key={i}><td>{f.name}</td><td align="right">{f.size} B</td><td align="center"><button className="btn danger" onClick={() => removeFileAt(i)}>Entfernen</button></td></tr>
-                            ))}
+                            {formFiles.map((f, i) => {
+                              const sizeMB = f.size != null ? (f.size / 1024 / 1024) : 0
+                              return (
+                                <tr key={i}>
+                                  <td className="invoices-file-name" title={f.name}>{f.name}</td>
+                                  <td align="right">{sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)} MB</td>
+                                  <td align="center"><button className="btn danger" onClick={() => removeFileAt(i)}>Entfernen</button></td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       )}
@@ -827,15 +859,18 @@ export default function InvoicesView() {
                       <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
                         <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="center">Aktion</th></tr></thead>
                         <tbody>
-                          {(editInvoiceFiles || []).map((f) => (
-                            <tr key={f.id}>
-                              <td>{f.fileName}</td>
-                              <td align="right">{f.size != null ? `${f.size} B` : '—'}</td>
-                              <td align="center"><button className="btn danger" onClick={async () => {
-                                try { await window.api?.invoiceFiles?.delete?.({ fileId: f.id }); const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id }); setEditInvoiceFiles(res?.files || []) } catch (e: any) { alert(e?.message || String(e)) }
-                              }}>Entfernen</button></td>
-                            </tr>
-                          ))}
+                          {(editInvoiceFiles || []).map((f) => {
+                            const sizeMB = f.size != null ? (Number(f.size) / 1024 / 1024) : null
+                            return (
+                              <tr key={f.id}>
+                                <td className="invoices-file-name" title={f.fileName}>{f.fileName}</td>
+                                <td align="right">{sizeMB != null ? (sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)) + ' MB' : '—'}</td>
+                                <td align="center"><button className="btn danger" onClick={async () => {
+                                  try { await window.api?.invoiceFiles?.delete?.({ fileId: f.id }); const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id }); setEditInvoiceFiles(res?.files || []) } catch (e: any) { alert(e?.message || String(e)) }
+                                }}>Entfernen</button></td>
+                              </tr>
+                            )
+                          })}
                           {(editInvoiceFiles || []).length === 0 && <tr><td colSpan={3} className="helper">Keine Dateien.</td></tr>}
                         </tbody>
                       </table>
@@ -848,7 +883,7 @@ export default function InvoicesView() {
             {(() => {
               const missing: string[] = []
               if (!form!.draft.date) missing.push('Datum')
-              if (!(form!.draft.invoiceNo || '').trim()) missing.push('Rechnungsnummer')
+              if (!(form!.draft.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
               if (!form!.draft.party?.trim()) missing.push('Partei')
               const a = parseAmount(form!.draft.grossAmount)
               if (a == null || a <= 0) missing.push('Betrag')
@@ -891,9 +926,9 @@ export default function InvoicesView() {
 
       {detailId != null && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setDetailId(null); setDetail(null) }}>
-          <div className="modal invoices-detail-grid" onClick={e => e.stopPropagation()} style={{ maxWidth: 760 }}>
+          <div className="modal invoices-detail-grid" onClick={e => e.stopPropagation()} style={{ maxWidth: 860 }}>
             <div className="invoices-detail-header">
-              <h2 style={{ margin: 0 }}>Rechnung {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
+              <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
               <div className="invoices-detail-header-actions">
                 <button className="btn ghost" onClick={() => { setDetailId(null); setDetail(null) }}>✕</button>
               </div>
@@ -962,11 +997,13 @@ export default function InvoicesView() {
                     <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
                       <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="left">Datum</th><th align="center">Aktion</th></tr></thead>
                       <tbody>
-                        {(detail.files || []).map(f => (
-                          <tr key={f.id}>
-                            <td>{f.fileName}</td>
-                            <td align="right">{f.size != null ? `${f.size} B` : '—'}</td>
-                            <td>{f.createdAt || '—'}</td>
+                        {(detail.files || []).map(f => {
+                          const sizeMB = f.size != null ? (Number(f.size) / 1024 / 1024) : null
+                          return (
+                            <tr key={f.id}>
+                              <td>{f.fileName}</td>
+                              <td align="right">{sizeMB != null ? (sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)) + ' MB' : '—'}</td>
+                              <td>{f.createdAt || '—'}</td>
                             <td align="center" style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
                               <button className="btn" title="Datei öffnen" onClick={async () => {
                                 try { const res = await window.api?.invoiceFiles?.open?.({ fileId: f.id }); if (!res?.ok) alert('Datei konnte nicht geöffnet werden') } catch (e: any) { alert(e?.message || String(e)) }
@@ -974,9 +1011,18 @@ export default function InvoicesView() {
                               <button className="btn" title="Speichern unter …" onClick={async () => {
                                 try { const res = await window.api?.invoiceFiles?.saveAs?.({ fileId: f.id }); if (res?.filePath) alert(`Gespeichert: ${res.filePath}`) } catch (e: any) { const msg = e?.message || String(e); if (!/Abbruch/i.test(msg)) alert(msg) }
                               }}>Speichern…</button>
+                              <button className="btn danger" title="Datei entfernen" onClick={async () => {
+                                if (!confirm(`Datei "${f.fileName}" wirklich entfernen?`)) return
+                                try {
+                                  await window.api?.invoiceFiles?.delete?.({ fileId: f.id })
+                                  const updated = await window.api?.invoices?.get?.({ id: detail.id })
+                                  if (updated) setDetail(updated)
+                                } catch (e: any) { alert(e?.message || String(e)) }
+                              }}>Entfernen</button>
                             </td>
                           </tr>
-                        ))}
+                        )
+                        })}
                         {detail.files.length === 0 && <tr><td colSpan={4} className="helper">Keine Dateien.</td></tr>}
                       </tbody>
                     </table>
@@ -1029,11 +1075,11 @@ export default function InvoicesView() {
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
             <ModalHeader 
-              title="Rechnung löschen" 
+              title="Verbindlichkeit löschen" 
               subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`}
               onClose={() => setDeleteConfirm(null)} 
             />
-            <div>Diese Rechnung wirklich löschen?</div>
+            <div>Diese Verbindlichkeit wirklich löschen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
               <button className="btn danger" disabled={busyAction} onClick={() => { deleteInvoice(deleteConfirm.id); setForm(null) }}>Ja, löschen</button>
@@ -1046,14 +1092,14 @@ export default function InvoicesView() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
             <ModalHeader
               title="Als Buchung hinzufügen"
-              subtitle={`${postToVoucherModal.invoiceNo ? `Rechnung ${postToVoucherModal.invoiceNo}` : `Rechnung #${postToVoucherModal.id}`}`}
+              subtitle={`${postToVoucherModal.invoiceNo ? `Verbindlichkeit ${postToVoucherModal.invoiceNo}` : `Verbindlichkeit #${postToVoucherModal.id}`}`}
               onClose={() => setPostToVoucherModal(null)} 
             />
             <div style={{ marginBottom: 16 }}>
               <strong>{postToVoucherModal.party}</strong>
             </div>
             <div className="helper" style={{ marginBottom: 16 }}>
-              Diese bezahlte Rechnung als Buchung hinzufügen?
+              Diese bezahlte Verbindlichkeit als Buchung hinzufügen?
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setPostToVoucherModal(null)}>Abbrechen</button>
@@ -1069,7 +1115,7 @@ export default function InvoicesView() {
                         : r
                     ))
                   }
-                  notify?.('success', 'Rechnung wurde als Buchung hinzugefügt')
+                  notify?.('success', 'Verbindlichkeit wurde als Buchung hinzugefügt')
                   setPostToVoucherModal(null)
                   await Promise.all([load(), loadSummary()])
                 } catch (e: any) {

@@ -1,4 +1,4 @@
-export type NavKey = 'Dashboard' | 'Buchungen' | 'Rechnungen' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Belege' | 'Reports' | 'Einstellungen'
+export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Belege' | 'Reports' | 'Einstellungen'
 
 export type NavGroup = 'dashboard' | 'core' | 'reports' | 'settings'
 
@@ -13,7 +13,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { key: 'Dashboard', label: 'Dashboard', group: 'dashboard' },
   { key: 'Buchungen', label: 'Buchungen', group: 'core', showDividerAfter: true },
-  { key: 'Rechnungen', label: 'Rechnungen', group: 'core', showDividerAfter: true },
+  { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'core', showDividerAfter: true },
   { key: 'Mitglieder', label: 'Mitglieder', group: 'core' },
   { key: 'Budgets', label: 'Budgets', group: 'core' },
   { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'core' },

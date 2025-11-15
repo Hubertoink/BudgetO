@@ -39,13 +39,13 @@ export default function SmartRestoreModal({ preview, onClose, onApply }: {
           <div style={{ height: 6 }} />
           <div className="helper">Tabellenstände</div>
           <Item label="Buchungen" cur={String(current.counts?.vouchers ?? 0)} defv={String(def.counts?.vouchers ?? 0)} />
-          <Item label="Rechnungen" cur={String(current.counts?.invoices ?? 0)} defv={String(def.counts?.invoices ?? 0)} />
+          <Item label="Verbindlichkeiten" cur={String(current.counts?.invoices ?? 0)} defv={String(def.counts?.invoices ?? 0)} />
           <Item label="Mitglieder" cur={String(current.counts?.members ?? 0)} defv={String(def.counts?.members ?? 0)} />
           <Item label="Tags" cur={String(current.counts?.tags ?? 0)} defv={String(def.counts?.tags ?? 0)} />
           <div style={{ height: 6 }} />
           <div className="helper">Letzte Aktivität</div>
           <Item label="Buchung" cur={current.last?.voucher ?? '—'} defv={def.last?.voucher ?? '—'} />
-          <Item label="Rechnung" cur={current.last?.invoice ?? '—'} defv={def.last?.invoice ?? '—'} />
+          <Item label="Verbindlichkeit" cur={current.last?.invoice ?? '—'} defv={def.last?.invoice ?? '—'} />
           <Item label="Mitglied" cur={current.last?.member ?? '—'} defv={def.last?.member ?? '—'} />
           <Item label="Audit" cur={current.last?.audit ?? '—'} defv={def.last?.audit ?? '—'} />
         </div>

@@ -1,6 +1,6 @@
 import React from 'react'
 
-export type PageKey = 'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen'
+export type PageKey = 'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Verbindlichkeiten' | 'Mitglieder' | 'Einstellungen'
 export type NavIconColorMode = 'color' | 'mono'
 
 export default function SidebarNav({
@@ -38,17 +38,17 @@ export default function SidebarNav({
 
             <div className="nav-separator" aria-hidden />
 
-            {/* Group 2: Buchungen, Rechnungen, Mitglieder, Budgets, Zweckbindungen */}
+            {/* Group 2: Buchungen, Verbindlichkeiten, Mitglieder, Budgets, Zweckbindungen */}
             <Button
                 keyName="Buchungen"
                 label="Buchungen"
                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>}
             />
             <Button
-                keyName="Rechnungen"
-                label="Rechnungen"
+                keyName="Verbindlichkeiten"
+                label="Verbindlichkeiten"
                 icon={(
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Verbindlichkeiten">
                         <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
                         <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
                     </svg>

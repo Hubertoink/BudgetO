@@ -67,7 +67,7 @@ export function GeneralPane({
               <option value="none">Ohne Linien/Zebra</option>
             </select>
             <div className="helper">
-              „Nur Linien" entspricht der Rechnungen-Tabelle. „Zebra" hebt jede zweite Zeile leicht hervor.
+              "Nur Linien" entspricht der Verbindlichkeiten-Tabelle. "Zebra" hebt jede zweite Zeile leicht hervor.
             </div>
           </div>
           <div className="field">

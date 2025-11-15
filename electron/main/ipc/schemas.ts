@@ -339,7 +339,9 @@ export const InvoicesSummaryOutput = z.object({
     count: z.number(),
     gross: z.number(),
     paid: z.number(),
-    remaining: z.number()
+    remaining: z.number(),
+    grossIn: z.number(),
+    grossOut: z.number()
 })
 export type TInvoicesSummaryInput = z.infer<typeof InvoicesSummaryInput>
 export type TInvoicesSummaryOutput = z.infer<typeof InvoicesSummaryOutput>
