@@ -186,38 +186,20 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
   function renderPreview() {
     if (!certificate) return null
     return (
-      <div
-        style={{
-          flex: 1,
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          overflow: 'hidden',
-          minHeight: 260,
-          maxHeight: '50vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--background)',
-          position: 'relative'
-        }}
-      >
+      <div className="taxex-preview">
         {isImage && previewUrl && (
-          <img
-            src={previewUrl}
-            alt="Bescheid Vorschau"
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
+          <img src={previewUrl} alt="Bescheid Vorschau" className="taxex-preview-img" />
         )}
         {isPdf && (
-          <div style={{ textAlign: 'center', color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 12 }}>📄</div>
-            <div style={{ fontWeight: 500 }}>PDF Bescheid</div>
-            <div className="helper" style={{ fontSize: 12 }}>Zum Speichern oder Ersetzen unten Aktionen nutzen</div>
+          <div className="taxex-preview-message">
+            <div className="taxex-icon-64">📄</div>
+            <strong className="taxex-pdf-label">PDF Bescheid</strong>
+            <div className="helper taxex-shortcut-hint">Zum Speichern oder Ersetzen unten Aktionen nutzen</div>
           </div>
         )}
         {!isPdf && !isImage && (
-          <div style={{ textAlign: 'center', color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 12 }}>📎</div>
+          <div className="taxex-preview-message">
+            <div className="taxex-icon-56">📎</div>
             <div>Keine Vorschau verfügbar</div>
           </div>
         )}
@@ -226,68 +208,28 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
   }
 
   return createPortal(
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        background: 'color-mix(in oklab, var(--surface) 65%, transparent)',
-        padding: '24px 16px',
-        zIndex: 9999,
-        overflowY: 'auto'
-      }}
-    >
-      <div
-        className="modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 'min(920px, 96vw)',
-          maxHeight: '92vh',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-          background: 'var(--surface)'
-        }}
-      >
+    <div className="modal-overlay taxex-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal taxex-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <header className="taxex-header">
           <div>
-            <h2 style={{ margin: 0, fontSize: 18 }}>📄 Steuerbefreiungsbescheid</h2>
+            <h2 className="taxex-title">📄 Steuerbefreiungsbescheid</h2>
             <div className="helper">Gemeinnützigkeitsbescheid für Spendenbescheinigungen</div>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ fontSize: 20 }}>
+          <button className="btn ghost taxex-close-btn" onClick={onClose} aria-label="Schließen">
             ✕
           </button>
         </header>
 
-        {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48, color: 'var(--text-dim)' }}>
-            <div>Lade...</div>
-          </div>
-        )}
-        {error && <div style={{ color: 'var(--danger)', marginBottom: 12 }}>{error}</div>}
+        {loading && (<div className="taxex-loading"><div>Lade...</div></div>)}
+        {error && <div className="taxex-error">{error}</div>}
 
         {!loading && !certificate && (
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div
-              style={{
-                border: '2px dashed var(--border)',
-                borderRadius: 8,
-                padding: 48,
-                textAlign: 'center',
-                color: 'var(--text-dim)'
-              }}
-            >
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📎</div>
-              <div style={{ marginBottom: 8 }}>Kein Bescheid hinterlegt</div>
-              <div className="helper" style={{ marginBottom: 16 }}>
+          <div className="grid gap-12">
+            <div className="taxex-empty">
+              <div className="taxex-empty-icon">📎</div>
+              <div className="taxex-empty-title">Kein Bescheid hinterlegt</div>
+              <div className="helper taxex-empty-helper">
                 Laden Sie Ihren Gemeinnützigkeitsbescheid hoch (PDF, JPG, PNG - max. 5 MB)
               </div>
               <input
@@ -295,7 +237,9 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileSelect}
-                style={{ display: 'none' }}
+                hidden
+                aria-label="Gemeinnützigkeitsbescheid auswählen zum Hochladen"
+                title="Gemeinnützigkeitsbescheid auswählen zum Hochladen"
               />
               <button
                 className="btn primary"
@@ -309,13 +253,13 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
         )}
 
         {!loading && certificate && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
+          <div className="taxex-cert-layout">
             {/* Preview */}
             {renderPreview()}
 
             {/* File Info */}
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="taxex-file-grid">
+              <div className="taxex-file-row">
                 <div>
                   <strong>{certificate.fileName}</strong>
                   <div className="helper">
@@ -328,29 +272,33 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
               {/* Validity Dates */}
               <div className="row">
                 <div className="field">
-                  <label>Gültig von (optional)</label>
+                  <label htmlFor="taxex-valid-from">Gültig von (optional)</label>
                   <input
                     className="input"
                     type="date"
+                    id="taxex-valid-from"
                     value={validFrom}
                     onChange={(e) => setValidFrom(e.target.value)}
                     disabled={busy}
+                    title="Startdatum der Gültigkeit"
                   />
                 </div>
                 <div className="field">
-                  <label>Gültig bis (optional)</label>
+                  <label htmlFor="taxex-valid-until">Gültig bis (optional)</label>
                   <input
                     className="input"
                     type="date"
+                    id="taxex-valid-until"
                     value={validUntil}
                     onChange={(e) => setValidUntil(e.target.value)}
                     disabled={busy}
+                    title="Enddatum der Gültigkeit"
                   />
                 </div>
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="taxex-actions">
                 <button className="btn" onClick={handleDownload} disabled={busy}>
                   💾 Als Datei speichern
                 </button>
@@ -359,7 +307,9 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
                   onChange={handleFileSelect}
-                  style={{ display: 'none' }}
+                  className="hidden"
+                  aria-label="Neuen Gemeinnützigkeitsbescheid hochladen"
+                  title="Neuen Gemeinnützigkeitsbescheid hochladen"
                 />
                 <button className="btn" onClick={() => fileInputRef.current?.click()} disabled={busy}>
                   📎 Neuen Bescheid hochladen
@@ -384,20 +334,11 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
         )}
 
         {/* Footer */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 16,
-            paddingTop: 16,
-            borderTop: '1px solid var(--border)'
-          }}
-        >
-          <div className="helper" style={{ fontSize: 12 }}>
+        <div className="taxex-footer">
+          <div className="helper taxex-shortcut-hint">
             Esc = Schließen{certificate ? ' · Strg+S = Speichern' : ''}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex gap-8">
             {certificate && (
               <button className="btn primary" onClick={handleSaveValidity} disabled={busy}>
                 Speichern

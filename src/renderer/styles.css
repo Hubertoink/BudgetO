@@ -780,6 +780,46 @@ svg text {
     z-index: 5000; /* below toasts (9999) */
 }
 
+/* Tax Exemption Modal (refactored from inline styles) */
+.taxex-overlay {
+    background: color-mix(in oklab, var(--surface) 65%, transparent);
+    padding: 24px 16px;
+    overflow-y: auto;
+}
+.taxex-modal {
+    width: min(920px, 96vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    background: var(--surface);
+}
+.taxex-header { margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.taxex-title { margin: 0; font-size: 18px; }
+.taxex-close-btn { font-size: 20px; }
+.taxex-loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--text-dim); }
+.taxex-error { color: var(--danger); margin-bottom: 12px; }
+.taxex-empty { border: 2px dashed var(--border); border-radius: 8px; padding: 48px; text-align: center; color: var(--text-dim); }
+.taxex-empty-icon { font-size: 48px; margin-bottom: 16px; }
+.taxex-empty-title { margin-bottom: 8px; }
+.taxex-empty-helper { margin-bottom: 16px; }
+.taxex-cert-layout { display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 0; }
+.taxex-file-grid { display: grid; gap: 8px; }
+.taxex-file-row { display: flex; justify-content: space-between; align-items: center; }
+.taxex-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.taxex-preview { flex: 1; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-height: 260px; max-height: 50vh; display: flex; align-items: center; justify-content: center; background: var(--background); position: relative; }
+.taxex-preview-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.taxex-preview-message { text-align: center; color: var(--text-dim); }
+.taxex-icon-64 { font-size: 64px; line-height: 1; margin-bottom: 12px; }
+.taxex-icon-56 { font-size: 56px; line-height: 1; margin-bottom: 12px; }
+.taxex-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.taxex-shortcut-hint { font-size: 12px; }
+.min-h-0 { min-height: 0; }
+.mb-16 { margin-bottom: 16px; }
+.mb-12 { margin-bottom: 12px; }
+.p-48 { padding: 48px; }
+
 .modal {
     width: min(900px, 96vw);
     background: color-mix(in oklab, var(--surface) 80%, transparent);
@@ -1761,6 +1801,8 @@ label .req-asterisk {
     width: 28px;
     height: 28px;
     border-radius: 6px;
+    background: var(--swatch-color);
+    color: var(--swatch-text, #fff);
 }
 
 .color-swatch-selected {
@@ -1775,6 +1817,13 @@ label .req-asterisk {
 .custom-color-btn {
     height: 28px;
 }
+
+/* TagsEditor */
+.tags-editor-input { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-height:34px; }
+.tags-editor-text-input { flex:1; min-width:120px; border:none; outline:none; background:transparent; color:var(--text); }
+.tags-suggestions { padding:6px; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; }
+.tag-suggestion-btn { position:relative; }
+.tag-suggestion-btn.tag-has-color { background: var(--tag-bg); color: var(--tag-fg); }
 
 /* Modal footer actions */
 .modal-footer {
@@ -1874,6 +1923,11 @@ label .req-asterisk {
 .input-error {
     border-color: var(--danger);
 }
+
+/* Additional BudgetModal refinements */
+.budget-enforce-range-label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.budget-enforce-range-checkbox { cursor:pointer; }
+.budget-actions-row { display:flex; gap:8px; }
 
 /* ========================================
    Report Charts - Common CSS Classes

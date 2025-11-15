@@ -129,13 +129,13 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
           </div>
           {(v.startDate || v.endDate) && (
             <div className="field field-full-width">
-              <label htmlFor="budget-enforce-range" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <label htmlFor="budget-enforce-range" className="budget-enforce-range-label">
                 <input 
                   id="budget-enforce-range" 
                   type="checkbox" 
                   checked={!!v.enforceTimeRange} 
                   onChange={(e) => setV({ ...v, enforceTimeRange: e.target.checked ? 1 : 0 })} 
-                  style={{ cursor: 'pointer' }}
+                  className="budget-enforce-range-checkbox"
                 />
                 <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
               </label>
@@ -146,11 +146,11 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
             <label>Farbe</label>
             <div className="color-picker-container">
               {PALETTE.map((c) => (
-                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ background: c }} aria-label={`Farbe ${c}`}>
+                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ '--swatch-color': c } as React.CSSProperties} aria-label={`Farbe ${c}`}>
                   <span aria-hidden="true" />
                 </button>
               ))}
-              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
+              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ '--swatch-color': v.color || 'var(--muted)', '--swatch-text': v.color ? contrastText(v.color) : 'var(--text)' } as React.CSSProperties}>
                 Eigene…
               </button>
               <button type="button" className="btn custom-color-btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe">Keine</button>
@@ -159,7 +159,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
         </div>
         <div className="modal-footer">
           <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="budget-actions-row">
             {!!v.id && (
               <button className="btn danger modal-delete-btn" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
@@ -203,8 +203,8 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
               </div>
             </div>
             <div className="card color-preview-card">
-              <div className="color-preview-swatch" style={{ background: draftColor }} />
-              <div className="helper">Kontrast: <span className="contrast-sample" style={{ background: draftColor, color: contrastText(draftColor) }}>{contrastText(draftColor)}</span></div>
+              <div className="color-preview-swatch" style={{ '--preview-color': draftColor } as React.CSSProperties} />
+              <div className="helper">Kontrast: <span className="contrast-sample" style={{ '--preview-color': draftColor, '--preview-text': contrastText(draftColor) } as React.CSSProperties}>{contrastText(draftColor)}</span></div>
             </div>
             <div className="delete-modal-actions">
               <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
