@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vereino-db
+    environment:
+      POSTGRES_USER: vereino
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password}
+      POSTGRES_DB: vereino
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vereino-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vereino"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vereino-api
+    environment:
+      DATABASE_URL: postgresql://vereino:${DB_PASSWORD:-dev_password}@postgres:5432/vereino
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+      NODE_ENV: production
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "3000:3000"
+    volumes:
+      - upload_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vereino-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  upload_data:
+    driver: local
+
+networks:
+  vereino-network:
+    driver: bridge

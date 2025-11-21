@@ -8,14 +8,15 @@
 // Navigation & Layout Types
 // ============================================================================
 
-export type TileKey = 
-  | 'general' 
-  | 'table' 
-  | 'storage' 
-  | 'import' 
-  | 'org' 
-  | 'tags' 
-  | 'yearEnd' 
+export type TileKey =
+  | 'general'
+  | 'table'
+  | 'storage'
+  | 'import'
+  | 'org'
+  | 'tags'
+  | 'yearEnd'
+  | 'cloud'
   | 'tutorial' 
   | 'about'
 

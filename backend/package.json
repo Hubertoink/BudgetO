@@ -1,0 +1,38 @@
+{
+  "name": "vereino-backend",
+  "version": "1.0.0",
+  "description": "VereinO Cloud Backend API",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "node dist/scripts/migrate.js",
+    "migrate:dev": "tsx src/scripts/migrate.ts",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f backend"
+  },
+  "keywords": ["vereino", "backend", "api"],
+  "author": "Hubertoink",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^9.0.0",
+    "@fastify/jwt": "^8.0.0",
+    "@fastify/multipart": "^8.1.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.0",
+    "fastify": "^4.26.0",
+    "pg": "^8.11.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

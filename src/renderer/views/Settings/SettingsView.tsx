@@ -8,6 +8,7 @@ import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
 import { YearEndPane } from './panes/YearEndPane'
+import { CloudPane } from './panes/CloudPane'
 
 /**
  * SettingsView - Main Settings Container
@@ -114,6 +115,8 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
           />
         )}
+        
+        {activeTile === 'cloud' && <CloudPane />}
       </div>
 
       {/* Developer Badge - edge anchored handle; panel retracts on mouse leave */}

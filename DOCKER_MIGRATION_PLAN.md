@@ -579,22 +579,25 @@ interface SyncConflict {
 
 ## Implementierungs-Reihenfolge
 
-### Sprint 1 (Week 1)
-- [ ] Branch `docker` erstellen ✅
-- [ ] Ordnerstruktur anlegen (`backend/`, Shared Types)
-- [ ] `shared/api-types.ts` definieren
-- [ ] Config-System für Modi (`app-mode.ts`)
-- [ ] Backend Grundgerüst (Fastify + PostgreSQL)
-- [ ] Auth-System (Users-Tabelle, JWT-Middleware)
-- [ ] Erste Route: `/api/auth/login`
+### Sprint 1 (Week 1) ✅ ABGESCHLOSSEN
+- [x] Branch `docker` erstellen ✅
+- [x] Ordnerstruktur anlegen (`backend/`, Shared Types)
+- [x] `shared/api-types.ts` definieren
+- [x] Config-System für Modi (`app-mode.ts`)
+- [x] Backend Grundgerüst (Fastify + PostgreSQL)
+- [x] Auth-System (Users-Tabelle, JWT-Middleware)
+- [x] Erste Route: `/api/auth/login`
+- [x] Auto-Migrationen beim Docker-Start
+- [x] PostgreSQL Schema vollständig portiert
 
-### Sprint 2 (Week 2)
-- [ ] Adapter-Pattern implementieren (`LocalAdapter`, `CloudAdapter`)
-- [ ] IPC-Handler auf Adapter umstellen
-- [ ] Backend: Vouchers-Routes vollständig
-- [ ] Backend: Members-Routes vollständig
-- [ ] Login-Screen im Frontend
-- [ ] Settings: Mode-Switcher
+### Sprint 2 (Week 2) ✅ ABGESCHLOSSEN
+- [x] Adapter-Pattern implementieren (`LocalAdapter`, `CloudAdapter`)
+- [x] IPC-Handler auf Adapter umstellen
+- [x] Backend: Auth-Routes vollständig
+- [x] Login-Modal im Frontend (CloudLoginModal)
+- [x] Settings: Mode-Switcher (Cloud/Lokal)
+- [x] CSP konfiguriert für localhost:3000
+- [x] Docker Compose Setup vollständig
 
 ### Sprint 3 (Week 2-3)
 - [ ] Alle verbleibenden Routes (Invoices, Budgets, Earmarks, Reports)
@@ -624,16 +627,35 @@ interface SyncConflict {
 
 ---
 
-## Nächste Schritte
+## ✅ Aktueller Status (21.11.2025)
 
-1. **Jetzt:** Diese Datei committen
-2. **Heute:** Backend-Ordner anlegen + package.json
-3. **Morgen:** Auth-System + erste Route
-4. **Diese Woche:** Adapter-Pattern fertig
+### Fertiggestellt
+- ✅ Backend-API mit Fastify + PostgreSQL läuft
+- ✅ Docker Compose Setup (Auto-Migrationen)
+- ✅ Auth-System (Register/Login mit JWT)
+- ✅ Adapter-Pattern (LocalAdapter, CloudAdapter)
+- ✅ Frontend: Cloud-Login Modal
+- ✅ Settings: Mode-Switcher
+- ✅ CSP konfiguriert für Electron + Backend
 
-**Bereit zum Start?** Soll ich:
-- A) Backend-Grundgerüst erstellen (`backend/package.json`, `server.ts`)
-- B) Shared Types auslagern (`shared/api-types.ts`)
-- C) Config-System implementieren (`app-mode.ts`)
+### Nächste Schritte
 
-Was zuerst?
+**Sprint 3 (Diese Woche):**
+- [ ] Backend: Vouchers-Routes implementieren
+- [ ] Backend: Members-Routes implementieren
+- [ ] Backend: Budgets/Earmarks-Routes
+- [ ] Backend: Reports-Routes
+- [ ] File-Upload für Anhänge
+- [ ] Vollständige IPC → REST Migration
+
+**Sprint 4 (Nächste Woche):**
+- [ ] Production Deployment (Mittwald)
+- [ ] SSL/HTTPS Setup
+- [ ] Backup-Strategy
+- [ ] Performance-Testing
+- [ ] Sicherheits-Audit
+
+**Backlog:**
+- [ ] Bidirektionale Sync (Local ↔ Cloud)
+- [ ] Offline-Modus mit Queue
+- [ ] Conflict Resolution

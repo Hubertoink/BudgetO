@@ -46,7 +46,7 @@ async function createWindow(): Promise<BrowserWindow> {
             "font-src 'self' data:;",
             "style-src 'self' 'unsafe-inline';",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://localhost:5173;",
-            "connect-src 'self' http://localhost:5173 ws://localhost:5173;",
+            "connect-src 'self' http://localhost:5173 ws://localhost:5173 http://localhost:3000 https://*.mittwald.io;",
             "frame-ancestors 'none'"
         ].join(' ')
 
@@ -58,7 +58,7 @@ async function createWindow(): Promise<BrowserWindow> {
             "font-src 'self' data:;",
             "style-src 'self' 'unsafe-inline';",
             "script-src 'self';",
-            "connect-src 'self';",
+            "connect-src 'self' https://*.mittwald.io;",
             "frame-ancestors 'none'"
         ].join(' ')
 
