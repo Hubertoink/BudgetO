@@ -1470,10 +1470,48 @@ export function registerIpcHandlers() {
                 const content = fs.readFileSync(filePath, 'utf-8')
                 const data = JSON.parse(content)
                 if (Array.isArray(data.submissions)) {
-                    allSubmissions.push(...data.submissions)
+                    // Transform web-app format to internal format
+                    const transformed = data.submissions.map((sub: any) => ({
+                        externalId: sub.externalId || sub.id,
+                        date: sub.date,
+                        type: sub.type || 'OUT',
+                        description: sub.description,
+                        grossAmount: sub.grossAmount,
+                        categoryHint: sub.categoryHint,
+                        counterparty: sub.counterparty,
+                        submittedBy: sub.submittedBy,
+                        submittedAt: sub.submittedAt,
+                        // Convert single attachment to attachments array
+                        attachments: sub.attachment ? [{
+                            filename: sub.attachment.name,
+                            mimeType: sub.attachment.mimeType,
+                            data: sub.attachment.dataBase64
+                        }] : (sub.attachments || []).map((att: any) => ({
+                            filename: att.filename || att.name,
+                            mimeType: att.mimeType,
+                            data: att.data || att.dataBase64
+                        }))
+                    }))
+                    allSubmissions.push(...transformed)
                 } else if (data.date && data.grossAmount) {
                     // Single submission format
-                    allSubmissions.push(data)
+                    const sub = data
+                    allSubmissions.push({
+                        externalId: sub.externalId || sub.id,
+                        date: sub.date,
+                        type: sub.type || 'OUT',
+                        description: sub.description,
+                        grossAmount: sub.grossAmount,
+                        categoryHint: sub.categoryHint,
+                        counterparty: sub.counterparty,
+                        submittedBy: sub.submittedBy,
+                        submittedAt: sub.submittedAt,
+                        attachments: sub.attachment ? [{
+                            filename: sub.attachment.name,
+                            mimeType: sub.attachment.mimeType,
+                            data: sub.attachment.dataBase64
+                        }] : []
+                    })
                 }
             } catch (e) {
                 console.error(`Failed to parse submission file: ${filePath}`, e)
