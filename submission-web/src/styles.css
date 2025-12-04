@@ -35,6 +35,10 @@
     padding: 0;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 html {
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
@@ -91,7 +95,7 @@ body {
 .main {
     flex: 1;
     padding: 16px;
-    padding-bottom: calc(80px + var(--safe-bottom));
+    padding-bottom: calc(120px + var(--safe-bottom));
     overflow-y: auto;
 }
 
@@ -346,7 +350,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 16px;
-    padding-bottom: calc(80px + var(--safe-bottom));
+    padding-bottom: calc(120px + var(--safe-bottom));
 }
 
 .list-header {
@@ -539,12 +543,12 @@ body {
 /* ===== Responsive Tweaks ===== */
 @media (min-width: 480px) {
     .main {
-        max-width: 480px;
+        max-width: 100%; /* Allow expansion */
         margin: 0 auto;
     }
     
     .list-view {
-        max-width: 480px;
+        max-width: 100%;
         margin: 0 auto;
     }
 }
@@ -698,7 +702,7 @@ body {
     font-size: 1rem;
     border: 2px solid var(--border);
     border-radius: var(--radius-sm);
-    background: var(--surface);
+    background-color: var(--surface);
     color: var(--text);
     transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-appearance: none;
@@ -725,3 +729,84 @@ body {
 .shake {
     animation: shake 0.3s ease-in-out;
 }
+
+/* ===== Desktop Responsive ===== */
+@media (min-width: 768px) {
+    .header {
+        padding: 20px 40px;
+        justify-content: center;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+        margin-right: auto;
+        max-width: 900px;
+    }
+
+    .header-badge {
+        margin-left: 16px;
+    }
+    
+    .main {
+        padding: 32px 20px;
+        padding-bottom: calc(140px + var(--safe-bottom));
+        max-width: 900px; /* Limit width for readability */
+    }
+    
+    /* 2-Column Grid Layout */
+    .form-card {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px 32px;
+        padding: 40px;
+    }
+    
+    .form-group {
+        margin-bottom: 0;
+    }
+    
+    /* Full width items */
+    .form-group--full,
+    .form-submit {
+        grid-column: 1 / -1;
+    }
+    
+    .submissions-list,
+    .settings-card {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .bottom-nav {
+        padding: 16px 40px;
+        max-width: 600px;
+        margin: 0 auto 20px auto;
+        border-radius: 50px;
+        bottom: 20px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .bottom-nav .nav-btn {
+        padding: 14px 32px;
+        font-size: 1rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .main {
+        padding-top: 48px;
+    }
+    
+    .form-card {
+        gap: 32px 48px;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group input[type="date"],
+    .form-group select {
+        padding: 14px 16px; /* Keep consistent */
+    }
+}
+

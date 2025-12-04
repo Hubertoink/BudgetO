@@ -54,7 +54,7 @@
                     <input type="number" id="amount" step="0.01" min="0.01" placeholder="0,00" required inputmode="decimal">
                 </div>
 
-                <div class="form-group">
+                <div class="form-group form-group--full">
                     <label for="description">Beschreibung *</label>
                     <input type="text" id="description" placeholder="Wofür?" required>
                 </div>
@@ -69,8 +69,13 @@
                     <input type="text" id="category" placeholder="z.B. Vereinsfest, Material, etc.">
                 </div>
 
-                <!-- Image upload -->
                 <div class="form-group">
+                    <label for="submitter">Dein Name *</label>
+                    <input type="text" id="submitter" placeholder="Vor- und Nachname" required>
+                </div>
+
+                <!-- Image upload - full width -->
+                <div class="form-group form-group--full">
                     <label>Beleg-Foto</label>
                     <div class="image-upload" id="image-upload">
                         <input type="file" id="image-input" accept="image/*" capture="environment" hidden>
@@ -85,12 +90,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="submitter">Dein Name *</label>
-                    <input type="text" id="submitter" placeholder="Vor- und Nachname" required>
-                </div>
-
-                <button type="submit" class="btn-primary">
+                <button type="submit" class="btn-primary form-submit">
                     <span class="icon">➕</span> Zur Liste hinzufügen
                 </button>
             </form>
