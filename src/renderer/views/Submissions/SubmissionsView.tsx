@@ -14,6 +14,8 @@ interface Submission {
     externalId?: string | null
     date: string
     type: 'IN' | 'OUT'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+    paymentMethod?: 'BAR' | 'BANK' | null
     description?: string | null
     grossAmount: number
     categoryHint?: string | null
@@ -84,11 +86,11 @@ function ReviewModal({
     const [draft, setDraft] = useState<VoucherDraft>(() => ({
         date: submission.date,
         type: submission.type,
-        sphere: 'IDEELL',
+        sphere: submission.sphere || 'IDEELL',
         description: submission.description || '',
         grossAmount: submission.grossAmount, // stored in cents
         vatRate: 0,
-        paymentMethod: 'BANK',
+        paymentMethod: submission.paymentMethod || 'BANK',
         earmarkId: null,
         budgetId: null,
         tags: [],

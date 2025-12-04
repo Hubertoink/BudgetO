@@ -6,6 +6,8 @@ export interface Submission {
   externalId?: string | null
   date: string
   type: 'IN' | 'OUT'
+  sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+  paymentMethod?: 'BAR' | 'BANK' | null
   description?: string | null
   grossAmount: number
   categoryHint?: string | null
@@ -35,6 +37,8 @@ export interface CreateSubmissionPayload {
   externalId?: string
   date: string
   type: 'IN' | 'OUT'
+  sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  paymentMethod?: 'BAR' | 'BANK'
   description?: string
   grossAmount: number
   categoryHint?: string
@@ -48,6 +52,8 @@ export interface ImportSubmissionPayload {
     externalId?: string
     date: string
     type?: 'IN' | 'OUT'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    paymentMethod?: 'BAR' | 'BANK'
     description?: string
     grossAmount: number
     categoryHint?: string
@@ -66,7 +72,9 @@ export function createSubmissionsRepository(db: DB) {
       
       let sql = `
         SELECT 
-          s.id, s.external_id as externalId, s.date, s.type, s.description,
+          s.id, s.external_id as externalId, s.date, s.type, 
+          s.sphere, s.payment_method as paymentMethod,
+          s.description,
           s.gross_amount as grossAmount, s.category_hint as categoryHint,
           s.counterparty, s.submitted_by as submittedBy, s.submitted_at as submittedAt,
           s.status, s.reviewed_at as reviewedAt, s.reviewer_notes as reviewerNotes,
@@ -135,8 +143,8 @@ export function createSubmissionsRepository(db: DB) {
 
     create(payload: CreateSubmissionPayload): { id: number } {
       const insertSubmission = db.prepare(`
-        INSERT INTO submissions (external_id, date, type, description, gross_amount, category_hint, counterparty, submitted_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO submissions (external_id, date, type, sphere, payment_method, description, gross_amount, category_hint, counterparty, submitted_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -149,6 +157,8 @@ export function createSubmissionsRepository(db: DB) {
           payload.externalId || null,
           payload.date,
           payload.type,
+          payload.sphere || null,
+          payload.paymentMethod || null,
           payload.description || null,
           payload.grossAmount,
           payload.categoryHint || null,
@@ -171,8 +181,8 @@ export function createSubmissionsRepository(db: DB) {
 
     import(payload: ImportSubmissionPayload): { imported: number; ids: number[] } {
       const insertSubmission = db.prepare(`
-        INSERT INTO submissions (external_id, date, type, description, gross_amount, category_hint, counterparty, submitted_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO submissions (external_id, date, type, sphere, payment_method, description, gross_amount, category_hint, counterparty, submitted_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -188,6 +198,8 @@ export function createSubmissionsRepository(db: DB) {
             sub.externalId || null,
             sub.date,
             sub.type || 'OUT',
+            sub.sphere || null,
+            sub.paymentMethod || null,
             sub.description || null,
             sub.grossAmount,
             sub.categoryHint || null,

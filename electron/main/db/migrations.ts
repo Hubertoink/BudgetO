@@ -462,6 +462,14 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_submissions_date ON submissions(date);
     CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission ON submission_attachments(submission_id);
     `
+  },
+  {
+    version: 22,
+    up: `
+    -- Add sphere and payment_method to submissions
+    ALTER TABLE submissions ADD COLUMN sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB'));
+    ALTER TABLE submissions ADD COLUMN payment_method TEXT CHECK(payment_method IN ('BAR','BANK'));
+    `
   }
 ]
 
