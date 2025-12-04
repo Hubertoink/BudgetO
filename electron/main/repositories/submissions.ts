@@ -123,6 +123,7 @@ export function createSubmissionsRepository(db: DB) {
         SELECT 
           id, external_id as externalId, date, type, description,
           gross_amount as grossAmount, category_hint as categoryHint,
+          sphere, payment_method as paymentMethod,
           counterparty, submitted_by as submittedBy, submitted_at as submittedAt,
           status, reviewed_at as reviewedAt, reviewer_notes as reviewerNotes,
           voucher_id as voucherId

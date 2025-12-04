@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom'
 import { ICONS } from '../../utils/icons'
 import TagsEditor from '../../components/TagsEditor'
 
-// Unicode icons for buttons (keine ICONS.upload/refresh/trash im bestehenden ICONS-Set)
+// Unicode icons for buttons
 const ICON_IMPORT = '📥'
-const ICON_REFRESH = '🔄'
 const ICON_DELETE = ICONS.DELETE
 
 // Type matching the backend schema
@@ -568,6 +567,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             setReviewSubmission(null)
             loadSubmissions()
             bumpDataVersion()
+            window.dispatchEvent(new Event('data-changed'))
         } catch (e: any) {
             notify('error', 'Genehmigung fehlgeschlagen: ' + (e?.message || e))
         }
@@ -585,6 +585,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             setReviewSubmission(null)
             loadSubmissions()
             bumpDataVersion()
+            window.dispatchEvent(new Event('data-changed'))
         } catch (e: any) {
             notify('error', 'Ablehnung fehlgeschlagen: ' + (e?.message || e))
         }
@@ -604,6 +605,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             setDeleteConfirm(null)
             loadSubmissions()
             bumpDataVersion()
+            window.dispatchEvent(new Event('data-changed'))
         } catch (e: any) {
             notify('error', 'Löschen fehlgeschlagen: ' + (e?.message || e))
         } finally {
@@ -677,9 +679,6 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     <option value="approved">Genehmigt</option>
                     <option value="rejected">Abgelehnt</option>
                 </select>
-                <button className="btn" onClick={loadSubmissions}>
-                    {ICON_REFRESH} Aktualisieren
-                </button>
             </div>
 
             {/* Error */}
