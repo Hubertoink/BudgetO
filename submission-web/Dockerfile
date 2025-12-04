@@ -10,7 +10,6 @@ RUN npm ci
 # Copy source files and build
 COPY src ./src
 COPY vite.config.js ./
-COPY index.html ./
 RUN npm run build
 
 # Production stage
