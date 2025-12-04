@@ -25,6 +25,7 @@ const dateInput = document.getElementById('date')
 const typeInput = document.getElementById('type')
 const sphereInput = document.getElementById('sphere')
 const sphereHelp = document.getElementById('sphere-help')
+const paymentMethodInput = document.getElementById('paymentMethod')
 const amountInput = document.getElementById('amount')
 const descriptionInput = document.getElementById('description')
 const counterpartyInput = document.getElementById('counterparty')
@@ -71,6 +72,16 @@ function setupEventListeners() {
             typeButtons.forEach(b => b.classList.remove('active'))
             btn.classList.add('active')
             typeInput.value = btn.dataset.type
+        })
+    })
+    
+    // Payment method toggle
+    const payButtons = document.querySelectorAll('.btn-toggle-pay[data-pay]')
+    payButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            payButtons.forEach(b => b.classList.remove('active'))
+            btn.classList.add('active')
+            paymentMethodInput.value = btn.dataset.pay
         })
     })
     
@@ -121,6 +132,7 @@ function handleFormSubmit(e) {
         date: dateInput.value,
         type: typeInput.value,
         sphere: sphereInput.value,
+        paymentMethod: paymentMethodInput.value,
         grossAmount: Math.round(parseFloat(amountInput.value) * 100), // Convert to cents
         description: descriptionInput.value.trim(),
         counterparty: counterpartyInput.value.trim() || null,
@@ -267,8 +279,9 @@ function renderSubmissionsList() {
             </div>
             <div class="submission-description">${escapeHtml(sub.description)}</div>
             <div class="submission-meta">
-                ${sub.counterparty ? `${escapeHtml(sub.counterparty)} · ` : ''}
-                ${sub.categoryHint ? `${escapeHtml(sub.categoryHint)}` : ''}
+                ${sub.paymentMethod === 'BAR' ? '💵' : '🏦'} ${sub.sphere === 'W' ? 'Wirtschaftlich' : 'Ideell'}
+                ${sub.counterparty ? ` · ${escapeHtml(sub.counterparty)}` : ''}
+                ${sub.categoryHint ? ` · ${escapeHtml(sub.categoryHint)}` : ''}
             </div>
             ${sub.attachment ? '<div class="submission-image-indicator">📎 Beleg angehängt</div>' : ''}
         </div>

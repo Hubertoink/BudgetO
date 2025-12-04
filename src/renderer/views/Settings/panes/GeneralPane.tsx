@@ -29,6 +29,8 @@ export function GeneralPane({
   dateFmt,
   setDateFmt,
   openSetupWizard,
+  showSubmissionBadge,
+  setShowSubmissionBadge,
 }: GeneralPaneProps) {
   // Date format examples
   const sample = '2025-01-15'
@@ -117,6 +119,21 @@ export function GeneralPane({
                 onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
               />
             </div>
+          </div>
+          <div className="field">
+            <div className="label-row">
+              <label htmlFor="toggle-submission-badge">Menü-Badges anzeigen</label>
+              <input
+                id="toggle-submission-badge"
+                role="switch"
+                aria-checked={showSubmissionBadge}
+                className="toggle"
+                type="checkbox"
+                checked={showSubmissionBadge}
+                onChange={(e) => setShowSubmissionBadge(e.target.checked)}
+              />
+            </div>
+            <div className="helper">Zeigt die Anzahl ausstehender Einreichungen und offener Verbindlichkeiten im Menü an.</div>
           </div>
           <div className="field">
             <label htmlFor="select-color-theme">Farb-Theme</label>

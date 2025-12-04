@@ -22,6 +22,8 @@ interface UIPreferencesContextValue {
   setJournalRowStyle: (val: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (val: JournalRowDensity) => void
+  showSubmissionBadge: boolean
+  setShowSubmissionBadge: (val: boolean) => void
 }
 
 const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(null)
@@ -64,6 +66,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
+  const [showSubmissionBadge, setShowSubmissionBadge] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ui.showSubmissionBadge')
+    return stored !== 'false' // default true
+  })
+
   useEffect(() => {
     localStorage.setItem('ui.navLayout', navLayout)
   }, [navLayout])
@@ -95,6 +102,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     document.documentElement.setAttribute('data-journal-row-density', journalRowDensity)
   }, [journalRowDensity])
 
+  useEffect(() => {
+    localStorage.setItem('ui.showSubmissionBadge', String(showSubmissionBadge))
+  }, [showSubmissionBadge])
+
   return (
     <UIPreferencesContext.Provider
       value={{
@@ -111,7 +122,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         journalRowStyle,
         setJournalRowStyle,
         journalRowDensity,
-        setJournalRowDensity
+        setJournalRowDensity,
+        showSubmissionBadge,
+        setShowSubmissionBadge
       }}
     >
       {children}

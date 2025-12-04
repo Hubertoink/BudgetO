@@ -291,7 +291,7 @@ export const InvoicesListInput = z.object({
     limit: z.number().min(1).max(100).default(20).optional(),
     offset: z.number().min(0).default(0).optional(),
     sort: z.enum(['ASC', 'DESC']).optional(),
-    sortBy: z.enum(['date', 'due', 'amount']).optional(),
+    sortBy: z.enum(['date', 'due', 'amount', 'status']).optional(),
     status: z.enum(['OPEN', 'PARTIAL', 'PAID', 'ALL']).optional(),
     sphere: Sphere.optional(),
     budgetId: z.number().optional(),

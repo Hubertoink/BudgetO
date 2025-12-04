@@ -112,8 +112,50 @@ function AppInner() {
         journalRowStyle,
         setJournalRowStyle,
         journalRowDensity,
-        setJournalRowDensity
+        setJournalRowDensity,
+        showSubmissionBadge,
+        setShowSubmissionBadge
     } = useUIPreferences()
+    
+    // Pending submissions count for nav badge
+    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadPendingCount() {
+            try {
+                // Use limit: 1 and total from API (efficient count)
+                const res = await (window as any).api?.submissions?.list?.({ status: 'pending', limit: 1 })
+                if (!cancelled) {
+                    setPendingSubmissionsCount(res?.total || 0)
+                }
+            } catch { /* ignore */ }
+        }
+        loadPendingCount()
+        const onChanged = () => loadPendingCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    
+    // Open invoices count for nav badge
+    const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadOpenCount() {
+            try {
+                // Count OPEN and PARTIAL invoices using total from API (limit: 1 to minimize data transfer)
+                const resOpen = await (window as any).api?.invoices?.list?.({ status: 'OPEN', limit: 1 })
+                const resPartial = await (window as any).api?.invoices?.list?.({ status: 'PARTIAL', limit: 1 })
+                if (!cancelled) {
+                    const openCount = (resOpen?.total || 0) + (resPartial?.total || 0)
+                    setOpenInvoicesCount(openCount)
+                }
+            } catch { /* ignore */ }
+        }
+        loadOpenCount()
+        const onChanged = () => loadOpenCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
     
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
@@ -713,6 +755,9 @@ function AppInner() {
                             activePage={activePage}
                             onNavigate={setActivePage}
                             navIconColorMode={navIconColorMode}
+                            pendingSubmissionsCount={pendingSubmissionsCount}
+                            openInvoicesCount={openInvoicesCount}
+                            showBadges={showSubmissionBadge}
                         />
                     </div>
                 ) : null}
@@ -737,6 +782,9 @@ function AppInner() {
                         onNavigate={setActivePage}
                         navIconColorMode={navIconColorMode}
                         collapsed={sidebarCollapsed}
+                        pendingSubmissionsCount={pendingSubmissionsCount}
+                        openInvoicesCount={openInvoicesCount}
+                        showBadges={showSubmissionBadge}
                     />
                 </aside>
             )}
@@ -837,6 +885,8 @@ function AppInner() {
                             setJournalRowStyle={setJournalRowStyle}
                             journalRowDensity={journalRowDensity}
                             setJournalRowDensity={setJournalRowDensity}
+                            showSubmissionBadge={showSubmissionBadge}
+                            setShowSubmissionBadge={setShowSubmissionBadge}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}

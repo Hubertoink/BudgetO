@@ -125,6 +125,8 @@ export interface SettingsProps {
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (v: JournalRowDensity) => void
+  showSubmissionBadge: boolean
+  setShowSubmissionBadge: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -161,6 +163,8 @@ export interface GeneralPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
+  showSubmissionBadge: boolean
+  setShowSubmissionBadge: (v: boolean) => void
 }
 
 export interface TablePaneProps {

@@ -60,6 +60,13 @@
 .settings-sub { color: color-mix(in oklab, var(--text)/68%, transparent); font-size: 12px; margin-bottom: 10px; }
 .muted-sep { height: 1px; background: color-mix(in oklab, var(--text)/10%, transparent); margin: 12px 0; }
 
+/* Generic table styling */
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 12px 16px; text-align: left; }
+.table th { font-weight: 600; color: var(--text-dim); font-size: 13px; border-bottom: 1px solid var(--border); }
+.table td { border-bottom: 1px solid var(--border); }
+.table tbody tr:hover { background: color-mix(in oklab, var(--accent)/5%, transparent); }
+
 /* InvoicesView utility classes */
 .invoices-text-danger { color: var(--danger); }
 .invoices-table { width: 100%; }
@@ -1662,8 +1669,28 @@ textarea:focus {
 .header-left-group { display: inline-flex; align-items: center; gap: 6px; }
 .top-nav { display: inline-flex; align-items: center; gap: 6px; justify-self: center; }
 .side-nav { display: flex; flex-direction: column; gap: 4px; }
-.nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+.nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; position: relative; }
 .nav-btn.active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
+.nav-badge { 
+  position: absolute; 
+  top: -4px; 
+  right: -4px; 
+  min-width: 18px; 
+  height: 18px; 
+  padding: 0 5px; 
+  border-radius: 9px; 
+  background: color-mix(in oklab, var(--danger) 75%, transparent); 
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white; 
+  font-size: 11px; 
+  font-weight: 700; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  pointer-events: none;
+  border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+}
 .nav-divider { width: 1px; height: 20px; background: var(--border); align-self: center; }
 .side-nav .nav-divider { width: auto; height: 1px; margin: 6px 0; }
 .top-nav .divider-v { width: 1px; height: 20px; margin: 0; background: var(--border); }

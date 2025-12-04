@@ -70,6 +70,8 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
+            showSubmissionBadge={props.showSubmissionBadge}
+            setShowSubmissionBadge={props.setShowSubmissionBadge}
           />
         )}
         
