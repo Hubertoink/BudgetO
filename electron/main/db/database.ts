@@ -315,7 +315,23 @@ export function renameOrganization(orgId: string, newName: string): { success: b
     if (!newName || !newName.trim()) throw new Error('Name ist erforderlich')
     
     const cfg = readAppConfig()
-    const orgs = cfg.organizations || []
+    let orgs = cfg.organizations || []
+    
+    // Handle default org when no organizations are formally defined
+    if (orgId === 'default' && orgs.length === 0) {
+        // Create a formal entry for the default org with the new name
+        const currentRoot = getConfiguredRoot()
+        const defaultOrg = {
+            id: 'default',
+            name: newName.trim(),
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString()
+        }
+        orgs = [defaultOrg]
+        writeAppConfig({ ...cfg, organizations: orgs, activeOrgId: 'default' })
+        return { success: true }
+    }
+    
     const idx = orgs.findIndex(o => o.id === orgId)
     if (idx === -1) throw new Error('Organisation nicht gefunden')
     

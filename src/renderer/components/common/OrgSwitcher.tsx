@@ -42,6 +42,11 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
 
   useEffect(() => {
     loadOrganizations()
+    
+    // Reload when data changes (e.g. after rename)
+    const onDataChanged = () => loadOrganizations()
+    window.addEventListener('data-changed', onDataChanged)
+    return () => window.removeEventListener('data-changed', onDataChanged)
   }, [])
 
   // Close dropdown when clicking outside

@@ -3045,3 +3045,318 @@ html[data-glass-modals="true"] .settings-content {
 html[data-glass-modals="true"] .settings-pane-card {
     background: color-mix(in oklab, var(--surface) 60%, transparent) !important;
 }
+
+/* ========================================
+   Info Icon Button
+   ======================================== */
+
+.btn-info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-info-icon:hover {
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
+    transform: scale(1.05);
+}
+
+.btn-info-icon:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.btn-info-icon[aria-expanded="true"] {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+/* ========================================
+   Flyout Popover
+   ======================================== */
+
+.flyout-popover {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    padding: 16px 20px;
+    animation: flyout-in 0.15s ease-out;
+}
+
+@keyframes flyout-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.flyout-arrow {
+    position: absolute;
+    top: -6px;
+    right: 16px;
+    width: 12px;
+    height: 12px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    transform: rotate(45deg);
+}
+
+.flyout-title {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.flyout-text {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.flyout-text code {
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.flyout-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.flyout-link:hover {
+    text-decoration: underline;
+}
+
+/* Glass mode enhancement for flyout */
+html[data-glass-modals="true"] .flyout-popover {
+    background: color-mix(in oklab, var(--surface) 80%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+html[data-glass-modals="true"] .flyout-arrow {
+    background: color-mix(in oklab, var(--surface) 80%, transparent);
+}
+
+/* ========================================
+   Setup Wizard - Modern Appearance Step
+   ======================================== */
+
+.setup-appearance-card {
+    padding: 16px;
+    display: grid;
+    gap: 20px;
+}
+
+.setup-toggle-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.setup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setup-field > label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.setup-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.setup-section > label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.setup-preview-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+/* Toggle Button Group */
+.toggle-button-group {
+    display: flex;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.toggle-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s ease;
+}
+
+.toggle-button:not(:last-child) {
+    border-right: 1px solid var(--border);
+}
+
+.toggle-button:hover {
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    color: var(--text);
+}
+
+.toggle-button.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 500;
+}
+
+.toggle-icon {
+    font-size: 14px;
+}
+
+/* Theme Picker */
+.theme-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.theme-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: color-mix(in oklab, var(--surface) 50%, transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    transition: all 0.15s ease;
+}
+
+.theme-chip:hover {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.theme-chip.active {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 20%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+.theme-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+}
+
+.theme-swatch[data-theme="default"] { background: linear-gradient(135deg, #7C4DFF 50%, #00BCD4 50%); }
+.theme-swatch[data-theme="fiery-ocean"] { background: linear-gradient(135deg, #FF5722 50%, #2196F3 50%); }
+.theme-swatch[data-theme="peachy-delight"] { background: linear-gradient(135deg, #FF8A65 50%, #FFCCBC 50%); }
+.theme-swatch[data-theme="pastel-dreamland"] { background: linear-gradient(135deg, #CE93D8 50%, #90CAF9 50%); }
+.theme-swatch[data-theme="ocean-breeze"] { background: linear-gradient(135deg, #26A69A 50%, #4DD0E1 50%); }
+.theme-swatch[data-theme="earthy-tones"] { background: linear-gradient(135deg, #8D6E63 50%, #A5D6A7 50%); }
+.theme-swatch[data-theme="monochrome-harmony"] { background: linear-gradient(135deg, #78909C 50%, #CFD8DC 50%); }
+.theme-swatch[data-theme="vintage-charm"] { background: linear-gradient(135deg, #8E7CC3 50%, #F9CB9C 50%); }
+.theme-swatch[data-theme="soft-blush"] { background: linear-gradient(135deg, #F48FB1 50%, #FCE4EC 50%); }
+.theme-swatch[data-theme="professional-light"] { background: linear-gradient(135deg, #5C6BC0 50%, #E8EAF6 50%); }
+
+/* Background Image Picker */
+.background-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.background-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: color-mix(in oklab, var(--surface) 50%, transparent);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text);
+    transition: all 0.15s ease;
+    min-width: 90px;
+}
+
+.background-chip:hover {
+    border-color: var(--accent);
+}
+
+.background-chip.active {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+}
+
+.background-preview {
+    width: 70px;
+    height: 45px;
+    border-radius: 4px;
+    background-size: cover;
+    background-position: center;
+    border: 1px solid var(--border);
+}
+
+.background-preview.bg-none {
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.background-preview.bg-none::after {
+    content: '—';
+    color: var(--muted);
+}
+
+.background-preview.bg-cherry-blossom {
+    background-image: url('./assets/a_close_up_of_a_tree_branch_with_pink_flowers.jpg');
+}
+
+.background-preview.bg-foggy-forest {
+    background-image: url('./assets/a_foggy_forest_with_trees.png');
+}
+
+.background-preview.bg-mountain-snow {
+    background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+}

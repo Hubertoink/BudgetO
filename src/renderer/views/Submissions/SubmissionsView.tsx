@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ICONS } from '../../utils/icons'
 import TagsEditor from '../../components/TagsEditor'
@@ -616,6 +616,21 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     const [deleteConfirm, setDeleteConfirm] = useState<Submission | null>(null)
     const [deleting, setDeleting] = useState(false)
     const [showHelp, setShowHelp] = useState(false)
+    const helpButtonRef = useRef<HTMLButtonElement>(null)
+
+    // Click-outside handler for help flyout
+    useEffect(() => {
+        if (!showHelp) return
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node
+            const flyout = document.getElementById('submissions-help-flyout')
+            if (flyout && !flyout.contains(target) && helpButtonRef.current && !helpButtonRef.current.contains(target)) {
+                setShowHelp(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [showHelp])
 
     // ESC key handler for delete modal
     useEffect(() => {
@@ -827,32 +842,59 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     <h1 style={{ margin: 0 }}>Einreichungen</h1>
                     <p className="helper">Eingereichte Buchungsvorschläge von Mitgliedern</p>
                 </div>
-                <div className="flex gap-8">
-                    <button className="btn ghost" onClick={() => setShowHelp(!showHelp)} title="Hilfe anzeigen">
-                        ℹ️
+                <div className="flex gap-8" style={{ position: 'relative' }}>
+                    <button
+                        ref={helpButtonRef}
+                        className="btn-info-icon"
+                        onClick={() => setShowHelp(!showHelp)}
+                        title="Hilfe anzeigen"
+                        aria-label="Hilfe anzeigen"
+                        aria-expanded={showHelp}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
                     </button>
+                    {showHelp && (
+                        <div
+                            id="submissions-help-flyout"
+                            className="flyout-popover"
+                            role="tooltip"
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: 8,
+                                width: 360,
+                                zIndex: 100
+                            }}
+                        >
+                            <div className="flyout-arrow" />
+                            <h4 className="flyout-title">Wie funktioniert das?</h4>
+                            <p className="flyout-text">
+                                Mitglieder können ihre Auslagen über die Web-App unter{' '}
+                                <a
+                                    href="#"
+                                    onClick={(e) => { e.preventDefault(); window.api?.shell?.openExternal?.('https://vereino.kassiero.de/') }}
+                                    className="flyout-link"
+                                >
+                                    vereino.kassiero.de
+                                </a>{' '}
+                                erfassen.
+                            </p>
+                            <p className="flyout-text" style={{ marginBottom: 0 }}>
+                                Am Ende wird eine Datei (<code>.vereino-submission.json</code>) erstellt, die das Mitglied an den Kassenwart sendet.
+                                Diese Datei kann über den <strong>Importieren</strong>-Button eingelesen werden.
+                            </p>
+                        </div>
+                    )}
                     <button className="btn" onClick={handleImport} title="JSON-Datei importieren">
                         {ICON_IMPORT} Importieren
                     </button>
                 </div>
             </header>
-
-            {showHelp && (
-                <div className="card mb-16" style={{ padding: 16, background: 'var(--surface-2)', borderLeft: '4px solid var(--accent)' }}>
-                    <h3 style={{ marginTop: 0 }}>Wie funktioniert das?</h3>
-                    <p>
-                        Mitglieder können ihre Auslagen über die Web-App unter{' '}
-                        <a href="#" onClick={(e) => { e.preventDefault(); window.api?.shell?.openExternal?.('https://vereino.kassiero.de/') }}>
-                            https://vereino.kassiero.de/
-                        </a>{' '}
-                        erfassen.
-                    </p>
-                    <p>
-                        Am Ende wird eine Datei (<code>.vereino-submission.json</code>) erstellt, die das Mitglied an den Kassenwart sendet.
-                        Diese Datei kann über den "Importieren"-Button hier eingelesen werden.
-                    </p>
-                </div>
-            )}
 
             {/* Stats */}
             <div className="grid gap-16 mb-16" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

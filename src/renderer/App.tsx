@@ -1063,6 +1063,8 @@ function AppInner() {
                     setJournalRowStyle={(v) => { setJournalRowStyle(v); try { localStorage.setItem('ui.journalRowStyle', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-style', v) } catch {} }}
                     journalRowDensity={journalRowDensity}
                     setJournalRowDensity={(v) => { setJournalRowDensity(v); try { localStorage.setItem('ui.journalRowDensity', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-density', v) } catch {} }}
+                    backgroundImage={backgroundImage}
+                    setBackgroundImage={(v) => { setBackgroundImage(v); try { localStorage.setItem('ui.backgroundImage', v) } catch {}; try { document.documentElement.setAttribute('data-background-image', v) } catch {} }}
                     existingTags={tagDefs as any}
                     notify={notify}
                 />
