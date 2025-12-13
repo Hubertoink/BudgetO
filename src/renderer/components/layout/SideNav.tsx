@@ -35,17 +35,15 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
               <div className="nav-divider" aria-hidden="true" />
             )}
             <button
-              className={`btn ghost nav-btn ${isActive ? 'active' : ''}`}
+              className={`btn ghost nav-btn has-tooltip tooltip-right ${isActive ? 'active' : ''}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
-              title={item.label}
               aria-label={item.label}
-              style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: isActive ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+              data-tooltip={item.label}
             >
               <span className={`icon-wrapper ${colorClass}`}>
                 {getNavIcon(item.key)}
               </span>
-              {!collapsed && <span className="nav-label">{item.label}</span>}
               {showBadge && (
                 <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}

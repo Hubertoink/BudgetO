@@ -19,7 +19,6 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         const showDividerBefore = idx > 0 && item.group !== navItems[idx - 1]?.group
-        const showDividerAfter = item.showDividerAfter
         
         // Determine badge count based on nav item
         let badgeCount = 0
@@ -35,11 +34,11 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
               <span className="divider-v" aria-hidden="true" />
             )}
             <button
-              className={`btn ghost nav-btn ${isActive ? 'active' : ''}`}
+              className={`btn ghost nav-btn has-tooltip ${isActive ? 'active' : ''}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
-              title={item.label}
               aria-label={item.label}
+              data-tooltip={item.label}
             >
               <span className={colorClass}>
                 {getNavIcon(item.key)}
@@ -48,9 +47,6 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
                 <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}
             </button>
-            {showDividerAfter && (
-              <span className="divider-v" aria-hidden="true" />
-            )}
           </React.Fragment>
         )
       })}

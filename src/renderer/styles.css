@@ -1936,7 +1936,7 @@ textarea:focus {
 .no-drag { pointer-events: auto; }
 .header-left-group { display: inline-flex; align-items: center; gap: 6px; }
 .top-nav { display: inline-flex; align-items: center; gap: 6px; justify-self: center; }
-.side-nav { display: flex; flex-direction: column; gap: 4px; }
+.side-nav { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
 .nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; position: relative; }
 .nav-btn.active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
 .nav-badge { 
@@ -1970,11 +1970,100 @@ textarea:focus {
 
 .nav-divider { width: 1px; height: 20px; background: var(--border); align-self: center; }
 .side-nav .nav-divider { width: auto; height: 1px; margin: 6px 0; }
-.top-nav .divider-v { width: 1px; height: 20px; margin: 0; background: var(--border); }
+.top-nav .divider-v { 
+  display: block;
+  width: 1px; 
+  height: 24px; 
+  margin: 0 6px; 
+  background: var(--border); 
+  flex-shrink: 0;
+  opacity: 0.6;
+}
 .nav-label { font-size: 14px; }
-.icon-wrapper { width: 22px; display: inline-flex; justify-content: center; align-items: center; }
-.app-sidebar { grid-area: side; display: flex; flex-direction: column; padding: 8px; border-right: 1px solid var(--border); overflow-y: auto; }
-.side-nav-btn { text-align: left; display: flex; align-items: center; gap: 10px; }
+.icon-wrapper { width: 22px; min-width: 22px; display: inline-flex; justify-content: center; align-items: center; }
+.app-sidebar { grid-area: side; display: flex; flex-direction: column; padding: 8px 4px; border-right: 1px solid var(--border); overflow: visible; }
+.side-nav { overflow: visible; }
+
+/* Side nav button styles - collapsed (icon only) and expanded (with labels) */
+.side-nav .nav-btn { 
+  width: 100%; 
+  height: auto;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+.side-nav .nav-btn:not(:has(.nav-label)) { 
+  justify-content: center; 
+}
+.side-nav .nav-btn:has(.nav-label) { 
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+/* Custom Tooltip Styles */
+.has-tooltip {
+  position: relative;
+}
+
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.has-tooltip::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: var(--border);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.has-tooltip:hover::after,
+.has-tooltip:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Tooltip right (for sidebar) */
+.has-tooltip.tooltip-right::after {
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+
+.has-tooltip.tooltip-right::before {
+  top: 50%;
+  left: calc(100% + 4px);
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-right-color: var(--border);
+  border-bottom-color: transparent;
+}
+
 .app-main { grid-area: main; padding: 16px; overflow-y: auto; }
 .app-logo { border-radius: 4px; display: block; }
 .toast-row { display: flex; align-items: center; gap: 12px; }
