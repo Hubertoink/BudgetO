@@ -5,6 +5,7 @@ on:
     branches:
       - feature/submissions
       - main
+      - MultipleOrga
     paths:
       - 'submission-web/**'
       - '.github/workflows/deploy-submission-web.yml'
