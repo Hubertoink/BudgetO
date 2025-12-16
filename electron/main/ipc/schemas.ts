@@ -21,7 +21,9 @@ export const VoucherCreateInput = z
         categoryId: z.number().optional(),
         projectId: z.number().optional(),
         earmarkId: z.number().optional(),
+        earmarkAmount: z.number().nullable().optional(),
         budgetId: z.number().optional(),
+        budgetAmount: z.number().nullable().optional(),
         files: z
             .array(
                 z.object({
@@ -235,11 +237,27 @@ export const VouchersListOutput = z.object({
             grossAmount: z.number(),
             fileCount: z.number().optional(),
             earmarkId: z.number().nullable().optional(),
+            earmarkAmount: z.number().nullable().optional(),
             earmarkCode: z.string().nullable().optional(),
             budgetId: z.number().nullable().optional(),
+            budgetAmount: z.number().nullable().optional(),
             budgetLabel: z.string().nullable().optional(),
             budgetColor: z.string().nullable().optional(),
-            tags: z.array(z.string()).optional()
+            tags: z.array(z.string()).optional(),
+            // Multiple assignments
+            budgets: z.array(z.object({
+                id: z.number(),
+                budgetId: z.number(),
+                amount: z.number(),
+                label: z.string().optional()
+            })).optional(),
+            earmarksAssigned: z.array(z.object({
+                id: z.number(),
+                earmarkId: z.number(),
+                amount: z.number(),
+                code: z.string().optional(),
+                name: z.string().optional()
+            })).optional()
         })
     ),
     total: z.number()
@@ -425,6 +443,15 @@ export type TVouchersRecentInput = z.infer<typeof VouchersRecentInput>
 export type TVouchersRecentOutput = z.infer<typeof VouchersRecentOutput>
 
 // Update/Delete
+export const VoucherBudgetAssignment = z.object({
+    budgetId: z.number(),
+    amount: z.number()
+})
+export const VoucherEarmarkAssignment = z.object({
+    earmarkId: z.number(),
+    amount: z.number()
+})
+
 export const VoucherUpdateInput = z.object({
     id: z.number(),
     date: z.string().optional(),
@@ -435,7 +462,12 @@ export const VoucherUpdateInput = z.object({
     transferFrom: PaymentMethod.nullable().optional(),
     transferTo: PaymentMethod.nullable().optional(),
     earmarkId: z.number().nullable().optional(),
+    earmarkAmount: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
+    budgetAmount: z.number().nullable().optional(),
+    // New: multiple budget/earmark assignments
+    budgets: z.array(VoucherBudgetAssignment).optional(),
+    earmarks: z.array(VoucherEarmarkAssignment).optional(),
     // amounts (optional): provide either netAmount (+ optional vatRate) OR grossAmount
     netAmount: z.number().optional(),
     vatRate: z.number().optional(),

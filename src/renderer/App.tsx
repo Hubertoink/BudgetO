@@ -172,10 +172,14 @@ function AppInner() {
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgew?hlten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgew?hlten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgew?hlte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung w?rde den verf?gbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese ?nderung w?rde den verf?gbaren Rahmen der Zweckbindung unterschreiten.'
+        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
+        // SQLite UNIQUE constraint errors for budget/earmark duplicates
+        if (/UNIQUE constraint failed.*voucher_budgets/i.test(msg)) return 'Fehler: Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Budget-Einträge.'
+        if (/UNIQUE constraint failed.*voucher_earmarks/i.test(msg)) return 'Fehler: Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Einträge.'
+        if (/UNIQUE constraint failed/i.test(msg)) return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
         return 'Fehler: ' + msg
     }
     // Dynamic available years from vouchers
