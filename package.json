@@ -1,8 +1,8 @@
 {
-  "name": "verein-budget-planner",
-  "version": "1.7.0",
+  "name": "budgeto",
+  "version": "0.1.0",
   "private": true,
-  "description": "Offline-first Electron app for non-profit finance planning (Windows/macOS/Linux)",
+  "description": "Budget- und Finanzmanagement für die Jugendförderung - Outputorientierte Finanzplanung",
   "main": "dist-electron/main/index.cjs",
   "author": "Nikolas Häfner",
   "license": "MIT",

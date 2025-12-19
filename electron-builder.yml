@@ -1,5 +1,5 @@
-appId: org.verein.finanzplaner
-productName: VereinO
+appId: org.jugendfoerderung.budgeto
+productName: BudgetO
 icon: build/Icon.ico
 files:
   - dist/**

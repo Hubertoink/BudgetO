@@ -1,9 +1,19 @@
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
-instructions
+# BudgetO Copilot Project Instructions
 
-# VereinO Copilot Project Instructions
+Diese Anweisungen konfigurieren GitHub Copilot für die BudgetO Electron + React + TypeScript Anwendung – ein Budget- und Finanzmanagement-Tool für die Jugendförderung.
 
-These instructions tailor GitHub Copilot to our Electron + React + TypeScript application. They paraphrase core standards (React & TypeScript best practices, styling conventions, accessibility, security) and apply specifically to this codebase. Do not reproduce external instruction text verbatim; follow the guidance below when generating or modifying code.
+## Projektkontext
+- **Basis:** Fork von [VereinO](https://github.com/Hubertoink/VereinO)
+- **Zweck:** Outputorientierte Finanzplanung für Jugendförderung
+- **Architektur:** Electron (Main) + React (Renderer) + SQLite/PostgreSQL
+- **Sprache:** Deutsch (UI), Englisch (Code)
+
+## Kernmodule (BudgetO-spezifisch)
+- **Budgets:** Jahresbudget-Planung mit Soll-Ist-Vergleich
+- **Übungsleiter (instructors):** Verträge, Rechnungen, Jahresobergrenzen
+- **Barvorschüsse (cash-advance):** Anordnungsnummern, Teil-Vorschüsse, Über-/Unterdeckung
+- **Excel-Import:** Buchungsimport via .xlsx mit Spalten-Mapping
+- **Kostenstellen:** Mehrere Sachgebiete pro Kassier
 
 ## Core Principles
 - Prefer readability and maintainability over clever shortcuts.
@@ -21,77 +31,93 @@ These instructions tailor GitHub Copilot to our Electron + React + TypeScript ap
 
 ## TypeScript Guidelines
 - Target TS 5.x features; prefer native ES2022 APIs (e.g. `Array.prototype.at`).
-- Use discriminated unions or enums for domain states (e.g. voucher types).
+- Use discriminated unions or enums for domain states (e.g. `InstructorStatus`, `CashAdvanceStatus`).
 - Centralize shared shapes in `shared/types.ts` or domain-specific type files.
 - Prefer `readonly` and immutability for data structures exposed to multiple layers.
 - Provide explicit return types for public functions/services.
 
+## BudgetO Domain Types
+When creating new features, use these patterns:
+```typescript
+// Übungsleiter Status
+type InstructorStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'
+
+// Barvorschuss Status
+type CashAdvanceStatus = 'OPEN' | 'RESOLVED' | 'OVERDUE'
+
+// Teil-Barvorschuss
+interface PartialCashAdvance {
+  id: number
+  cashAdvanceId: number
+  employeeName: string
+  amount: number
+  issuedAt: string
+  resolvedAt?: string
+  overUnderCoverage?: number
+}
+```
+
 ## Styling & Layout
-- Minimize inline styles. Allow them only for truly dynamic or data-driven values that cannot be expressed via a CSS class (e.g. width computed from props).
-- Use existing utility classes in `styles.css` (`flex`, `grid`, `gap-*`, `items-center`, etc.) and add new semantic classes for recurring patterns (e.g. `.taxex-preview`).
-- Centralize spacing, colors, radii in CSS variables; do not duplicate hex codes in components.
-- Prefer component-specific classes with a `feature-` or semantic prefix over generic new utilities when a layout is unique.
-- Remove inline layout objects like `{ display:'flex', gap:8 }` in favor of utility classes (`flex gap-8`).
-- Box shadows, border styling, and backgrounds should reference existing vars (`var(--surface)`, `var(--border)`).
+- Minimize inline styles. Allow them only for truly dynamic values.
+- Use existing utility classes in `styles.css` (`flex`, `grid`, `gap-*`, `items-center`, etc.).
+- Centralize spacing, colors, radii in CSS variables.
+- Prefer component-specific classes with semantic prefixes (e.g. `.instructor-card`, `.cash-advance-row`).
 
 ## Accessibility
-- Provide `aria-label` on icon-only interactive elements (close buttons, icons).
-- Ensure modals: `role="dialog"` + `aria-modal="true"` and focus trapping if necessary.
-- Keyboard shortcuts (e.g. ESC, Ctrl+S) must not interfere with native browser shortcuts.
-- All images require descriptive `alt`; decorative emojis inside labels can remain.
-- Maintain sufficient contrast using theme variables; avoid hard-coded colors.
+- Provide `aria-label` on icon-only interactive elements.
+- Ensure modals: `role="dialog"` + `aria-modal="true"`.
+- All images require descriptive `alt`.
+- Maintain sufficient contrast using theme variables.
 
 ## Security & Data Handling
-- Sanitize or escape external file names or user-provided strings before rendering if they could contain markup (currently filenames are trusted from backend; revisit if backend allows arbitrary input).
-- Never execute dynamic code from user content. Avoid `eval`, dynamic `Function` constructors.
-- Validate IPC payloads against schemas in `electron/main/ipc/schemas.ts` before using.
-- When adding new IPC channels, keep schema + type definitions aligned and avoid duplicating validation logic.
+- Validate IPC payloads against schemas in `electron/main/ipc/schemas.ts`.
+- Never execute dynamic code from user content.
+- Sanitize file uploads (contracts, receipts).
 
-## Services & IPC
-- Keep Electron main services side-effect aware: provide `initialize` / `dispose` if complex resources (DB, file watchers) are added.
-- Renderer calls must go through the preload `api` bridge; do not access Node APIs directly.
-- For new features: add schema → service method → IPC handler → preload exposure → typed renderer hook.
+## Services & IPC Pattern
+For new features, follow this pattern:
+1. Add DB migration in `electron/main/db/migrations.ts`
+2. Create repository in `electron/main/repositories/`
+3. Add IPC handler in `electron/main/ipc/`
+4. Expose via preload bridge
+5. Create typed renderer hook in `src/renderer/hooks/`
+
+## Module System
+BudgetO uses a modular architecture. When adding modules:
+- Define module in `src/renderer/modules/` (future)
+- Add enable/disable toggle in settings
+- Lazy-load module components
+- Store module config in `module_config` DB table
 
 ## Testing
-- Use Jest + React Testing Library for component behavior, not implementation details.
-- Add tests for edge cases (empty states, error messages, file validation failures).
-- When refactoring styles, ensure tests reference roles/text rather than class names.
+- Use Jest + React Testing Library.
+- Add tests for edge cases (empty states, validation errors).
+- Test file upload scenarios for contracts/receipts.
 
-## Performance
-- Avoid unnecessary `useEffect` when derived values can be computed inline.
-- Memoize expensive derived lists only when profiling shows re-render issues.
-- Lazy-load heavy modals or feature panels if they grow large.
+## Commit Conventions
+```
+<type>(<scope>): <description>
 
-## Comments & Documentation
-- Comment only to clarify intent or non-obvious trade-offs. Remove stale comments after refactors.
-- For intricate helper functions (e.g. chunked base64 conversion) keep a brief rationale comment.
+Types: feat, fix, docs, refactor, test, chore
+Scopes: instructors, cash-advance, budgets, excel-import, core, ui
+```
 
-## Inline Style Policy
-Allowed inline styles:
-- Truly dynamic values based on runtime data (e.g. computed widths/heights, color derived from status).
-- One-off transforms or animations that are not reused.
-Disallowed inline styles:
-- Static layout (flex/grid, gaps, alignment).
-- Static spacing, borders, backgrounds using existing variables.
-- Font sizing and weights that match existing tokens.
-Action: When adding a component, first check for an existing utility class; if missing and pattern will recur, create a semantic class in `styles.css`.
+## Key Files
+- `electron/main/db/migrations.ts` – DB schema changes
+- `src/renderer/views/` – Main view components
+- `shared/types.ts` – Shared TypeScript types
+- `electron/main/repositories/` – Data access layer
 
-## Migration Approach (Legacy Inline Styles)
-- Incrementally replace static inline style objects with classes (`TaxExemptionModal` already started). Avoid massive churn in a single PR.
-- Each refactor: introduce semantic classes in CSS, then strip inline style blocks.
-- Keep regression risk low by preserving structure and verifying visually.
-
-## Commit & PR Conventions
-- Use concise commit messages: `<scope>: <summary>` (e.g. `taxex: extract preview styles`).
-- PR description should list: scope, key changes, risk assessment, test updates.
-
-## Session Checklist (Historical)
-The previous checklist content was replaced by these standards. If needed, refer to git history for earlier scaffolding tasks.
+## German UI Terms
+| English | German (UI) |
+|---------|-------------|
+| Instructor | Übungsleiter |
+| Cash Advance | Barvorschuss |
+| Order Number | Anordnungsnummer |
+| Coverage | Deckung |
+| Cost Center | Kostenstelle |
+| Invoice | Rechnung |
+| Contract | Vertrag |
 
 ---
-When Copilot suggests code:
-- Reject suggestions with large inline style blobs.
-- Prefer adding/importing a hook over embedding complex state logic in JSX.
-- Ask for type-safe return values and error handling around async IPC calls.
-
-# End of Instructions
+*BudgetO – Budget- und Finanzmanagement für die Jugendförderung*

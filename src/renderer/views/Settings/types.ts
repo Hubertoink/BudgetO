@@ -92,6 +92,7 @@ export interface TagDef {
   id: number
   name: string
   color?: string | null
+  description?: string | null
   usage?: number
 }
 

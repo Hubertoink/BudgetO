@@ -426,6 +426,14 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     `
   }
+  ,
+  {
+    version: 21,
+    up: `
+    -- BudgetO: Add description field to tags for category explanations
+    ALTER TABLE tags ADD COLUMN description TEXT;
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

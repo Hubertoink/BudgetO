@@ -16,7 +16,7 @@ function contrastText(bg?: string | null) {
 
 const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
 
-export type TagValue = { id?: number; name: string; color?: string | null }
+export type TagValue = { id?: number; name: string; color?: string | null; description?: string | null }
 
 export default function TagModal({ value, onClose, onSaved, notify }: { value: TagValue; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
     const [v, setV] = useState(value)
@@ -36,6 +36,17 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
                     <div className="field">
                         <label>Name</label>
                         <input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
+                    </div>
+                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                        <label>Beschreibung <span className="helper">(optional)</span></label>
+                        <textarea 
+                            className="input" 
+                            value={v.description || ''} 
+                            onChange={(e) => setV({ ...v, description: e.target.value || null })} 
+                            placeholder="Erklärung zur Kategorie..."
+                            rows={2}
+                            style={{ resize: 'vertical', minHeight: 48 }}
+                        />
                     </div>
                     <div className="field" style={{ gridColumn: '1 / span 2' }}>
                         <label>Farbe</label>

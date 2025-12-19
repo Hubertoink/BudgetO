@@ -3,7 +3,7 @@ import { getDb, withTransaction } from '../db/database'
 
 type DB = InstanceType<typeof Database>
 
-export type Tag = { id: number; name: string; color?: string | null }
+export type Tag = { id: number; name: string; color?: string | null; description?: string | null }
 
 export function listTags(opts?: { q?: string; includeUsage?: boolean }) {
     const d = getDb()
@@ -11,7 +11,7 @@ export function listTags(opts?: { q?: string; includeUsage?: boolean }) {
     const params: any[] = []
     if (opts?.q) { wh.push('name LIKE ?'); params.push(`%${opts.q}%`) }
     const whereSql = wh.length ? ` WHERE ${wh.join(' AND ')}` : ''
-    const rows = d.prepare(`SELECT id, name, color FROM tags${whereSql} ORDER BY name`).all(...params) as any[]
+    const rows = d.prepare(`SELECT id, name, color, description FROM tags${whereSql} ORDER BY name`).all(...params) as any[]
     if (!opts?.includeUsage) return rows
     const withUsage = rows.map(r => {
         const c = (d.prepare('SELECT COUNT(1) as c FROM voucher_tags WHERE tag_id=?').get(r.id) as any)?.c || 0
@@ -20,13 +20,13 @@ export function listTags(opts?: { q?: string; includeUsage?: boolean }) {
     return withUsage
 }
 
-export function upsertTag(input: { id?: number; name: string; color?: string | null }) {
+export function upsertTag(input: { id?: number; name: string; color?: string | null; description?: string | null }) {
     const d = getDb()
     if (input.id) {
-        d.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?').run(input.name, input.color ?? null, input.id)
+        d.prepare('UPDATE tags SET name = ?, color = ?, description = ? WHERE id = ?').run(input.name, input.color ?? null, input.description ?? null, input.id)
         return { id: input.id }
     }
-    const info = d.prepare('INSERT INTO tags(name, color) VALUES (?, ?)').run(input.name, input.color ?? null)
+    const info = d.prepare('INSERT INTO tags(name, color, description) VALUES (?, ?, ?)').run(input.name, input.color ?? null, input.description ?? null)
     return { id: Number(info.lastInsertRowid) }
 }
 
