@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
 import type { NavKey } from '../../utils/navItems'
+import { useModules } from '../../context/ModuleContext'
 
 interface SideNavProps {
   activePage: NavKey
@@ -9,29 +10,33 @@ interface SideNavProps {
   navIconColorMode: 'color' | 'mono'
   collapsed: boolean
   onToggleCollapse?: () => void
-  pendingSubmissionsCount?: number
   openInvoicesCount?: number
-  showBadges?: boolean
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, openInvoicesCount = 0 }: SideNavProps) {
+  const { isModuleEnabled } = useModules()
+  
+  // Filter nav items based on module enabled status
+  const visibleItems = useMemo(() => {
+    return navItems.filter(item => {
+      // If no moduleKey, always show
+      if (!item.moduleKey) return true
+      // Otherwise, check if module is enabled
+      return isModuleEnabled(item.moduleKey)
+    })
+  }, [isModuleEnabled])
+
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
-      {navItems.map((item, idx) => {
+      {visibleItems.map((item, idx) => {
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
-        
-        // Determine badge count based on nav item
-        let badgeCount = 0
-        if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
-        if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
-        
-        const showBadge = showBadges && badgeCount > 0
-        const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)
+        const showBadge = item.key === 'Verbindlichkeiten' && openInvoicesCount > 0
+        const badgeText = openInvoicesCount > 99 ? '99+' : String(openInvoicesCount)
         
         return (
           <React.Fragment key={item.key}>
-            {idx > 0 && item.group !== navItems[idx - 1]?.group && (
+            {idx > 0 && item.group !== visibleItems[idx - 1]?.group && (
               <div className="nav-divider" aria-hidden="true" />
             )}
             <button
@@ -45,7 +50,7 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
                 {getNavIcon(item.key)}
               </span>
               {showBadge && (
-                <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
+                <span className="nav-badge" aria-label={`${openInvoicesCount} offen`}>{badgeText}</span>
               )}
             </button>
           </React.Fragment>

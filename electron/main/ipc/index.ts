@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
@@ -8,7 +8,6 @@ import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
-import { createSubmissionsRepository } from '../repositories/submissions'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -148,7 +147,7 @@ export function registerIpcHandlers() {
         const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
         const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
 
-    if (parsed.format === 'PDF') {
+        if (parsed.format === 'PDF') {
             // Phase 1 PDF: simple summary page rendered in an offscreen BrowserWindow and printed to PDF
             const when = new Date()
             const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
@@ -297,18 +296,18 @@ export function registerIpcHandlers() {
                 const baseY = H - 28
                 const maxH = baseY - 24
                 const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                
+
                 // Build cumulative saldo
                 const cumSaldo: number[] = []
                 let run = 0
                 for (const b of detailed) { run += (Number(b.saldo) || 0); cumSaldo.push(run) }
-                
+
                 // Scale by max of bars and cumulative line
                 const maxBar = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
                 const minLine = Math.min(0, ...cumSaldo)
                 const maxLine = Math.max(0, ...cumSaldo)
                 const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
-                
+
                 const xs = (i: number, n: number) => {
                     const usable = W - 2 * P
                     const seg = usable / Math.max(1, n)
@@ -319,9 +318,9 @@ export function registerIpcHandlers() {
                     const range = maxValue - (-maxValue)
                     return 16 + ((maxValue - v) / range) * (baseY - 16)
                 }
-                
+
                 const barW = 12, gap = 8
-                
+
                 // Y-axis ticks
                 function niceStep(max: number) {
                     if (max <= 0) return 1
@@ -338,9 +337,9 @@ export function registerIpcHandlers() {
                 const yStep = niceStep(maxValue)
                 const yTicks: number[] = []
                 for (let v = 0; v <= maxValue + 1e-9; v += yStep) yTicks.push(Math.round(v))
-                
+
                 const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
-                
+
                 // Bars
                 const bars = detailed.map((b: any, i: number) => {
                     const xCenter = xs(i, detailed.length)
@@ -351,30 +350,30 @@ export function registerIpcHandlers() {
                     return `<rect x="${xCenter - barW - gap/2}" y="${yBar(inV)}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
                             <rect x="${xCenter + gap/2}" y="${yBar(outV)}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
                 }).join('')
-                
+
                 // Cumulative line
                 const linePts = cumSaldo.map((v, i) => `${xs(i, detailed.length)},${yLine(v)}`).join(' ')
-                
+
                 // X labels (thinned out for readability)
                 let tickEvery = 1
                 const total = detailed.length
                 if (total > 48) tickEvery = 12
                 else if (total > 24) tickEvery = 6
                 else if (total > 12) tickEvery = 3
-                
+
                 const xLabels = detailed.map((b: any, i: number) => {
                     if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
                     const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
                     const mon = m[monIdx] || String(b.month).slice(5)
                     return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
                 }).join('')
-                
+
                 // Y grid + labels
                 const yGrid = yTicks.map(v => {
                     return `<line x1="${P}" x2="${W-P/2}" y1="${yBar(v)}" y2="${yBar(v)}" stroke="#ddd" opacity="0.5"/>
                             <text x="${P-6}" y="${yBar(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
                 }).join('')
-                
+
                 return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
                     <line x1="${P}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
                     <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
@@ -396,18 +395,18 @@ export function registerIpcHandlers() {
                 const baseY = H - 28
                 const maxH = baseY - 16
                 const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                
+
                 const maxVal = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
-                
+
                 const xs = (i: number, n: number) => {
                     const usable = W - 2 * P
                     const seg = usable / Math.max(1, n)
                     return P + seg / 2 + i * seg
                 }
                 const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
-                
+
                 const barW = 10, gap = 5
-                
+
                 // Y-axis ticks
                 function niceStep(max: number) {
                     if (max <= 0) return 1
@@ -424,9 +423,9 @@ export function registerIpcHandlers() {
                 const yStep = niceStep(maxVal)
                 const yTicks: number[] = []
                 for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
-                
+
                 const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
-                
+
                 // Bars
                 const bars = detailed.map((b: any, i: number) => {
                     const xCenter = xs(i, detailed.length)
@@ -437,27 +436,27 @@ export function registerIpcHandlers() {
                     return `<rect x="${xCenter - barW * 1.5 - gap}" y="${baseY - hIn}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
                             <rect x="${xCenter - barW / 2}" y="${baseY - hOut}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
                 }).join('')
-                
+
                 // X labels (thinned out for readability)
                 let tickEvery = 1
                 const total = detailed.length
                 if (total > 48) tickEvery = 12
                 else if (total > 24) tickEvery = 6
                 else if (total > 12) tickEvery = 3
-                
+
                 const xLabels = detailed.map((b: any, i: number) => {
                     if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
                     const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
                     const mon = m[monIdx] || String(b.month).slice(5)
                     return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
                 }).join('')
-                
+
                 // Y grid + labels
                 const yGrid = yTicks.map(v => {
                     return `<line x1="${P}" x2="${W-P/2}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#ddd" opacity="0.5"/>
                             <text x="${P-6}" y="${yFor(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
                 }).join('')
-                
+
                 return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
                     <line x1="${P/2}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
                     <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
@@ -1585,262 +1584,5 @@ export function registerIpcHandlers() {
         return getActiveOrganizationAppearance()
     })
 }
-
     // Get single submission
-    ipcMain.handle('submissions.get', async (_e, payload) => {
-        const parsed = SubmissionGetInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.get(parsed.id)
-        return SubmissionGetOutput.parse(result)
-    })
-
-    // Import submissions from JSON
-    ipcMain.handle('submissions.import', async (_e, payload) => {
-        const parsed = SubmissionsImportInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.import(parsed)
-        return SubmissionsImportOutput.parse(result)
-    })
-
-    // Import submissions from file picker
-    ipcMain.handle('submissions.importFromFile', async () => {
-        const result = await dialog.showOpenDialog({
-            title: 'Einreichungen importieren',
-            filters: [
-                { name: 'Einreichungen', extensions: ['vereino-submission.json', 'json'] }
-            ],
-            properties: ['openFile', 'multiSelections']
-        })
-        if (result.canceled || !result.filePaths.length) {
-            return { imported: 0, ids: [] }
-        }
-
-        const allSubmissions: any[] = []
-        for (const filePath of result.filePaths) {
-            try {
-                const content = fs.readFileSync(filePath, 'utf-8')
-                const data = JSON.parse(content)
-                if (Array.isArray(data.submissions)) {
-                    // Transform web-app format to internal format
-                    const transformed = data.submissions.map((sub: any) => ({
-                        externalId: sub.externalId || sub.id,
-                        date: sub.date,
-                        type: sub.type || 'OUT',
-                        sphere: sub.sphere || null,
-                        paymentMethod: sub.paymentMethod || null,
-                        description: sub.description,
-                        grossAmount: sub.grossAmount,
-                        categoryHint: sub.categoryHint,
-                        counterparty: sub.counterparty,
-                        submittedBy: sub.submittedBy,
-                        submittedAt: sub.submittedAt,
-                        // Convert single attachment to attachments array
-                        attachments: sub.attachment ? [{
-                            filename: sub.attachment.name,
-                            mimeType: sub.attachment.mimeType,
-                            data: sub.attachment.dataBase64
-                        }] : (sub.attachments || []).map((att: any) => ({
-                            filename: att.filename || att.name,
-                            mimeType: att.mimeType,
-                            data: att.data || att.dataBase64
-                        }))
-                    }))
-                    allSubmissions.push(...transformed)
-                } else if (data.date && data.grossAmount) {
-                    // Single submission format
-                    const sub = data
-                    allSubmissions.push({
-                        externalId: sub.externalId || sub.id,
-                        date: sub.date,
-                        type: sub.type || 'OUT',
-                        sphere: sub.sphere || null,
-                        paymentMethod: sub.paymentMethod || null,
-                        description: sub.description,
-                        grossAmount: sub.grossAmount,
-                        categoryHint: sub.categoryHint,
-                        counterparty: sub.counterparty,
-                        submittedBy: sub.submittedBy,
-                        submittedAt: sub.submittedAt,
-                        attachments: sub.attachment ? [{
-                            filename: sub.attachment.name,
-                            mimeType: sub.attachment.mimeType,
-                            data: sub.attachment.dataBase64
-                        }] : []
-                    })
-                }
-            } catch (e) {
-                console.error(`Failed to parse submission file: ${filePath}`, e)
-            }
-        }
-
-        if (allSubmissions.length === 0) {
-            return { imported: 0, ids: [] }
-        }
-
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const importResult = repo.import({ submissions: allSubmissions })
-        return SubmissionsImportOutput.parse(importResult)
-    })
-
-    // Approve submission
-    ipcMain.handle('submissions.approve', async (_e, payload) => {
-        const parsed = SubmissionApproveInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.approve(parsed.id, { reviewerNotes: parsed.reviewerNotes })
-        return SubmissionApproveOutput.parse(result)
-    })
-
-    // Reject submission
-    ipcMain.handle('submissions.reject', async (_e, payload) => {
-        const parsed = SubmissionRejectInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.reject(parsed.id, { reviewerNotes: parsed.reviewerNotes })
-        return SubmissionRejectOutput.parse(result)
-    })
-
-    // Delete submission
-    ipcMain.handle('submissions.delete', async (_e, payload) => {
-        const parsed = SubmissionDeleteInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.delete(parsed.id)
-        return SubmissionDeleteOutput.parse(result)
-    })
-
-    // Convert approved submission to voucher
-    ipcMain.handle('submissions.convert', async (_e, payload) => {
-        const parsed = SubmissionConvertInput.parse(payload)
-        const db = getDb()
-        const submRepo = createSubmissionsRepository(db)
-        
-        const submission = submRepo.get(parsed.id)
-        if (!submission) {
-            return { ok: false }
-        }
-        if (submission.status !== 'approved') {
-            return { ok: false }
-        }
-
-        // Create voucher from submission
-        const voucherPayload = {
-            date: submission.date,
-            type: submission.type as 'IN' | 'OUT',
-            sphere: parsed.sphere,
-            description: submission.description || undefined,
-            grossAmount: submission.grossAmount,
-            vatRate: 0,
-            paymentMethod: parsed.paymentMethod,
-            categoryId: parsed.categoryId,
-            earmarkId: parsed.earmarkId,
-            budgetId: parsed.budgetId,
-            counterparty: submission.counterparty || undefined,
-            files: [] as Array<{ name: string; dataBase64: string; mime?: string }>
-        }
-
-        // Add attachments as files
-        for (const att of submission.attachments) {
-            const fullAtt = submRepo.getAttachment(att.id)
-            if (fullAtt) {
-                voucherPayload.files.push({
-                    name: fullAtt.filename,
-                    dataBase64: fullAtt.data.toString('base64'),
-                    mime: fullAtt.mimeType || undefined
-                })
-            }
-        }
-
-        const voucherResult = createVoucher(voucherPayload)
-        
-        // Link submission to voucher
-        if (voucherResult.id) {
-            submRepo.linkToVoucher(parsed.id, voucherResult.id)
-        }
-
-        return SubmissionConvertOutput.parse({ ok: true, voucherId: voucherResult.id })
-    })
-
-    // Summary
-    ipcMain.handle('submissions.summary', async () => {
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.summary()
-        return SubmissionsSummaryOutput.parse(result)
-    })
-
-    // Read attachment data
-    ipcMain.handle('submissions.readAttachment', async (_e, payload) => {
-        const parsed = SubmissionAttachmentReadInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const att = repo.getAttachment(parsed.attachmentId)
-        if (!att) {
-            return null
-        }
-        return SubmissionAttachmentReadOutput.parse({
-            filename: att.filename,
-            mimeType: att.mimeType,
-            dataBase64: att.data.toString('base64')
-        })
-    })
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Organization Management
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    ipcMain.handle('organizations.list', async () => {
-        return { organizations: listOrganizations() }
-    })
-    
-    ipcMain.handle('organizations.active', async () => {
-        return { organization: getActiveOrganization() }
-    })
-    
-    ipcMain.handle('organizations.create', async (_e, payload: { name: string }) => {
-        if (!payload?.name) throw new Error('Name ist erforderlich')
-        const org = createOrganization(payload.name)
-        return { organization: org }
-    })
-    
-    ipcMain.handle('organizations.switch', async (_e, payload: { orgId: string }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        const result = switchOrganization(payload.orgId)
-        // Signal renderer to reload
-        const win = BrowserWindow.getFocusedWindow()
-        if (win) {
-            win.webContents.send('organizations:switched', result.org)
-        }
-        return result
-    })
-    
-    ipcMain.handle('organizations.rename', async (_e, payload: { orgId: string; name: string }) => {
-        if (!payload?.orgId || !payload?.name) throw new Error('orgId und name sind erforderlich')
-        return renameOrganization(payload.orgId, payload.name)
-    })
-    
-    ipcMain.handle('organizations.delete', async (_e, payload: { orgId: string; deleteData?: boolean }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return deleteOrganization(payload.orgId, payload.deleteData ?? false)
-    })
-    
-    ipcMain.handle('organizations.getAppearance', async (_e, payload: { orgId: string }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return getOrganizationAppearance(payload.orgId)
-    })
-    
-    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return setOrganizationAppearance(payload.orgId, {
-            colorTheme: payload.colorTheme,
-            backgroundImage: payload.backgroundImage,
-            glassModals: payload.glassModals
-        })
-    })
-    
-    ipcMain.handle('organizations.activeAppearance', async () => {
-        return getActiveOrganizationAppearance()
 

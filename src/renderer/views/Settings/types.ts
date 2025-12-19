@@ -18,7 +18,6 @@ export type TileKey =
   | 'modules'
   | 'users'
   | 'yearEnd'
-  | 'cloud'
   | 'tutorial' 
   | 'about'
 

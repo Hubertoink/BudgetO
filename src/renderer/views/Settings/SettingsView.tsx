@@ -10,7 +10,6 @@ import { TagsPane } from './panes/TagsPane'
 import { ModulesPane } from './panes/ModulesPane'
 import { UsersPane } from './panes/UsersPane'
 import { YearEndPane } from './panes/YearEndPane'
-import { CloudPane } from './panes/CloudPane'
 
 /**
  * SettingsView - Main Settings Container
@@ -68,8 +67,6 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowStyle={props.setJournalRowStyle}
             journalRowDensity={props.journalRowDensity}
             setJournalRowDensity={props.setJournalRowDensity}
-            backgroundImage={props.backgroundImage}
-            setBackgroundImage={props.setBackgroundImage}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
             dateFmt={props.dateFmt}
@@ -79,8 +76,6 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
-            showSubmissionBadge={props.showSubmissionBadge}
-            setShowSubmissionBadge={props.setShowSubmissionBadge}
           />
         )}
         
@@ -133,8 +128,6 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
           />
         )}
-        
-        {activeTile === 'cloud' && <CloudPane />}
       </div>
 
       {/* Developer Badge - edge anchored handle; panel retracts on mouse leave */}

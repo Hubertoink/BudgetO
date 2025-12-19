@@ -33,8 +33,6 @@ interface UIPreferencesContextValue {
   setJournalRowStyle: (val: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (val: JournalRowDensity) => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (val: boolean) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
   glassModals: boolean
@@ -170,10 +168,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
-  const [showSubmissionBadge, setShowSubmissionBadge] = useState<boolean>(() => {
-    const stored = localStorage.getItem('ui.showSubmissionBadge')
-    return stored !== 'false' // default true
-  })
 
   useEffect(() => {
     localStorage.setItem('ui.navLayout', navLayout)
@@ -207,10 +201,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [journalRowDensity])
 
   useEffect(() => {
-    localStorage.setItem('ui.showSubmissionBadge', String(showSubmissionBadge))
-  }, [showSubmissionBadge])
-
-  useEffect(() => {
     localStorage.setItem('ui.backgroundImage', backgroundImage)
     document.documentElement.setAttribute('data-background-image', backgroundImage)
   }, [backgroundImage])
@@ -237,8 +227,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setJournalRowStyle,
         journalRowDensity,
         setJournalRowDensity,
-        showSubmissionBadge,
-        setShowSubmissionBadge,
         backgroundImage,
         setBackgroundImage,
         glassModals,

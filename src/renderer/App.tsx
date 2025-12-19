@@ -8,7 +8,6 @@ import MembersView from './views/Mitglieder/MembersView'
 import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
-import SubmissionsView from './views/Submissions/SubmissionsView'
 import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
@@ -89,7 +88,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
     const text = [org || null, cashier || null].filter(Boolean).join(' | ')
     return (
         <div className="inline-flex items-center gap-8">
-            <img src={appLogo} alt="BudgetO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
+            <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
             <OrgSwitcher notify={notify} />
             {text ? (
                 <div className="helper text-ellipsis" title={text}>{text}</div>
@@ -110,8 +109,6 @@ function AppInner() {
         setSidebarCollapsed,
         colorTheme,
         setColorTheme,
-        backgroundImage,
-        setBackgroundImage,
         navIconColorMode,
         setNavIconColorMode,
         dateFormat,
@@ -123,29 +120,8 @@ function AppInner() {
         backgroundImage,
         setBackgroundImage,
         glassModals,
-        setGlassModals,
-        showSubmissionBadge,
-        setShowSubmissionBadge
+        setGlassModals
     } = useUIPreferences()
-    
-    // Pending submissions count for nav badge
-    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
-    useEffect(() => {
-        let cancelled = false
-        async function loadPendingCount() {
-            try {
-                // Use limit: 1 and total from API (efficient count)
-                const res = await (window as any).api?.submissions?.list?.({ status: 'pending', limit: 1 })
-                if (!cancelled) {
-                    setPendingSubmissionsCount(res?.total || 0)
-                }
-            } catch { /* ignore */ }
-        }
-        loadPendingCount()
-        const onChanged = () => loadPendingCount()
-        window.addEventListener('data-changed', onChanged)
-        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-    }, [])
     
     // Open invoices count for nav badge
     const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
@@ -758,9 +734,7 @@ function AppInner() {
                             activePage={activePage}
                             onNavigate={setActivePage}
                             navIconColorMode={navIconColorMode}
-                            pendingSubmissionsCount={pendingSubmissionsCount}
                             openInvoicesCount={openInvoicesCount}
-                            showBadges={showSubmissionBadge}
                         />
                     </div>
                 ) : null}
@@ -785,9 +759,7 @@ function AppInner() {
                         onNavigate={setActivePage}
                         navIconColorMode={navIconColorMode}
                         collapsed={true}
-                        pendingSubmissionsCount={pendingSubmissionsCount}
                         openInvoicesCount={openInvoicesCount}
-                        showBadges={showSubmissionBadge}
                     />
                 </aside>
             )}
@@ -888,8 +860,6 @@ function AppInner() {
                             setNavIconColorMode={setNavIconColorMode}
                             colorTheme={colorTheme}
                             setColorTheme={setColorTheme}
-                            backgroundImage={backgroundImage}
-                            setBackgroundImage={setBackgroundImage}
                             journalRowStyle={journalRowStyle}
                             setJournalRowStyle={setJournalRowStyle}
                             journalRowDensity={journalRowDensity}
@@ -898,8 +868,6 @@ function AppInner() {
                             setBackgroundImage={setBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
-                            showSubmissionBadge={showSubmissionBadge}
-                            setShowSubmissionBadge={setShowSubmissionBadge}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}
@@ -970,18 +938,6 @@ function AppInner() {
 
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
-                    )}
-
-                    {activePage === 'Einreichungen' && (
-                        <SubmissionsView
-                            notify={notify}
-                            bumpDataVersion={bumpDataVersion}
-                            eurFmt={eurFmt}
-                            fmtDate={fmtDate}
-                            earmarks={earmarks}
-                            budgetsForEdit={budgetsForEdit}
-                            tagDefs={tagDefs}
-                        />
                     )}
             </main>
 
@@ -1902,60 +1858,11 @@ function IconArrow({ size = 14 }: { size?: number }) {
 export default function App() {
     return (
         <UIPreferencesProvider>
-            <ToastProvider>
-                <AuthProvider>
-                    <ModuleProvider>
-                        <AuthGate />
-                    </ModuleProvider>
-                </AuthProvider>
-            </ToastProvider>
+            <ModuleProvider>
+                <ToastProvider>
+                    <AppInner />
+                </ToastProvider>
+            </ModuleProvider>
         </UIPreferencesProvider>
-    )
-}
-
-// Auth gate - shows login if required
-function AuthGate() {
-    const { authRequired, isAuthenticated, isLoading } = useAuth()
-    const [showLogin, setShowLogin] = useState(!isAuthenticated && authRequired)
-    
-    useEffect(() => {
-        if (authRequired && !isAuthenticated && !isLoading) {
-            setShowLogin(true)
-        } else if (isAuthenticated) {
-            setShowLogin(false)
-        }
-    }, [authRequired, isAuthenticated, isLoading])
-    
-    // Listen for logout to show login again
-    useEffect(() => {
-        const handleAuthChange = () => {
-            // Re-check auth state
-        }
-        window.addEventListener('auth-changed', handleAuthChange)
-        return () => window.removeEventListener('auth-changed', handleAuthChange)
-    }, [])
-    
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center" style={{ height: '100vh' }}>
-                <div className="text-center">
-                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>💰</div>
-                    <div>BudgetO wird geladen...</div>
-                </div>
-            </div>
-        )
-    }
-    
-    return (
-        <>
-            {showLogin && authRequired && (
-                <LoginModal 
-                    isOpen={true} 
-                    onClose={() => setShowLogin(false)}
-                    allowClose={false}
-                />
-            )}
-            {(!authRequired || isAuthenticated) && <AppInner />}
-        </>
     )
 }

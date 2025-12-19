@@ -1,12 +1,12 @@
 import React from 'react'
 import { GeneralPaneProps, BackgroundImage } from '../types'
 
-// Hintergrundbilder aus assets
+// Hintergrundbilder aus assets (Pfad relativ zu dieser Datei)
 const BG_IMAGES: Record<BackgroundImage, { label: string; thumb: string }> = {
   none: { label: 'Kein Bild', thumb: '' },
-  mountain: { label: 'Berge', thumb: new URL('../../../../assets/a_mountain_with_snow_and_clouds.jpg', import.meta.url).href },
-  village: { label: 'Winterdorf', thumb: new URL('../../../../assets/a_snow_covered_houses_and_a_street_light.png', import.meta.url).href },
-  landscape: { label: 'Schneelandschaft', thumb: new URL('../../../../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg', import.meta.url).href },
+  mountain: { label: 'Berge', thumb: new URL('../../../../../assets/a_mountain_with_snow_and_clouds.jpg', import.meta.url).href },
+  village: { label: 'Winterdorf', thumb: new URL('../../../../../assets/a_snow_covered_houses_and_a_street_light.png', import.meta.url).href },
+  landscape: { label: 'Schneelandschaft', thumb: new URL('../../../../../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg', import.meta.url).href },
 }
 
 /**
@@ -39,10 +39,6 @@ export function GeneralPane({
   dateFmt,
   setDateFmt,
   openSetupWizard,
-  showSubmissionBadge,
-  setShowSubmissionBadge,
-  backgroundImage,
-  setBackgroundImage,
   glassModals,
   setGlassModals,
 }: GeneralPaneProps) {
@@ -212,18 +208,6 @@ export function GeneralPane({
               type="checkbox"
               checked={navIconColorMode === 'color'}
               onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
-            />
-          </div>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-submission-badge">Menü-Badges</label>
-            <input
-              id="toggle-submission-badge"
-              role="switch"
-              aria-checked={showSubmissionBadge}
-              className="toggle"
-              type="checkbox"
-              checked={showSubmissionBadge}
-              onChange={(e) => setShowSubmissionBadge(e.target.checked)}
             />
           </div>
           

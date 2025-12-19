@@ -1,10 +1,12 @@
-export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'Belege' | 'Reports' | 'Einstellungen'
+import type { ModuleKey } from '../context/ModuleContext'
+
+export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Belege' | 'Reports' | 'Einstellungen'
 
 /**
  * Navigation groups for visual separation:
  * - overview: Dashboard (Startseite)
  * - transactions: Buchungen, Verbindlichkeiten (Kernbereiche Geldfluss)
- * - organization: Mitglieder, Budgets, Zweckbindungen, Einreichungen (Vereinsstruktur)
+ * - organization: Mitglieder, Budgets, Zweckbindungen (Vereinsstruktur)
  * - documents: Belege, Reports (Dokumente & Auswertungen)
  * - system: Einstellungen (Konfiguration)
  */
@@ -15,7 +17,8 @@ export interface NavItem {
   label: string
   group: NavGroup
   showDividerAfter?: boolean
-  // Inline SVG as React nodes will be supplied by consumers to keep this file framework-light
+  /** If set, this nav item is only shown when the corresponding module is enabled */
+  moduleKey?: ModuleKey
 }
 
 export const navItems: NavItem[] = [
@@ -23,12 +26,11 @@ export const navItems: NavItem[] = [
   { key: 'Dashboard', label: 'Dashboard', group: 'overview' },
   // Kernbereiche Geldfluss
   { key: 'Buchungen', label: 'Buchungen', group: 'transactions' },
-  { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'transactions' },
+  { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'transactions', moduleKey: 'invoices' },
   // Vereinsstruktur & Planung
-  { key: 'Mitglieder', label: 'Mitglieder', group: 'organization' },
-  { key: 'Budgets', label: 'Budgets', group: 'organization' },
-  { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'organization' },
-  { key: 'Einreichungen', label: 'Einreichungen', group: 'organization' },
+  { key: 'Mitglieder', label: 'Mitglieder', group: 'organization', moduleKey: 'members' },
+  { key: 'Budgets', label: 'Budgets', group: 'organization', moduleKey: 'budgets' },
+  { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'organization', moduleKey: 'earmarks' },
   // Dokumente & Auswertungen
   { key: 'Belege', label: 'Belege', group: 'documents' },
   { key: 'Reports', label: 'Reports', group: 'documents' },
