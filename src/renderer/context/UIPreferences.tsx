@@ -6,6 +6,7 @@ type NavIconColorMode = 'color' | 'mono'
 type DateFormat = 'de' | 'iso'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
+type BackgroundImage = 'none' | 'mountain' | 'village' | 'landscape'
 
 interface UIPreferencesContextValue {
   navLayout: NavLayout
@@ -14,6 +15,8 @@ interface UIPreferencesContextValue {
   setSidebarCollapsed: (val: boolean) => void
   colorTheme: ColorTheme
   setColorTheme: (val: ColorTheme) => void
+  backgroundImage: BackgroundImage
+  setBackgroundImage: (val: BackgroundImage) => void
   navIconColorMode: NavIconColorMode
   setNavIconColorMode: (val: NavIconColorMode) => void
   dateFormat: DateFormat
@@ -42,6 +45,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return (stored === 'default' || stored === 'fiery-ocean' || stored === 'peachy-delight' || 
             stored === 'pastel-dreamland' || stored === 'ocean-breeze' || stored === 'earthy-tones' || 
             stored === 'monochrome-harmony' || stored === 'vintage-charm') ? stored : 'default'
+  })
+
+  const [backgroundImage, setBackgroundImage] = useState<BackgroundImage>(() => {
+    const stored = localStorage.getItem('ui.backgroundImage')
+    return (stored === 'none' || stored === 'mountain' || stored === 'village' || stored === 'landscape') ? stored : 'none'
   })
 
   const [navIconColorMode, setNavIconColorMode] = useState<NavIconColorMode>(() => {
@@ -78,6 +86,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [colorTheme])
 
   useEffect(() => {
+    localStorage.setItem('ui.backgroundImage', backgroundImage)
+    document.documentElement.setAttribute('data-bg-image', backgroundImage)
+  }, [backgroundImage])
+
+  useEffect(() => {
     localStorage.setItem('navIconColorMode', navIconColorMode)
   }, [navIconColorMode])
 
@@ -104,6 +117,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setSidebarCollapsed,
         colorTheme,
         setColorTheme,
+        backgroundImage,
+        setBackgroundImage,
         navIconColorMode,
         setNavIconColorMode,
         dateFormat,

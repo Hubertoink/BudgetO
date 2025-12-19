@@ -1,5 +1,7 @@
 # 🎯 BudgetO – Projektplan
+
 ## Budget- und Finanzmanagement für die Jugendförderung
+
 ### Basierend auf VereinO (Fork von github.com/Hubertoink/VereinO)
 
 ---
@@ -20,6 +22,7 @@
 **Ziel:** Eine modulare Budget-App für die Jugendförderung, die outputorientierte Finanzplanung ermöglicht.
 
 **Basis-Technologie (von VereinO):**
+
 - **Frontend:** Electron + React + TypeScript + Vite
 - **Datenbank:** SQLite (lokal) + PostgreSQL (Cloud/Multi-User)
 - **Backend:** Fastify (für Cloud-Features)
@@ -66,6 +69,7 @@
 ## 📦 Module (Ein-/Ausschaltbar)
 
 ### 1️⃣ Modul: Jahresbudget (outputorientierte Finanzierung)
+
 - [ ] Budgetplanung nach Kostenarten
 - [ ] Soll-Ist-Vergleich in Echtzeit
 - [ ] Budgetwarnung bei Überschreitung
@@ -73,10 +77,12 @@
 - [ ] Jahresabschluss-Report
 
 ### 2️⃣ Modul: Sach- und Honorarbuchungen
+
 - [ ] Trennung Sachkosten vs. Honorarkosten
 - [ ] Kostenstellen-Zuordnung
 
 ### 3️⃣ Modul: Übungsleiter (ÜL) Verwaltung
+
 - [ ] Übungsleiterdatenbank (Name, Kontakt, Steuernr.)
 - [ ] Jahresobergrenze pro ÜL (z.B. Übungsleiterpauschale)
 - [ ] Stundensatz und Abrechnungsmodell
@@ -85,6 +91,7 @@
 - [ ] Restbudget-Anzeige pro ÜL
 
 ### 4️⃣ Modul: Barvorschüsse
+
 - [ ] Anordnungsnummer (Pflichteingabe)
 - [ ] Haupt-Barvorschuss von Stadtkasse
 - [ ] Teil-Barvorschüsse an Mitarbeiter
@@ -96,6 +103,7 @@
 - [ ] Offene Barvorschüsse Dashboard-Widget
 
 ### 5️⃣ Modul: Excel-Import
+
 - [ ] Import von Buchungen via Excel (.xlsx)
 - [ ] Spalten-Mapping (flexibel konfigurierbar)
 - [ ] Vorschau vor Import
@@ -103,6 +111,7 @@
 - [ ] Import-Protokoll
 
 ### 6️⃣ Modul: Berichtswesen (Reports)
+
 - [ ] Jahresübersicht
 - [ ] Monatsberichte
 - [ ] ÜL-Abrechnungsübersicht
@@ -115,21 +124,24 @@
 
 ### Rollen
 
-| Rolle | Beschreibung | Rechte |
-|-------|-------------|--------|
-| **Kassier (Admin)** | Hauptverantwortlicher | Vollzugriff: Lesen, Schreiben, Löschen, Einstellungen |
-| **Leserechte-User** | Prüfer, Vorstand, etc. | Nur Lesen: Buchungen, Reports, Dashboards einsehen |
+| Rolle               | Beschreibung           | Rechte                                                |
+| ------------------- | ---------------------- | ----------------------------------------------------- |
+| **Kassier (Admin)** | Hauptverantwortlicher  | Vollzugriff: Lesen, Schreiben, Löschen, Einstellungen |
+| **Leserechte-User** | Prüfer, Vorstand, etc. | Nur Lesen: Buchungen, Reports, Dashboards einsehen    |
 
 ### Zentrale Datenbank (Multi-PC-Zugriff)
 
 **Option A: Netzlaufwerk (Einfach)**
+
 ```
 \\Server\Freigabe\BudgetO\database.sqlite
 ```
+
 - SQLite-Datei auf Netzlaufwerk
 - ⚠️ Nur ein gleichzeitiger Schreibzugriff empfohlen
 
 **Option B: PostgreSQL-Server (Empfohlen für Multi-User)**
+
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────────────┐
 │  PC 1   │────▶│         │     │                 │
@@ -140,6 +152,7 @@
 │ Leser   │     └─────────┘
 └─────────┘
 ```
+
 - Echter Multi-User-Zugriff
 - Rollenverwaltung auf DB-Ebene
 - Docker-Compose bereits in VereinO vorhanden
@@ -149,18 +162,21 @@
 ## 🗓️ Phasen-Plan
 
 ### Phase 0: Setup & Fork (1 Woche)
+
 - [ ] Repository forken
 - [ ] Umbenennung zu BudgetO
 - [ ] Entwicklungsumgebung einrichten
 - [ ] Branding anpassen (Logo, Titel, About)
 
 ### Phase 1: Modul-System (2 Wochen)
+
 - [ ] Modul-Registry implementieren
 - [ ] Ein-/Ausschalten in Einstellungen
 - [ ] Dynamische Navigation
 - [ ] Datenbankschema modular erweitern
 
 ### Phase 2: Benutzer & Rechte (2-3 Wochen)
+
 - [ ] Login-System
 - [ ] Rollen-Verwaltung
 - [ ] Lese-/Schreibrechte-Prüfung
@@ -168,6 +184,7 @@
 - [ ] Multi-PC-Sync testen
 
 ### Phase 3: Übungsleiter-Modul (3 Wochen)
+
 - [ ] DB-Schema: Übungsleiter-Tabelle
 - [ ] CRUD-Interface
 - [ ] Vertragsupload (Datei-Handling)
@@ -175,6 +192,7 @@
 - [ ] Jahresobergrenze & Restbudget
 
 ### Phase 4: Barvorschuss-Modul (2-3 Wochen)
+
 - [ ] DB-Schema: Barvorschüsse, Teil-Barvorschüsse
 - [ ] Anordnungsnummer-System
 - [ ] Ausgabe-/Auflösungs-Workflow
@@ -182,6 +200,7 @@
 - [ ] Dashboard-Widget
 
 ### Phase 5: Excel-Import (2 Wochen)
+
 - [ ] Excel-Parser (xlsx-Bibliothek)
 - [ ] Spalten-Mapping UI
 - [ ] Vorschau & Validierung
@@ -189,12 +208,14 @@
 - [ ] Fehlerbehandlung
 
 ### Phase 6: Budget-Erweiterung (2 Wochen)
+
 - [ ] Outputorientierte Struktur
 - [ ] Verknüpfung mit Kostenarten
 - [ ] Visualisierung (Charts)
 - [ ] Jahresabschluss
 
 ### Phase 7: Testing & Dokumentation (2 Wochen)
+
 - [ ] E2E-Tests erweitern
 - [ ] Benutzerhandbuch
 - [ ] Admin-Dokumentation
@@ -329,42 +350,43 @@ services:
     volumes:
       - budgeto-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - '5432:5432'
 ```
 
 ---
 
 ## 📝 Geklärte Anforderungen
 
-| Frage | Antwort |
-|-------|---------|
-| **Geschäftsjahr** | Kalenderjahr ✅ |
-| **MwSt** | Nicht relevant, nur Bruttobuchungen ✅ |
-| **Kategorien** | Über Tag-System mit Beschreibung (flexibel) ✅ |
-| **Genehmigungsworkflow** | Nicht erforderlich ✅ |
-| **Audit-Trail** | Nice-to-have, wenn Multi-User |
-| **Backups** | Ja, mit Wahlmöglichkeit (bereits vorhanden) ✅ |
-| **Kostenstellen** | Über bestehende Organisationen/Vereine realisieren ✅ |
+| Frage                    | Antwort                                               |
+| ------------------------ | ----------------------------------------------------- |
+| **Geschäftsjahr**        | Kalenderjahr ✅                                       |
+| **MwSt**                 | Nicht relevant, nur Bruttobuchungen ✅                |
+| **Kategorien**           | Über Tag-System mit Beschreibung (flexibel) ✅        |
+| **Genehmigungsworkflow** | Nicht erforderlich ✅                                 |
+| **Audit-Trail**          | Nice-to-have, wenn Multi-User                         |
+| **Backups**              | Ja, mit Wahlmöglichkeit (bereits vorhanden) ✅        |
+| **Kostenstellen**        | Über bestehende Organisationen/Vereine realisieren ✅ |
 
 ### Empfohlene Ergänzungen:
 
-| Feature | Beschreibung | Priorität |
-|---------|-------------|-----------|
-| **Dashboard-Widgets** | Schnellübersicht: Offene ÜL-Rechnungen, Barvorschüsse | Hoch |
-| **Benachrichtigungen** | Warnung bei Budgetüberschreitung | Mittel |
-| **Audit-Trail** | Wer hat was wann geändert | Hoch |
-| **Automatische Backups** | Tägliche Sicherung | Mittel |
-| **Jahresabschluss-Assistent** | Geführter Abschluss-Workflow | Niedrig |
-| **Suchfunktion** | Globale Suche über alle Daten | Mittel |
-| **Favoriten/Schnellzugriff** | Häufig genutzte Buchungsvorlagen | Niedrig |
-| **Kostenstellen** | Mehrere Projekte/Abteilungen | Mittel |
-| **Druckvorlagen** | Anpassbare Belege/Reports | Niedrig |
+| Feature                       | Beschreibung                                          | Priorität |
+| ----------------------------- | ----------------------------------------------------- | --------- |
+| **Dashboard-Widgets**         | Schnellübersicht: Offene ÜL-Rechnungen, Barvorschüsse | Hoch      |
+| **Benachrichtigungen**        | Warnung bei Budgetüberschreitung                      | Mittel    |
+| **Audit-Trail**               | Wer hat was wann geändert                             | Hoch      |
+| **Automatische Backups**      | Tägliche Sicherung                                    | Mittel    |
+| **Jahresabschluss-Assistent** | Geführter Abschluss-Workflow                          | Niedrig   |
+| **Suchfunktion**              | Globale Suche über alle Daten                         | Mittel    |
+| **Favoriten/Schnellzugriff**  | Häufig genutzte Buchungsvorlagen                      | Niedrig   |
+| **Kostenstellen**             | Mehrere Projekte/Abteilungen                          | Mittel    |
+| **Druckvorlagen**             | Anpassbare Belege/Reports                             | Niedrig   |
 
 ---
 
 ## 🚀 Nächste Schritte
 
 1. **Repository klonen und forken**
+
    ```bash
    git clone https://github.com/Hubertoink/VereinO.git BudgetO
    cd BudgetO
@@ -372,11 +394,13 @@ services:
    ```
 
 2. **Abhängigkeiten installieren**
+
    ```bash
    npm install
    ```
 
 3. **App im Entwicklungsmodus starten**
+
    ```bash
    npm run dev
    ```
@@ -395,5 +419,5 @@ services:
 
 ---
 
-*Erstellt: 19. Dezember 2024*
-*Version: 1.0 (Initialer Projektplan)*
+_Erstellt: 19. Dezember 2024_
+_Version: 1.0 (Initialer Projektplan)_

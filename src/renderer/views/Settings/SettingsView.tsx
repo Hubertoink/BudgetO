@@ -62,6 +62,8 @@ export function SettingsView(props: SettingsProps) {
             setNavIconColorMode={props.setNavIconColorMode}
             colorTheme={props.colorTheme}
             setColorTheme={props.setColorTheme}
+            backgroundImage={props.backgroundImage}
+            setBackgroundImage={props.setBackgroundImage}
             journalRowStyle={props.journalRowStyle}
             setJournalRowStyle={props.setJournalRowStyle}
             journalRowDensity={props.journalRowDensity}

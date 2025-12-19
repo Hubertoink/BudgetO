@@ -22,6 +22,7 @@
 **BudgetO** ist eine speziell für die Jugendförderung entwickelte Budget- und Finanzverwaltungssoftware. Die App ermöglicht eine einfache und übersichtliche Budgetplanung nach dem Grundsatz der **outputorientierten Finanzierung**.
 
 ### Kernfunktionen:
+
 - 📊 **Jahresbudget-Planung** mit Soll-Ist-Vergleich
 - 👥 **Übungsleiter-Verwaltung** mit Verträgen und Rechnungen
 - 💵 **Barvorschuss-Management** mit Anordnungsnummern
@@ -30,6 +31,7 @@
 - 🏢 **Kostenstellen** für verschiedene Sachgebiete
 
 ### Basiert auf:
+
 [VereinO](https://github.com/Hubertoink/VereinO) – Finanzmanagement für gemeinnützige Vereine
 
 ---
@@ -37,43 +39,51 @@
 ## ✨ Features
 
 ### 📊 Dashboard
+
 - KPI-Karten: Kassenstand, Einnahmen/Ausgaben, Budgetauslastung
 - Charts: Visualisierung von Budget vs. Ist
 - Widgets: Offene Barvorschüsse, ÜL-Rechnungen
 
 ### 💰 Buchungsverwaltung
+
 - Sach- und Honorarbuchungen
 - Kategorisierung via Tag-System (mit Beschreibung)
 - Belegverwaltung mit Datei-Upload
 
 ### 👨‍🏫 Übungsleiter-Modul
+
 - Stammdaten: Name, Kontakt, Stundensatz
 - Jahresobergrenze und Restbudget-Anzeige
 - Vertragsupload (PDF) mit Verknüpfung
 - Rechnungserfassung und Auszahlungsstatus
 
 ### 💵 Barvorschuss-Modul
+
 - Haupt-Barvorschuss von Stadtkasse
 - Teil-Barvorschüsse an Mitarbeiter
 - Anordnungsnummer als Pflichtfeld
 - Ausgabe-/Auflösungsdatum mit Über-/Unterdeckung
 
 ### 📥 Excel-Import
+
 - Import von Buchungen via .xlsx
 - Flexibles Spalten-Mapping
 - Vorschau und Validierung
 
 ### 👥 Benutzer & Rechte
-| Rolle | Beschreibung |
-|-------|-------------|
+
+| Rolle               | Beschreibung                                 |
+| ------------------- | -------------------------------------------- |
 | **Kassier (Admin)** | Vollzugriff: Lesen, Schreiben, Einstellungen |
-| **Leserechte-User** | Nur Lesen: Dashboards, Reports, Buchungen |
+| **Leserechte-User** | Nur Lesen: Dashboards, Reports, Buchungen    |
 
 ### 🏢 Kostenstellen / Organisationen
+
 - Mehrere Sachgebiete verwalten
 - Unabhängige Budgets pro Kostenstelle
 
 ### 🔒 Datensicherheit
+
 - Lokale SQLite-Datenbank
 - Optionale Cloud-Synchronisation (PostgreSQL)
 - Backup & Restore mit Wahl des Speicherorts
@@ -83,27 +93,32 @@
 ## 🚀 Installation
 
 ### Voraussetzungen
+
 - [Node.js](https://nodejs.org/) 20 oder höher
 - npm (wird mit Node.js installiert)
 - Git
 
 ### Schritt 1: Repository klonen
+
 ```bash
 git clone https://github.com/[DEIN-USERNAME]/BudgetO.git
 cd BudgetO
 ```
 
 ### Schritt 2: Abhängigkeiten installieren
+
 ```bash
 npm install
 ```
 
 ### Schritt 3: Entwicklung starten
+
 ```bash
 npm run dev
 ```
 
 ### Schritt 4: Ausführbare Datei erstellen
+
 ```bash
 npm run build
 npm run package
@@ -131,6 +146,7 @@ Die erstellten Dateien findest du im `release/` Ordner:
 ## 🛠️ Technologie-Stack
 
 ### Desktop-App
+
 - **Electron** – Cross-Platform Desktop Framework
 - **React** – UI-Bibliothek
 - **TypeScript** – Typsichere Entwicklung
@@ -138,11 +154,13 @@ Die erstellten Dateien findest du im `release/` Ordner:
 - **SQLite** (better-sqlite3) – Lokale Datenbank
 
 ### Backend (Multi-User)
+
 - **Fastify** – Web-Framework
 - **PostgreSQL** – Relationale Datenbank
 - **Docker** – Container-Deployment
 
 ### Entwicklungstools
+
 - **ESLint & Prettier** – Code-Qualität
 - **Playwright** – E2E-Tests
 - **Jest** – Unit-Tests
@@ -177,11 +195,11 @@ BudgetO/
 
 BudgetO ist modular aufgebaut. Module können in den Einstellungen aktiviert/deaktiviert werden:
 
-| Modul | Beschreibung |
-|-------|-------------|
-| `budgets` | Jahresbudget-Planung |
-| `instructors` | Übungsleiter-Verwaltung |
-| `cash-advance` | Barvorschuss-Management |
+| Modul          | Beschreibung               |
+| -------------- | -------------------------- |
+| `budgets`      | Jahresbudget-Planung       |
+| `instructors`  | Übungsleiter-Verwaltung    |
+| `cash-advance` | Barvorschuss-Management    |
 | `excel-import` | Excel-Import von Buchungen |
 
 ---
@@ -197,6 +215,7 @@ Beiträge sind willkommen! So kannst du helfen:
 5. Öffne einen Pull Request
 
 ### Commit-Konventionen
+
 ```
 <type>(<scope>): <description>
 
@@ -221,4 +240,4 @@ Dieses Projekt ist unter der **MIT-Lizenz** lizenziert.
 
 ---
 
-*Made with ❤️ für die Jugendförderung*
+_Made with ❤️ für die Jugendförderung_

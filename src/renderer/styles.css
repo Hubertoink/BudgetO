@@ -478,16 +478,73 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: Inter, "Plus Jakarta Sans", Segoe UI, system-ui, -apple-system, sans-serif;
-    line-height: 1.4;
+    font-family: 'VT323', 'Press Start 2P', monospace;
+    font-size: 18px;
+    line-height: 1.5;
+}
+
+/* BudgetO Retro/Pixel Theme Variables */
+:root {
+    --font-pixel: 'VT323', monospace;
+    --font-pixel-small: 'Press Start 2P', monospace;
+    --bg-image: none;
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+}
+
+/* Hintergrundbilder */
+:root[data-bg-image="mountain"] {
+    --bg-image: url('../assets/a_mountain_with_snow_and_clouds.jpg');
+}
+:root[data-bg-image="village"] {
+    --bg-image: url('../assets/a_snow_covered_houses_and_a_street_light.png');
+}
+:root[data-bg-image="landscape"] {
+    --bg-image: url('../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg');
+}
+
+/* App-Hintergrund mit Bild */
+#root {
+    position: relative;
+}
+
+#root::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--bg);
+    background-image: var(--bg-image);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* Overlay für bessere Lesbarkeit bei Hintergrundbildern */
+:root:not([data-bg-image="none"]) #root::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--bg-overlay);
+    pointer-events: none;
+}
+
+/* Bei Hintergrundbild: Karten und Flächen etwas transparenter */
+:root:not([data-bg-image="none"]) .card,
+:root:not([data-bg-image="none"]) .surface {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    backdrop-filter: blur(8px);
 }
 
 h1 {
-    font-size: 24px;
-    margin: 0 0 8px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 20px;
+    margin: 0 0 12px;
+    letter-spacing: 1px;
 }
 
 h2 {
+    font-family: 'VT323', monospace;
 
 /* Subtle hover highlight for buttons used in Setup Wizard */
 .btn.hover-highlight:hover {

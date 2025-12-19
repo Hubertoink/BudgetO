@@ -36,6 +36,12 @@ export type ColorTheme =
   | 'monochrome-harmony' 
   | 'vintage-charm'
 
+export type BackgroundImage = 
+  | 'none'
+  | 'mountain'
+  | 'village'
+  | 'landscape'
+
 // ============================================================================
 // Journal/Table Configuration Types
 // ============================================================================
@@ -125,6 +131,8 @@ export interface SettingsProps {
   setNavIconColorMode: (v: NavIconColorMode) => void
   colorTheme: ColorTheme
   setColorTheme: (v: ColorTheme) => void
+  backgroundImage: BackgroundImage
+  setBackgroundImage: (v: BackgroundImage) => void
   journalRowStyle: JournalRowStyle
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
@@ -154,6 +162,8 @@ export interface GeneralPaneProps {
   setNavIconColorMode: (v: NavIconColorMode) => void
   colorTheme: ColorTheme
   setColorTheme: (v: ColorTheme) => void
+  backgroundImage: BackgroundImage
+  setBackgroundImage: (v: BackgroundImage) => void
   journalRowStyle: JournalRowStyle
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity

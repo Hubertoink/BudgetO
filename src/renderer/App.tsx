@@ -107,6 +107,8 @@ function AppInner() {
         setSidebarCollapsed,
         colorTheme,
         setColorTheme,
+        backgroundImage,
+        setBackgroundImage,
         navIconColorMode,
         setNavIconColorMode,
         dateFormat,
@@ -835,6 +837,8 @@ function AppInner() {
                             setNavIconColorMode={setNavIconColorMode}
                             colorTheme={colorTheme}
                             setColorTheme={setColorTheme}
+                            backgroundImage={backgroundImage}
+                            setBackgroundImage={setBackgroundImage}
                             journalRowStyle={journalRowStyle}
                             setJournalRowStyle={setJournalRowStyle}
                             journalRowDensity={journalRowDensity}
