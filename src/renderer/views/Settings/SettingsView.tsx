@@ -7,6 +7,7 @@ import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
+import { ModulesPane } from './panes/ModulesPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { CloudPane } from './panes/CloudPane'
 
@@ -107,6 +108,10 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
             openTagsManager={props.openTagsManager}
           />
+        )}
+
+        {activeTile === 'modules' && (
+          <ModulesPane notify={props.notify} />
         )}
         
         {activeTile === 'yearEnd' && (

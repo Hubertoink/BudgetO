@@ -28,6 +28,7 @@ import EarmarksView from './views/Earmarks/EarmarksView'
 import { useQuickAdd } from './hooks/useQuickAdd'
 import { ToastProvider, useToast } from './context/ToastContext'
 import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences'
+import { ModuleProvider, useModules } from './context/ModuleContext'
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
@@ -1822,7 +1823,9 @@ export default function App() {
     return (
         <UIPreferencesProvider>
             <ToastProvider>
-                <AppInner />
+                <ModuleProvider>
+                    <AppInner />
+                </ModuleProvider>
             </ToastProvider>
         </UIPreferencesProvider>
     )

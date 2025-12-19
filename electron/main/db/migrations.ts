@@ -434,6 +434,32 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE tags ADD COLUMN description TEXT;
     `
   }
+  ,
+  {
+    version: 22,
+    up: `
+    -- BudgetO: Module configuration system
+    -- Allows enabling/disabling feature modules dynamically
+    CREATE TABLE IF NOT EXISTS module_config (
+      id INTEGER PRIMARY KEY,
+      module_key TEXT UNIQUE NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      config_json TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Default modules for BudgetO
+    INSERT OR IGNORE INTO module_config (module_key, enabled, display_order) VALUES
+      ('budgets', 1, 1),
+      ('instructors', 0, 2),
+      ('cash-advance', 0, 3),
+      ('excel-import', 0, 4),
+      ('members', 1, 5),
+      ('earmarks', 1, 6),
+      ('invoices', 1, 7);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

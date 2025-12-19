@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
 import type { NavKey } from '../../utils/navItems'
+import { useModules, MODULE_NAV_MAP } from '../../context/ModuleContext'
 
 interface SideNavProps {
   activePage: NavKey
@@ -12,15 +13,39 @@ interface SideNavProps {
 }
 
 export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed }: SideNavProps) {
+  const { enabledModules, loading } = useModules()
+
+  // Filter nav items based on enabled modules
+  const visibleNavItems = useMemo(() => {
+    if (loading) return navItems // Show all during loading
+    
+    return navItems.filter(item => {
+      // Dashboard, Buchungen, Belege, Reports, Einstellungen are always visible
+      const alwaysVisible: NavKey[] = ['Dashboard', 'Buchungen', 'Belege', 'Reports', 'Einstellungen']
+      if (alwaysVisible.includes(item.key)) return true
+      
+      // Check if this nav item's module is enabled
+      const moduleForNav = Object.entries(MODULE_NAV_MAP).find(([_, navKey]) => navKey === item.key)
+      if (!moduleForNav) return true // No module mapping = always visible
+      
+      const moduleKey = moduleForNav[0] as keyof typeof MODULE_NAV_MAP
+      return enabledModules.includes(moduleKey)
+    })
+  }, [enabledModules, loading])
+
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
-      {navItems.map((item, idx) => {
+      {visibleNavItems.map((item, idx) => {
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         
+        // Check if we need a divider (group changed from previous visible item)
+        const prevItem = visibleNavItems[idx - 1]
+        const showDivider = idx > 0 && prevItem && item.group !== prevItem.group
+        
         return (
           <React.Fragment key={item.key}>
-            {idx > 0 && item.group !== navItems[idx - 1]?.group && (
+            {showDivider && (
               <div className="nav-divider" aria-hidden="true" />
             )}
             <button

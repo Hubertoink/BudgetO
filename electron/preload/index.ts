@@ -186,6 +186,13 @@ contextBridge.exposeInMainWorld('api', {
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),
         openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath })
+    },
+    // BudgetO: Module System
+    modules: {
+        list: () => ipcRenderer.invoke('modules.list'),
+        setEnabled: (payload: { moduleKey: string; enabled: boolean }) => ipcRenderer.invoke('modules.setEnabled', payload),
+        setConfig: (payload: { moduleKey: string; configJson: string | null }) => ipcRenderer.invoke('modules.setConfig', payload),
+        getEnabled: () => ipcRenderer.invoke('modules.getEnabled')
     }
 })
 

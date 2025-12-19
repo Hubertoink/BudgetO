@@ -15,6 +15,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   const tiles: Array<{ key: TileKey; icon: string; label: string }> = [
     { key: 'general', icon: '🖼️', label: 'Darstellung' },
     { key: 'table', icon: '📋', label: 'Tabelle' },
+    { key: 'modules', icon: '🧩', label: 'Module' },
     { key: 'storage', icon: '🗄️', label: 'Speicher & Backup' },
     { key: 'import', icon: '📥', label: 'Import' },
     { key: 'org', icon: '🏢', label: 'Organisation' },

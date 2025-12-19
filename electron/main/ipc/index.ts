@@ -1421,4 +1421,38 @@ export function registerIpcHandlers() {
             return { ok: false, error: e?.message || String(e) }
         }
     })
+
+    // =========================================================================
+    // BudgetO: Module System
+    // =========================================================================
+    ipcMain.handle('modules.list', async () => {
+        const { listModules, MODULE_DEFINITIONS } = await import('../repositories/modules')
+        const configs = listModules()
+        // Merge definitions with configs
+        const result = MODULE_DEFINITIONS.map(def => {
+            const config = configs.find(c => c.moduleKey === def.key)
+            return {
+                ...def,
+                enabled: config?.enabled ?? true,
+                displayOrder: config?.displayOrder ?? 0,
+                configJson: config?.configJson ?? null
+            }
+        })
+        return { modules: result }
+    })
+
+    ipcMain.handle('modules.setEnabled', async (_e, payload: { moduleKey: string; enabled: boolean }) => {
+        const { setModuleEnabled } = await import('../repositories/modules')
+        return setModuleEnabled(payload.moduleKey as any, payload.enabled)
+    })
+
+    ipcMain.handle('modules.setConfig', async (_e, payload: { moduleKey: string; configJson: string | null }) => {
+        const { setModuleConfig } = await import('../repositories/modules')
+        return setModuleConfig(payload.moduleKey as any, payload.configJson)
+    })
+
+    ipcMain.handle('modules.getEnabled', async () => {
+        const { getEnabledModules } = await import('../repositories/modules')
+        return { enabledModules: getEnabledModules() }
+    })
 }
