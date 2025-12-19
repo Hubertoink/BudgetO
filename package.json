@@ -1,8 +1,8 @@
 {
   "name": "budgeto",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Budget- und Finanzmanagement für die Jugendförderung - Outputorientierte Finanzplanung",
+  "description": "BudgetO - Budget- und Finanzmanagement für die Jugendförderung",
   "main": "dist-electron/main/index.cjs",
   "author": "Nikolas Häfner",
   "license": "MIT",
@@ -40,6 +40,7 @@
     "@typescript-eslint/eslint-plugin": "^8.7.0",
     "@typescript-eslint/parser": "^8.7.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "baseline-browser-mapping": "^2.9.2",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",

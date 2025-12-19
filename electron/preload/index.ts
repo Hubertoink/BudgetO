@@ -185,7 +185,8 @@ contextBridge.exposeInMainWorld('api', {
     },
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),
-        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath })
+        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath }),
+        openExternal: (url: string) => ipcRenderer.invoke('shell.openExternal', { url })
     },
     // BudgetO: Module System
     modules: {
@@ -208,6 +209,24 @@ contextBridge.exposeInMainWorld('api', {
         update: (payload: { id: number; name?: string; username?: string; password?: string; email?: string; role?: string; isActive?: boolean }) => ipcRenderer.invoke('users.update', payload),
         delete: (payload: { id: number }) => ipcRenderer.invoke('users.delete', payload),
         count: () => ipcRenderer.invoke('users.count')
+    },
+    // Organizations (Kostenstellen)
+    organizations: {
+        list: () => ipcRenderer.invoke('organizations.list'),
+        active: () => ipcRenderer.invoke('organizations.active'),
+        create: (payload: { name: string }) => ipcRenderer.invoke('organizations.create', payload),
+        switch: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.switch', payload),
+        rename: (payload: { orgId: string; name: string }) => ipcRenderer.invoke('organizations.rename', payload),
+        delete: (payload: { orgId: string; deleteData?: boolean }) => ipcRenderer.invoke('organizations.delete', payload),
+        getAppearance: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.getAppearance', payload),
+        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => 
+            ipcRenderer.invoke('organizations.setAppearance', payload),
+        activeAppearance: () => ipcRenderer.invoke('organizations.activeAppearance'),
+        onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => {
+            const handler = (_: any, org: { id: string; name: string; dbRoot: string }) => cb(org)
+            ipcRenderer.on('organizations:switched', handler)
+            return () => ipcRenderer.removeListener('organizations:switched', handler)
+        }
     }
 })
 
