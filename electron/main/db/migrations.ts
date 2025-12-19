@@ -460,6 +460,45 @@ export const MIGRATIONS: Mig[] = [
       ('invoices', 1, 7);
     `
   }
+  ,
+  {
+    version: 23,
+    up: `
+    -- BudgetO Phase 2: User Authentication & Authorization
+    -- Extend users table with authentication fields
+    ALTER TABLE users ADD COLUMN username TEXT;
+    ALTER TABLE users ADD COLUMN password_hash TEXT;
+    ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE users ADD COLUMN last_login TEXT;
+    ALTER TABLE users ADD COLUMN email TEXT;
+    
+    -- Create unique index on username (only for non-null values)
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;
+    
+    -- Update existing admin user with default credentials
+    -- Default: username=admin, password=admin (will be hashed in app)
+    UPDATE users SET username = 'admin', is_active = 1 WHERE id = 1;
+    `
+  }
+  ,
+  {
+    version: 24,
+    up: `
+    -- BudgetO Phase 2: Session management
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      is_valid INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

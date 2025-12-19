@@ -1455,4 +1455,58 @@ export function registerIpcHandlers() {
         const { getEnabledModules } = await import('../repositories/modules')
         return { enabledModules: getEnabledModules() }
     })
+
+    // =========================================================================
+    // BudgetO Phase 2: User Authentication & Authorization
+    // =========================================================================
+    
+    ipcMain.handle('auth.login', async (_e, payload: { username: string; password: string }) => {
+        const { login } = await import('../repositories/users')
+        return login(payload.username, payload.password)
+    })
+
+    ipcMain.handle('auth.isRequired', async () => {
+        const { isAuthRequired } = await import('../repositories/users')
+        return { required: isAuthRequired() }
+    })
+
+    ipcMain.handle('auth.setInitialPassword', async (_e, payload: { userId: number; password: string }) => {
+        const { setInitialPassword } = await import('../repositories/users')
+        return setInitialPassword(payload.userId, payload.password)
+    })
+
+    ipcMain.handle('auth.changePassword', async (_e, payload: { userId: number; currentPassword: string; newPassword: string }) => {
+        const { changePassword } = await import('../repositories/users')
+        return changePassword(payload.userId, payload.currentPassword, payload.newPassword)
+    })
+
+    ipcMain.handle('users.list', async (_e, payload?: { includeInactive?: boolean }) => {
+        const { listUsers } = await import('../repositories/users')
+        return { users: listUsers(payload) }
+    })
+
+    ipcMain.handle('users.get', async (_e, payload: { id: number }) => {
+        const { getUserById } = await import('../repositories/users')
+        return { user: getUserById(payload.id) }
+    })
+
+    ipcMain.handle('users.create', async (_e, payload: { name: string; username: string; password: string; email?: string; role: string }) => {
+        const { createUser } = await import('../repositories/users')
+        return { user: createUser(payload as any) }
+    })
+
+    ipcMain.handle('users.update', async (_e, payload: { id: number; name?: string; username?: string; password?: string; email?: string; role?: string; isActive?: boolean }) => {
+        const { updateUser } = await import('../repositories/users')
+        return { user: updateUser(payload as any) }
+    })
+
+    ipcMain.handle('users.delete', async (_e, payload: { id: number }) => {
+        const { deleteUser } = await import('../repositories/users')
+        return deleteUser(payload.id)
+    })
+
+    ipcMain.handle('users.count', async () => {
+        const { getUserCount } = await import('../repositories/users')
+        return { count: getUserCount() }
+    })
 }

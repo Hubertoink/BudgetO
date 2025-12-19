@@ -16,6 +16,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'general', icon: '🖼️', label: 'Darstellung' },
     { key: 'table', icon: '📋', label: 'Tabelle' },
     { key: 'modules', icon: '🧩', label: 'Module' },
+    { key: 'users', icon: '👥', label: 'Benutzer' },
     { key: 'storage', icon: '🗄️', label: 'Speicher & Backup' },
     { key: 'import', icon: '📥', label: 'Import' },
     { key: 'org', icon: '🏢', label: 'Organisation' },

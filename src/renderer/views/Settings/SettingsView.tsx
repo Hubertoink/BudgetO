@@ -8,6 +8,7 @@ import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
 import { ModulesPane } from './panes/ModulesPane'
+import { UsersPane } from './panes/UsersPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { CloudPane } from './panes/CloudPane'
 
@@ -112,6 +113,10 @@ export function SettingsView(props: SettingsProps) {
 
         {activeTile === 'modules' && (
           <ModulesPane notify={props.notify} />
+        )}
+
+        {activeTile === 'users' && (
+          <UsersPane notify={props.notify} />
         )}
         
         {activeTile === 'yearEnd' && (

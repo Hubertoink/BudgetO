@@ -29,6 +29,8 @@ import { useQuickAdd } from './hooks/useQuickAdd'
 import { ToastProvider, useToast } from './context/ToastContext'
 import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences'
 import { ModuleProvider, useModules } from './context/ModuleContext'
+import { AuthProvider, useAuth, useRequireAuth } from './context/AuthContext'
+import LoginModal from './components/auth/LoginModal'
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
@@ -1823,10 +1825,59 @@ export default function App() {
     return (
         <UIPreferencesProvider>
             <ToastProvider>
-                <ModuleProvider>
-                    <AppInner />
-                </ModuleProvider>
+                <AuthProvider>
+                    <ModuleProvider>
+                        <AuthGate />
+                    </ModuleProvider>
+                </AuthProvider>
             </ToastProvider>
         </UIPreferencesProvider>
+    )
+}
+
+// Auth gate - shows login if required
+function AuthGate() {
+    const { authRequired, isAuthenticated, isLoading } = useAuth()
+    const [showLogin, setShowLogin] = useState(!isAuthenticated && authRequired)
+    
+    useEffect(() => {
+        if (authRequired && !isAuthenticated && !isLoading) {
+            setShowLogin(true)
+        } else if (isAuthenticated) {
+            setShowLogin(false)
+        }
+    }, [authRequired, isAuthenticated, isLoading])
+    
+    // Listen for logout to show login again
+    useEffect(() => {
+        const handleAuthChange = () => {
+            // Re-check auth state
+        }
+        window.addEventListener('auth-changed', handleAuthChange)
+        return () => window.removeEventListener('auth-changed', handleAuthChange)
+    }, [])
+    
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center" style={{ height: '100vh' }}>
+                <div className="text-center">
+                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>💰</div>
+                    <div>BudgetO wird geladen...</div>
+                </div>
+            </div>
+        )
+    }
+    
+    return (
+        <>
+            {showLogin && authRequired && (
+                <LoginModal 
+                    isOpen={true} 
+                    onClose={() => setShowLogin(false)}
+                    allowClose={false}
+                />
+            )}
+            {(!authRequired || isAuthenticated) && <AppInner />}
+        </>
     )
 }

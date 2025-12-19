@@ -193,6 +193,21 @@ contextBridge.exposeInMainWorld('api', {
         setEnabled: (payload: { moduleKey: string; enabled: boolean }) => ipcRenderer.invoke('modules.setEnabled', payload),
         setConfig: (payload: { moduleKey: string; configJson: string | null }) => ipcRenderer.invoke('modules.setConfig', payload),
         getEnabled: () => ipcRenderer.invoke('modules.getEnabled')
+    },
+    // BudgetO Phase 2: Authentication & Users
+    auth: {
+        login: (payload: { username: string; password: string }) => ipcRenderer.invoke('auth.login', payload),
+        isRequired: () => ipcRenderer.invoke('auth.isRequired'),
+        setInitialPassword: (payload: { userId: number; password: string }) => ipcRenderer.invoke('auth.setInitialPassword', payload),
+        changePassword: (payload: { userId: number; currentPassword: string; newPassword: string }) => ipcRenderer.invoke('auth.changePassword', payload)
+    },
+    users: {
+        list: (payload?: { includeInactive?: boolean }) => ipcRenderer.invoke('users.list', payload),
+        get: (payload: { id: number }) => ipcRenderer.invoke('users.get', payload),
+        create: (payload: { name: string; username: string; password: string; email?: string; role: string }) => ipcRenderer.invoke('users.create', payload),
+        update: (payload: { id: number; name?: string; username?: string; password?: string; email?: string; role?: string; isActive?: boolean }) => ipcRenderer.invoke('users.update', payload),
+        delete: (payload: { id: number }) => ipcRenderer.invoke('users.delete', payload),
+        count: () => ipcRenderer.invoke('users.count')
     }
 })
 
