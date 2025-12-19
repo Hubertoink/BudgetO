@@ -6,7 +6,7 @@ type NavIconColorMode = 'color' | 'mono'
 type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm' | 'soft-blush' | 'professional-light'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
@@ -391,9 +391,9 @@ export default function SetupWizardModal({
             ]
             const bgOptions: Array<{ value: BackgroundImage; label: string }> = [
                 { value: 'none', label: 'Keiner' },
-                { value: 'cherry-blossom', label: 'Kirschblüten' },
-                { value: 'foggy-forest', label: 'Nebelwald' },
-                { value: 'mountain-snow', label: 'Bergschnee' }
+                { value: 'mountain-clouds', label: 'Berglandschaft' },
+                { value: 'snowy-landscape', label: 'Schneelandschaft' },
+                { value: 'snow-houses', label: 'Winterdorf' }
             ]
             return (
                 <div className="card setup-appearance-card">

@@ -70,9 +70,8 @@ export default function QuickAddModal({
                                     const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
                                     return eurFmt.format(g)
                                 })()
-                                const sphere = qa.sphere
                                 const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
+                                return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span></>
                             })()}
                         </div>
                     </div>
@@ -104,15 +103,7 @@ export default function QuickAddModal({
                                         ))}
                                     </div>
                                 </div>
-                                <div className="field">
-                                    <label>Sphäre</label>
-                                    <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })} aria-label="Sphäre der Buchung">
-                                        <option value="IDEELL">IDEELL</option>
-                                        <option value="ZWECK">ZWECK</option>
-                                        <option value="VERMOEGEN">VERMOEGEN</option>
-                                        <option value="WGB">WGB</option>
-                                    </select>
-                                </div>
+                                {/* Sphäre ausgeblendet für BudgetO - nicht relevant für Jugendförderung */}
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field">
                                         <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>

@@ -234,120 +234,113 @@ export function UsersPane({ notify }: UsersPaneProps) {
   // Show edit/add form
   if (editUser || isAddMode) {
     return (
-      <div className="pane-section">
-        <h2>{isAddMode ? 'Neuer Benutzer' : 'Benutzer bearbeiten'}</h2>
+      <div className="stack gap-20">
+        <div>
+          <h2 style={{ margin: 0, marginBottom: 4 }}>{isAddMode ? 'Neuer Benutzer' : 'Benutzer bearbeiten'}</h2>
+          <p className="helper" style={{ margin: 0 }}>
+            {isAddMode ? 'Neuen Benutzer anlegen' : 'Benutzerdaten aktualisieren'}
+          </p>
+        </div>
         
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ display: 'grid', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                Name *
-              </label>
+          <div className="stack gap-16">
+            <div className="field">
+              <label>Name *</label>
               <input
                 type="text"
+                className="input"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Vollständiger Name"
-                style={{ width: '100%' }}
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                Benutzername {isAddMode && '*'}
-              </label>
+            <div className="field">
+              <label>Benutzername {isAddMode && '*'}</label>
               <input
                 type="text"
+                className="input"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="Benutzername für Login"
-                style={{ width: '100%' }}
+                placeholder="Für Login"
                 autoComplete="off"
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                E-Mail
-              </label>
+            <div className="field">
+              <label>E-Mail</label>
               <input
                 type="email"
+                className="input"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="E-Mail-Adresse (optional)"
-                style={{ width: '100%' }}
+                placeholder="Optional"
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                Rolle *
-              </label>
+            <div className="field">
+              <label>Rolle *</label>
               <select
+                className="input"
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                style={{ width: '100%' }}
                 disabled={editUser?.id === currentUser?.id}
               >
                 {Object.entries(ROLE_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
               </select>
-              <p className="helper" style={{ marginTop: 4 }}>
+              <div className="helper" style={{ marginTop: 4 }}>
                 {ROLE_DESCRIPTIONS[formData.role]}
-              </p>
+              </div>
               {editUser?.id === currentUser?.id && (
-                <p className="helper" style={{ color: 'var(--warning)', marginTop: 4 }}>
+                <div className="helper" style={{ color: 'var(--warning)', marginTop: 4 }}>
                   Sie können Ihre eigene Rolle nicht ändern.
-                </p>
+                </div>
               )}
             </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '4px 0' }} />
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                {isAddMode ? 'Passwort *' : 'Neues Passwort (leer lassen für unverändert)'}
-              </label>
+            <div className="field">
+              <label>{isAddMode ? 'Passwort *' : 'Neues Passwort'}</label>
               <input
                 type="password"
+                className="input"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder={isAddMode ? 'Passwort' : 'Neues Passwort (optional)'}
-                style={{ width: '100%' }}
+                placeholder={isAddMode ? 'Passwort' : 'Leer lassen für unverändert'}
                 autoComplete="new-password"
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-                Passwort bestätigen
-              </label>
+            <div className="field">
+              <label>Passwort bestätigen</label>
               <input
                 type="password"
+                className="input"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 placeholder="Passwort wiederholen"
-                style={{ width: '100%' }}
                 autoComplete="new-password"
               />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? 'Speichern...' : 'Speichern'}
-            </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'flex-end' }}>
             <button
               className="btn"
               onClick={handleCancel}
               disabled={saving}
             >
               Abbrechen
+            </button>
+            <button
+              className="btn primary"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Speichern...' : 'Speichern'}
             </button>
           </div>
         </div>
@@ -356,24 +349,25 @@ export function UsersPane({ notify }: UsersPaneProps) {
   }
 
   return (
-    <div className="pane-section">
-      <h2>Benutzer</h2>
-      
-      <p className="helper" style={{ marginBottom: 16 }}>
-        Verwalten Sie Benutzer und deren Zugriffsrechte.
-        {!authRequired && (
-          <span style={{ color: 'var(--warning)' }}>
-            {' '}Authentifizierung ist aktuell deaktiviert.
-          </span>
-        )}
-      </p>
+    <div className="stack gap-20">
+      <div>
+        <h2 style={{ margin: 0, marginBottom: 4 }}>Benutzer</h2>
+        <p className="helper" style={{ margin: 0 }}>
+          Verwalten Sie Benutzer und deren Zugriffsrechte.
+          {!authRequired && (
+            <span style={{ color: 'var(--warning)' }}>
+              {' '}Authentifizierung ist aktuell deaktiviert.
+            </span>
+          )}
+        </p>
+      </div>
 
       <button
-        className="btn btn-primary"
+        className="btn primary"
         onClick={handleAdd}
-        style={{ marginBottom: 16 }}
+        style={{ alignSelf: 'flex-start' }}
       >
-        + Neuer Benutzer
+        Neuer Benutzer
       </button>
 
       <div style={{ display: 'grid', gap: 12 }}>
@@ -449,30 +443,32 @@ export function UsersPane({ notify }: UsersPaneProps) {
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
               <button
                 className="btn btn-sm"
                 onClick={() => handleEdit(user)}
                 title="Bearbeiten"
+                style={{ padding: '4px 10px' }}
               >
-                ✏️
+                Bearbeiten
               </button>
               <button
                 className="btn btn-sm"
                 onClick={() => handleToggleActive(user)}
                 title={user.isActive ? 'Deaktivieren' : 'Aktivieren'}
                 disabled={user.id === currentUser?.id}
+                style={{ padding: '4px 10px' }}
               >
-                {user.isActive ? '🚫' : '✅'}
+                {user.isActive ? 'Deaktivieren' : 'Aktivieren'}
               </button>
               <button
                 className="btn btn-sm"
                 onClick={() => handleDelete(user)}
                 title="Löschen"
                 disabled={user.id === currentUser?.id}
-                style={{ color: 'var(--error)' }}
+                style={{ padding: '4px 10px', color: 'var(--error)' }}
               >
-                🗑️
+                Löschen
               </button>
             </div>
           </div>

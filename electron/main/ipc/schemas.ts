@@ -8,7 +8,7 @@ export const VoucherCreateInput = z
     .object({
         date: z.string(),
         type: VoucherType,
-        sphere: Sphere,
+        sphere: Sphere.optional(), // Optional when using custom categories
         description: z.string().optional(),
         // allow either net or gross entry
         netAmount: z.number().optional(),
@@ -18,7 +18,7 @@ export const VoucherCreateInput = z
         // Transfer direction (only when type === 'TRANSFER')
         transferFrom: PaymentMethod.optional(),
         transferTo: PaymentMethod.optional(),
-        categoryId: z.number().optional(),
+        categoryId: z.number().optional(), // Custom category (alternative to sphere)
         projectId: z.number().optional(),
         earmarkId: z.number().optional(),
         earmarkAmount: z.number().nullable().optional(),
@@ -965,3 +965,316 @@ export type TSubmissionConvertOutput = z.infer<typeof SubmissionConvertOutput>
 export type TSubmissionsSummaryOutput = z.infer<typeof SubmissionsSummaryOutput>
 export type TSubmissionAttachmentReadInput = z.infer<typeof SubmissionAttachmentReadInput>
 export type TSubmissionAttachmentReadOutput = z.infer<typeof SubmissionAttachmentReadOutput>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BudgetO Phase 3: Übungsleiter (Instructors)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const InstructorStatus = z.enum(['ACTIVE', 'INACTIVE', 'PENDING'])
+
+export const InstructorsListInput = z.object({
+  status: InstructorStatus.optional(),
+  q: z.string().optional(),
+  limit: z.number().min(1).max(200).default(50).optional(),
+  offset: z.number().min(0).default(0).optional()
+}).optional()
+
+export const InstructorSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  status: InstructorStatus,
+  yearlyCap: z.number().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable()
+})
+
+export const InstructorsListOutput = z.object({
+  rows: z.array(InstructorSchema),
+  total: z.number()
+})
+
+export const InstructorGetInput = z.object({ id: z.number() })
+
+export const InstructorContractSchema = z.object({
+  id: z.number(),
+  instructorId: z.number(),
+  title: z.string().nullable(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  fileName: z.string(),
+  filePath: z.string(),
+  mimeType: z.string().nullable(),
+  size: z.number().nullable(),
+  createdAt: z.string()
+})
+
+export const InstructorInvoiceSchema = z.object({
+  id: z.number(),
+  instructorId: z.number(),
+  date: z.string(),
+  description: z.string().nullable(),
+  amount: z.number(),
+  voucherId: z.number().nullable(),
+  fileName: z.string().nullable(),
+  filePath: z.string().nullable(),
+  mimeType: z.string().nullable(),
+  fileSize: z.number().nullable(),
+  createdAt: z.string()
+})
+
+export const InstructorGetOutput = InstructorSchema.extend({
+  contracts: z.array(InstructorContractSchema),
+  invoices: z.array(InstructorInvoiceSchema),
+  totalInvoiced: z.number()
+})
+
+export const InstructorCreateInput = z.object({
+  name: z.string(),
+  status: InstructorStatus.optional(),
+  yearlyCap: z.number().nullable().optional(),
+  notes: z.string().nullable().optional()
+})
+export const InstructorCreateOutput = z.object({ id: z.number() })
+
+export const InstructorUpdateInput = z.object({
+  id: z.number(),
+  name: z.string().optional(),
+  status: InstructorStatus.optional(),
+  yearlyCap: z.number().nullable().optional(),
+  notes: z.string().nullable().optional()
+})
+export const InstructorUpdateOutput = z.object({ id: z.number() })
+
+export const InstructorDeleteInput = z.object({ id: z.number() })
+export const InstructorDeleteOutput = z.object({ id: z.number() })
+
+// Contracts
+export const InstructorContractAddInput = z.object({
+  instructorId: z.number(),
+  title: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  fileName: z.string(),
+  dataBase64: z.string(),
+  mimeType: z.string().nullable().optional()
+})
+export const InstructorContractAddOutput = z.object({ id: z.number() })
+
+export const InstructorContractDeleteInput = z.object({ contractId: z.number() })
+export const InstructorContractDeleteOutput = z.object({ id: z.number() })
+
+export const InstructorContractReadInput = z.object({ contractId: z.number() })
+export const InstructorContractReadOutput = z.object({
+  fileName: z.string(),
+  mimeType: z.string().nullable(),
+  dataBase64: z.string()
+})
+
+// Invoices
+export const InstructorInvoiceAddInput = z.object({
+  instructorId: z.number(),
+  date: z.string(),
+  description: z.string().nullable().optional(),
+  amount: z.number(),
+  voucherId: z.number().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  dataBase64: z.string().nullable().optional(),
+  mimeType: z.string().nullable().optional()
+})
+export const InstructorInvoiceAddOutput = z.object({ id: z.number() })
+
+export const InstructorInvoiceDeleteInput = z.object({ invoiceId: z.number() })
+export const InstructorInvoiceDeleteOutput = z.object({ id: z.number() })
+
+// Yearly summary
+export const InstructorYearlySummaryInput = z.object({
+  instructorId: z.number(),
+  year: z.number()
+})
+export const InstructorYearlySummaryOutput = z.object({
+  total: z.number(),
+  cap: z.number().nullable(),
+  remaining: z.number().nullable(),
+  invoices: z.array(InstructorInvoiceSchema)
+})
+
+export type TInstructorsListInput = z.infer<typeof InstructorsListInput>
+export type TInstructorsListOutput = z.infer<typeof InstructorsListOutput>
+export type TInstructorGetInput = z.infer<typeof InstructorGetInput>
+export type TInstructorGetOutput = z.infer<typeof InstructorGetOutput>
+export type TInstructorCreateInput = z.infer<typeof InstructorCreateInput>
+export type TInstructorCreateOutput = z.infer<typeof InstructorCreateOutput>
+export type TInstructorUpdateInput = z.infer<typeof InstructorUpdateInput>
+export type TInstructorUpdateOutput = z.infer<typeof InstructorUpdateOutput>
+export type TInstructorDeleteInput = z.infer<typeof InstructorDeleteInput>
+export type TInstructorDeleteOutput = z.infer<typeof InstructorDeleteOutput>
+export type TInstructorContractAddInput = z.infer<typeof InstructorContractAddInput>
+export type TInstructorContractAddOutput = z.infer<typeof InstructorContractAddOutput>
+export type TInstructorContractDeleteInput = z.infer<typeof InstructorContractDeleteInput>
+export type TInstructorContractDeleteOutput = z.infer<typeof InstructorContractDeleteOutput>
+export type TInstructorContractReadInput = z.infer<typeof InstructorContractReadInput>
+export type TInstructorContractReadOutput = z.infer<typeof InstructorContractReadOutput>
+export type TInstructorInvoiceAddInput = z.infer<typeof InstructorInvoiceAddInput>
+export type TInstructorInvoiceAddOutput = z.infer<typeof InstructorInvoiceAddOutput>
+export type TInstructorInvoiceDeleteInput = z.infer<typeof InstructorInvoiceDeleteInput>
+export type TInstructorInvoiceDeleteOutput = z.infer<typeof InstructorInvoiceDeleteOutput>
+export type TInstructorYearlySummaryInput = z.infer<typeof InstructorYearlySummaryInput>
+export type TInstructorYearlySummaryOutput = z.infer<typeof InstructorYearlySummaryOutput>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cash Advances (Barvorschüsse) - Phase 4
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CashAdvanceStatus = z.enum(['OPEN', 'RESOLVED', 'OVERDUE'])
+
+export const CashAdvanceSchema = z.object({
+  id: z.number(),
+  orderNumber: z.string(),
+  employeeName: z.string(),
+  purpose: z.string().nullable(),
+  totalAmount: z.number(),
+  status: CashAdvanceStatus,
+  createdAt: z.string(),
+  resolvedAt: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  notes: z.string().nullable(),
+  costCenterId: z.number().nullable()
+})
+
+export const PartialCashAdvanceSchema = z.object({
+  id: z.number(),
+  cashAdvanceId: z.number(),
+  recipientName: z.string().nullable(),
+  amount: z.number(),
+  issuedAt: z.string(),
+  description: z.string().nullable(),
+  isSettled: z.boolean(),
+  settledAmount: z.number().nullable(),
+  settledAt: z.string().nullable()
+})
+
+export const CashAdvanceSettlementSchema = z.object({
+  id: z.number(),
+  cashAdvanceId: z.number(),
+  amount: z.number(),
+  settledAt: z.string(),
+  description: z.string().nullable(),
+  receiptFileName: z.string().nullable(),
+  receiptFilePath: z.string().nullable(),
+  receiptMimeType: z.string().nullable(),
+  voucherId: z.number().nullable()
+})
+
+export const CashAdvanceWithDetailsSchema = CashAdvanceSchema.extend({
+  partials: z.array(PartialCashAdvanceSchema),
+  settlements: z.array(CashAdvanceSettlementSchema),
+  totalPlanned: z.number(),
+  totalSettled: z.number(),
+  plannedRemaining: z.number(),
+  actualRemaining: z.number(),
+  coverage: z.number()
+})
+
+// List
+export const CashAdvancesListInput = z.object({
+  status: z.union([CashAdvanceStatus, z.literal('ALL')]).optional(),
+  search: z.string().optional(),
+  limit: z.number().optional(),
+  offset: z.number().optional()
+})
+export const CashAdvanceListItemSchema = CashAdvanceSchema.extend({
+  recipientCount: z.number(),
+  totalPlanned: z.number(),
+  totalSettled: z.number()
+})
+export const CashAdvancesListOutput = z.object({
+  items: z.array(CashAdvanceListItemSchema),
+  total: z.number()
+})
+
+// Get by ID
+export const CashAdvanceGetByIdInput = z.object({ id: z.number() })
+export const CashAdvanceGetByIdOutput = CashAdvanceWithDetailsSchema.nullable()
+
+// Create
+export const CashAdvanceCreateInput = z.object({
+  orderNumber: z.string(),
+  employeeName: z.string(),
+  purpose: z.string().nullable().optional(),
+  totalAmount: z.number(), // Jetzt Pflichtfeld!
+  dueDate: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  costCenterId: z.number().nullable().optional()
+})
+export const CashAdvanceCreateOutput = z.object({ id: z.number() })
+
+// Update
+export const CashAdvanceUpdateInput = z.object({
+  id: z.number(),
+  orderNumber: z.string().optional(),
+  employeeName: z.string().optional(),
+  purpose: z.string().nullable().optional(),
+  totalAmount: z.number().optional(),
+  status: CashAdvanceStatus.optional(),
+  dueDate: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  costCenterId: z.number().nullable().optional()
+})
+export const CashAdvanceUpdateOutput = z.object({ id: z.number() })
+
+// Delete
+export const CashAdvanceDeleteInput = z.object({ id: z.number() })
+export const CashAdvanceDeleteOutput = z.object({ id: z.number() })
+
+// Stats
+export const CashAdvanceStatsOutput = z.object({
+  totalOpen: z.number(),
+  totalResolved: z.number(),
+  totalOverdue: z.number(),
+  openAmount: z.number(),
+  overdueAmount: z.number()
+})
+
+// Partials
+export const PartialCashAdvanceAddInput = z.object({
+  cashAdvanceId: z.number(),
+  recipientName: z.string(), // Empfänger ist jetzt Pflichtfeld
+  amount: z.number(),
+  issuedAt: z.string().optional(),
+  description: z.string().nullable().optional()
+})
+export const PartialCashAdvanceAddOutput = z.object({ id: z.number() })
+
+export const PartialCashAdvanceSettleInput = z.object({
+  id: z.number(),
+  settledAmount: z.number(),
+  settledAt: z.string().optional()
+})
+export const PartialCashAdvanceSettleOutput = z.object({ id: z.number() })
+
+export const PartialCashAdvanceDeleteInput = z.object({ id: z.number() })
+export const PartialCashAdvanceDeleteOutput = z.object({ id: z.number() })
+
+// Settlements
+export const CashAdvanceSettlementAddInput = z.object({
+  cashAdvanceId: z.number(),
+  amount: z.number(),
+  settledAt: z.string().optional(),
+  description: z.string().nullable().optional(),
+  voucherId: z.number().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  dataBase64: z.string().nullable().optional(),
+  mimeType: z.string().nullable().optional()
+})
+export const CashAdvanceSettlementAddOutput = z.object({ id: z.number() })
+export const CashAdvanceSettlementDeleteInput = z.object({ id: z.number() })
+export const CashAdvanceSettlementDeleteOutput = z.object({ id: z.number() })
+export const CashAdvanceSettlementOpenInput = z.object({ id: z.number() })
+
+// Type exports
+export type TCashAdvanceStatus = z.infer<typeof CashAdvanceStatus>
+export type TCashAdvance = z.infer<typeof CashAdvanceSchema>
+export type TPartialCashAdvance = z.infer<typeof PartialCashAdvanceSchema>
+export type TCashAdvanceSettlement = z.infer<typeof CashAdvanceSettlementSchema>
+export type TCashAdvanceWithDetails = z.infer<typeof CashAdvanceWithDetailsSchema>

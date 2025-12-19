@@ -7,8 +7,10 @@ import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
+import { CategoriesPane } from './panes/CategoriesPane'
 import { ModulesPane } from './panes/ModulesPane'
 import { UsersPane } from './panes/UsersPane'
+import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
 
 /**
@@ -114,12 +116,20 @@ export function SettingsView(props: SettingsProps) {
           />
         )}
 
+        {activeTile === 'categories' && (
+          <CategoriesPane notify={props.notify} />
+        )}
+
         {activeTile === 'modules' && (
           <ModulesPane notify={props.notify} />
         )}
 
         {activeTile === 'users' && (
           <UsersPane notify={props.notify} />
+        )}
+
+        {activeTile === 'server' && (
+          <ServerPane notify={props.notify} />
         )}
         
         {activeTile === 'yearEnd' && (

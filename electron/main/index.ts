@@ -144,6 +144,24 @@ app.whenReady().then(async () => {
     // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers()
     createMenu()
+    
+    // Auto-start API server if configured
+    try {
+        const { getServerConfig, startServer } = await import('./services/apiServer')
+        const serverConfig = getServerConfig()
+        if (serverConfig.mode === 'server' && serverConfig.autoStart) {
+            console.log('[Startup] Auto-starting API server...')
+            const result = await startServer()
+            if (result.success) {
+                console.log(`[Startup] API server running on port ${serverConfig.port}`)
+            } else {
+                console.error('[Startup] API server failed:', result.error)
+            }
+        }
+    } catch (serverErr) {
+        console.error('[Startup] API server init error:', serverErr)
+    }
+    
     const win = await createWindow()
 
     // After window finished load, inform renderer if DB init failed

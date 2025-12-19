@@ -116,18 +116,18 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
           onClick={() => setIsOpen(!isOpen)}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          aria-label="Organisation wechseln"
+          aria-label="Sachgebiet wechseln"
           disabled={switching}
-          title={activeOrg?.name || 'Organisation wählen'}
+          title={activeOrg?.name || 'Sachgebiet wählen'}
         >
           <span className="org-switcher-icon">🏢</span>
-          <span className="org-switcher-name">{activeOrg?.name || 'Organisation'}</span>
+          <span className="org-switcher-name">{activeOrg?.name || 'Sachgebiet'}</span>
           <span className="org-switcher-arrow">{isOpen ? '▲' : '▼'}</span>
         </button>
 
         {isOpen && (
           <div className="org-switcher-dropdown" role="listbox">
-            <div className="org-switcher-header">Organisationen</div>
+            <div className="org-switcher-header">Sachgebiete</div>
             
             {organizations.map((org) => (
               <button
@@ -147,7 +147,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
             
             <button className="org-switcher-item org-switcher-new" onClick={handleNewOrg}>
               <span>➕</span>
-              <span>Neue Organisation…</span>
+              <span>Neues Sachgebiet…</span>
             </button>
           </div>
         )}

@@ -8,10 +8,11 @@
 
 - [Über das Projekt](#-über-das-projekt)
 - [Features](#-features)
-- [Installation](#-installation)
-- [Schnellstart](#-schnellstart)
+- [Installation & Start](#-installation--start)
+- [NPM-Befehle](#-npm-befehle)
 - [Technologie-Stack](#️-technologie-stack)
 - [Projektstruktur](#-projektstruktur)
+- [Module](#-module)
 - [Mitwirken](#-mitwirken)
 - [Lizenz](#-lizenz)
 
@@ -24,8 +25,8 @@
 ### Kernfunktionen:
 
 - 📊 **Jahresbudget-Planung** mit Soll-Ist-Vergleich
-- 👥 **Übungsleiter-Verwaltung** mit Verträgen und Rechnungen
-- 💵 **Barvorschuss-Management** mit Anordnungsnummern
+- 👥 **Übungsleiter-Verwaltung** mit Verträgen, Rechnungen und Jahresobergrenzen
+- 💵 **Barvorschuss-Management** mit Anordnungsnummern und Teil-Vorschüssen
 - 📁 **Excel-Import** für Buchungen
 - 🔐 **Multi-User-Zugriff** (Kassier + Leserechte)
 - 🏢 **Kostenstellen** für verschiedene Sachgebiete
@@ -47,22 +48,22 @@
 ### 💰 Buchungsverwaltung
 
 - Sach- und Honorarbuchungen
-- Kategorisierung via Tag-System (mit Beschreibung)
-- Belegverwaltung mit Datei-Upload
+- Kategorisierung via Tag-System
+- Belegverwaltung mit Datei-Upload (Drag & Drop)
 
 ### 👨‍🏫 Übungsleiter-Modul
 
-- Stammdaten: Name, Kontakt, Stundensatz
-- Jahresobergrenze und Restbudget-Anzeige
-- Vertragsupload (PDF) mit Verknüpfung
-- Rechnungserfassung und Auszahlungsstatus
+- Stammdaten mit Status (Aktiv/Inaktiv/Ausstehend)
+- Jahresobergrenze (z.B. 3.000€ ÜL-Pauschale) mit Restbudget-Anzeige
+- Vertragsupload (PDF, Scans) direkt beim Anlegen
+- Rechnungserfassung mit Datei-Anhang
 
 ### 💵 Barvorschuss-Modul
 
-- Haupt-Barvorschuss von Stadtkasse
-- Teil-Barvorschüsse an Mitarbeiter
-- Anordnungsnummer als Pflichtfeld
-- Ausgabe-/Auflösungsdatum mit Über-/Unterdeckung
+- Barvorschüsse mit Anordnungsnummer
+- Teil-Vorschüsse an Mitarbeiter
+- Abrechnungen mit Beleg-Upload
+- Deckungsberechnung (Abrechnung − Auszahlung)
 
 ### 📥 Excel-Import
 
@@ -70,31 +71,19 @@
 - Flexibles Spalten-Mapping
 - Vorschau und Validierung
 
-### 👥 Benutzer & Rechte
-
-| Rolle               | Beschreibung                                 |
-| ------------------- | -------------------------------------------- |
-| **Kassier (Admin)** | Vollzugriff: Lesen, Schreiben, Einstellungen |
-| **Leserechte-User** | Nur Lesen: Dashboards, Reports, Buchungen    |
-
-### 🏢 Kostenstellen / Organisationen
-
-- Mehrere Sachgebiete verwalten
-- Unabhängige Budgets pro Kostenstelle
-
 ### 🔒 Datensicherheit
 
 - Lokale SQLite-Datenbank
-- Optionale Cloud-Synchronisation (PostgreSQL)
+- Automatische Backups
 - Backup & Restore mit Wahl des Speicherorts
 
 ---
 
-## 🚀 Installation
+## 🚀 Installation & Start
 
 ### Voraussetzungen
 
-- [Node.js](https://nodejs.org/) 20 oder höher
+- [Node.js](https://nodejs.org/) **20 oder höher**
 - npm (wird mit Node.js installiert)
 - Git
 
@@ -111,35 +100,65 @@ cd BudgetO
 npm install
 ```
 
-### Schritt 3: Entwicklung starten
+### Schritt 3: Native Module für Electron bauen
+
+```bash
+npm run rebuild:native
+```
+
+### Schritt 4: Entwicklung starten
 
 ```bash
 npm run dev
 ```
 
-### Schritt 4: Ausführbare Datei erstellen
+Die App öffnet sich automatisch im Entwicklungsmodus mit Hot-Reload.
+
+---
+
+## 📦 NPM-Befehle
+
+| Befehl                   | Beschreibung                                           |
+| ------------------------ | ------------------------------------------------------ |
+| `npm run dev`            | Startet die App im Entwicklungsmodus (Hot-Reload)      |
+| `npm run start`          | Alias für `npm run dev`                                |
+| `npm run build`          | Baut die App für Produktion (ohne Packaging)           |
+| `npm run preview`        | Startet die gebaute App zur Vorschau                   |
+| `npm run package`        | Erstellt ausführbare Installer (.exe, .dmg, .AppImage) |
+| `npm run rebuild:native` | Baut native Module (better-sqlite3) für Electron       |
+| `npm run lint`           | Prüft Code mit ESLint                                  |
+| `npm run format`         | Formatiert Code mit Prettier                           |
+| `npm run test`           | Führt Jest Unit-Tests aus                              |
+| `npm run test:e2e`       | Führt Playwright E2E-Tests aus                         |
+
+### Produktions-Build erstellen
 
 ```bash
+# 1. Build für Produktion
 npm run build
+
+# 2. Installer erstellen (Windows .exe, macOS .dmg, Linux .AppImage)
 npm run package
 ```
 
 Die erstellten Dateien findest du im `release/` Ordner:
-| Plattform | Datei |
-|-----------|-------|
-| Windows | `.exe` (Installer) |
-| macOS | `.dmg` |
-| Linux | `.AppImage` |
+
+| Plattform | Datei                     |
+| --------- | ------------------------- |
+| Windows   | `BudgetO-Setup-1.0.0.exe` |
+| macOS     | `BudgetO-1.0.0.dmg`       |
+| Linux     | `BudgetO-1.0.0.AppImage`  |
 
 ---
 
 ## 🏃 Schnellstart
 
-1. **App starten:** Öffne die installierte Anwendung
+1. **App starten:** `npm run dev` oder installierte Anwendung öffnen
 2. **Setup-Wizard:** Beim ersten Start führt ein Assistent durch die Grundkonfiguration
-3. **Kostenstelle anlegen:** Sachgebiet/Organisation definieren
-4. **Budget planen:** Jahresbudget nach Kategorien erstellen
-5. **Buchungen erfassen:** Ausgaben und Einnahmen buchen
+3. **Organisation anlegen:** Sachgebiet/Kostenstelle definieren
+4. **Module aktivieren:** In Einstellungen → Module die gewünschten Features aktivieren
+5. **Budget planen:** Jahresbudget nach Kategorien erstellen
+6. **Buchungen erfassen:** Ausgaben und Einnahmen buchen
 
 ---
 
@@ -147,23 +166,26 @@ Die erstellten Dateien findest du im `release/` Ordner:
 
 ### Desktop-App
 
-- **Electron** – Cross-Platform Desktop Framework
-- **React** – UI-Bibliothek
-- **TypeScript** – Typsichere Entwicklung
-- **Vite** – Build-Tool & Dev-Server
-- **SQLite** (better-sqlite3) – Lokale Datenbank
-
-### Backend (Multi-User)
-
-- **Fastify** – Web-Framework
-- **PostgreSQL** – Relationale Datenbank
-- **Docker** – Container-Deployment
+| Technologie                 | Verwendung                       |
+| --------------------------- | -------------------------------- |
+| **Electron**                | Cross-Platform Desktop Framework |
+| **React 18**                | UI-Bibliothek                    |
+| **TypeScript**              | Typsichere Entwicklung           |
+| **Vite**                    | Build-Tool & Dev-Server          |
+| **electron-vite**           | Electron + Vite Integration      |
+| **SQLite** (better-sqlite3) | Lokale Datenbank                 |
+| **Zod**                     | Schema-Validierung               |
+| **ExcelJS**                 | Excel-Import/Export              |
 
 ### Entwicklungstools
 
-- **ESLint & Prettier** – Code-Qualität
-- **Playwright** – E2E-Tests
-- **Jest** – Unit-Tests
+| Tool                 | Verwendung        |
+| -------------------- | ----------------- |
+| **ESLint**           | Code-Linting      |
+| **Prettier**         | Code-Formatierung |
+| **Jest**             | Unit-Tests        |
+| **Playwright**       | E2E-Tests         |
+| **electron-builder** | App-Packaging     |
 
 ---
 
@@ -172,35 +194,60 @@ Die erstellten Dateien findest du im `release/` Ordner:
 ```
 BudgetO/
 ├── electron/
-│   ├── main/           # Electron Main-Prozess
-│   │   ├── db/         # Datenbank-Logik & Migrationen
-│   │   ├── ipc/        # IPC-Handler
-│   │   ├── repositories/  # Datenzugriffsschicht
-│   │   └── services/   # Business-Logik
-│   └── preload/        # Preload/IPC-Brücke
+│   ├── main/                 # Electron Main-Prozess
+│   │   ├── db/               # Datenbank & Migrationen
+│   │   │   ├── database.ts   # DB-Verbindung
+│   │   │   └── migrations.ts # Schema-Migrationen
+│   │   ├── ipc/              # IPC-Handler & Schemas
+│   │   ├── repositories/     # Datenzugriffsschicht
+│   │   │   ├── vouchers.ts   # Buchungen
+│   │   │   ├── instructors.ts # Übungsleiter
+│   │   │   └── cashAdvances.ts # Barvorschüsse
+│   │   └── services/         # Business-Logik
+│   └── preload/              # Preload/IPC-Brücke
+│       └── index.ts          # window.api Definition
 ├── src/
-│   └── renderer/       # React-Anwendung
-│       ├── components/ # UI-Komponenten
-│       ├── views/      # Seiten (Dashboard, Journal, etc.)
-│       ├── hooks/      # Custom React Hooks
-│       └── context/    # React Context Provider
-├── backend/            # Cloud-API (Fastify)
-├── shared/             # Gemeinsame Typen
-└── docs/               # Dokumentation
+│   └── renderer/             # React-Anwendung
+│       ├── assets/           # Bilder, Icons
+│       ├── components/       # Wiederverwendbare UI-Komponenten
+│       │   ├── layout/       # Navigation, Sidebar
+│       │   └── modals/       # Modal-Dialoge
+│       ├── context/          # React Context (Auth, UI, Module)
+│       ├── hooks/            # Custom React Hooks
+│       ├── views/            # Seiten/Views
+│       │   ├── Dashboard/
+│       │   ├── Journal/      # Buchungen
+│       │   ├── Instructors/  # Übungsleiter
+│       │   ├── CashAdvances/ # Barvorschüsse
+│       │   ├── Budgets/
+│       │   └── Settings/
+│       ├── utils/            # Hilfsfunktionen
+│       ├── App.tsx           # Haupt-App-Komponente
+│       ├── main.tsx          # React Entry Point
+│       └── styles.css        # Globale Styles
+├── shared/                   # Gemeinsame Typen
+├── build/                    # App-Icons & Ressourcen
+├── package.json
+├── electron-builder.yml      # Packaging-Konfiguration
+├── electron.vite.config.ts   # Vite-Konfiguration
+└── tsconfig.json
 ```
 
 ---
 
-## 🔧 Module (Ein-/Ausschaltbar)
+## 🔧 Module
 
-BudgetO ist modular aufgebaut. Module können in den Einstellungen aktiviert/deaktiviert werden:
+BudgetO ist modular aufgebaut. Module können in den **Einstellungen → Module** aktiviert/deaktiviert werden:
 
-| Modul          | Beschreibung               |
-| -------------- | -------------------------- |
-| `budgets`      | Jahresbudget-Planung       |
-| `instructors`  | Übungsleiter-Verwaltung    |
-| `cash-advance` | Barvorschuss-Management    |
-| `excel-import` | Excel-Import von Buchungen |
+| Modul                | Key            | Beschreibung                                |
+| -------------------- | -------------- | ------------------------------------------- |
+| 📊 Budgets           | `budgets`      | Jahresbudget-Planung mit Soll-Ist           |
+| 👨‍🏫 Übungsleiter      | `instructors`  | ÜL-Verwaltung, Verträge, Rechnungen         |
+| 💵 Barvorschüsse     | `cash-advance` | Anordnungsnummern, Teil-Vorschüsse, Deckung |
+| 📥 Excel-Import      | `excel-import` | Buchungsimport aus .xlsx                    |
+| 👥 Mitglieder        | `members`      | Mitgliederverwaltung                        |
+| 🎯 Zweckbindungen    | `earmarks`     | Zweckgebundene Mittel                       |
+| 📄 Verbindlichkeiten | `invoices`     | Rechnungsverwaltung                         |
 
 ---
 
@@ -218,6 +265,9 @@ Beiträge sind willkommen! So kannst du helfen:
 
 ```
 <type>(<scope>): <description>
+
+Types: feat, fix, docs, refactor, test, chore
+Scopes: instructors, cash-advance, budgets, excel-import, core, ui
 
 Beispiele:
 feat(instructors): Add contract upload

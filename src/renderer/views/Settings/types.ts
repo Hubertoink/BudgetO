@@ -15,8 +15,10 @@ export type TileKey =
   | 'import'
   | 'org'
   | 'tags'
+  | 'categories'
   | 'modules'
   | 'users'
+  | 'server'
   | 'yearEnd'
   | 'tutorial' 
   | 'about'
@@ -35,11 +37,7 @@ export type ColorTheme =
   | 'monochrome-harmony' 
   | 'vintage-charm'
 
-export type BackgroundImage = 
-  | 'none'
-  | 'mountain'
-  | 'village'
-  | 'landscape'
+export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
 
 // ============================================================================
 // Journal/Table Configuration Types
@@ -48,8 +46,6 @@ export type BackgroundImage =
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 
 export type JournalRowDensity = 'normal' | 'compact'
-
-export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
 
 export type DateFmt = 'ISO' | 'PRETTY'
 

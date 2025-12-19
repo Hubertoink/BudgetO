@@ -24,7 +24,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
     try {
       const result = await (window as any).api?.organizations?.create?.({ name: name.trim() })
       if (result?.organization) {
-        notify?.('success', `Organisation "${result.organization.name}" erstellt`)
+        notify?.('success', `Sachgebiet "${result.organization.name}" erstellt`)
         onCreated(result.organization)
       }
     } catch (e: any) {
@@ -57,12 +57,12 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
         aria-labelledby="new-org-title"
       >
         <header className="flex justify-between items-center mb-12">
-          <h2 id="new-org-title" style={{ margin: 0 }}>Neue Organisation anlegen</h2>
+          <h2 id="new-org-title" style={{ margin: 0 }}>Neues Sachgebiet anlegen</h2>
           <button className="btn icon-btn" onClick={onClose} aria-label="Schließen">✕</button>
         </header>
 
         <div className="helper" style={{ marginBottom: 16 }}>
-          Jede Organisation hat eine eigene Datenbank mit separaten Buchungen, Mitgliedern und Einstellungen.
+          Jedes Sachgebiet hat eine eigene Datenbank mit separaten Buchungen, Mitgliedern und Einstellungen.
         </div>
 
         {error && (
@@ -72,13 +72,13 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
         )}
 
         <div className="field">
-          <label htmlFor="org-name-input">Name der Organisation</label>
+          <label htmlFor="org-name-input">Name des Sachgebiets</label>
           <input
             id="org-name-input"
             className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="z.B. Förderverein Muster e.V."
+            placeholder="z.B. JH Hochstätt"
             autoFocus
             disabled={busy}
           />

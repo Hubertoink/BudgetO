@@ -1,12 +1,16 @@
 import React from 'react'
 import { GeneralPaneProps, BackgroundImage } from '../types'
 
-// Hintergrundbilder aus assets (Pfad relativ zu dieser Datei)
-const BG_IMAGES: Record<BackgroundImage, { label: string; thumb: string }> = {
-  none: { label: 'Kein Bild', thumb: '' },
-  mountain: { label: 'Berge', thumb: new URL('../../../../../assets/a_mountain_with_snow_and_clouds.jpg', import.meta.url).href },
-  village: { label: 'Winterdorf', thumb: new URL('../../../../../assets/a_snow_covered_houses_and_a_street_light.png', import.meta.url).href },
-  landscape: { label: 'Schneelandschaft', thumb: new URL('../../../../../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg', import.meta.url).href },
+// Hintergrundbilder - Vorschau für die Auswahl
+import mountainCloudsImg from '../../../assets/a_mountain_with_snow_and_clouds.jpg'
+import snowyLandscapeImg from '../../../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg'
+import snowHousesImg from '../../../assets/a_snow_covered_houses_and_a_street_light.png'
+
+const BG_IMAGES: Record<BackgroundImage, { label: string; emoji: string; thumb?: string }> = {
+  none: { label: 'Kein Hintergrundbild', emoji: '🚫' },
+  'mountain-clouds': { label: 'Berglandschaft', emoji: '🏔️', thumb: mountainCloudsImg },
+  'snowy-landscape': { label: 'Schneelandschaft', emoji: '❄️', thumb: snowyLandscapeImg },
+  'snow-houses': { label: 'Winterdorf', emoji: '🏘️', thumb: snowHousesImg },
 }
 
 /**
@@ -54,7 +58,7 @@ export function GeneralPane({
           <span aria-hidden="true">✨</span> <strong>Setup (Erststart)</strong>
         </div>
         <div className="settings-sub">
-          Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.
+          Öffne den Einrichtungs-Assistenten erneut, um Sachgebiet, Darstellung und Tags schnell zu konfigurieren.
         </div>
         <div className="settings-pane-actions">
           <button className="btn" onClick={() => openSetupWizard?.()}>
@@ -69,10 +73,10 @@ export function GeneralPane({
           <span aria-hidden="true">🎨</span> <strong>Farbschema & Design</strong>
         </div>
         <div className="settings-sub">
-          Diese Einstellungen werden pro Organisation gespeichert.
+          Diese Einstellungen werden pro Sachgebiet gespeichert.
         </div>
         
-        {/* Theme and Background */}
+        {/* Theme and Glass effect */}
         <div className="settings-row-2col" style={{ marginTop: 12 }}>
           <div className="field">
             <label htmlFor="select-color-theme">Farb-Theme</label>
@@ -90,20 +94,7 @@ export function GeneralPane({
             </select>
             <div className="helper">● = Dark | ○ = Light</div>
           </div>
-          <div className="field">
-            <label htmlFor="select-background-image">Hintergrundbild</label>
-            <select id="select-background-image" className="input" value={backgroundImage} onChange={(e) => setBackgroundImage(e.target.value as any)}>
-              <option value="none">Kein Hintergrundbild</option>
-              <option value="cherry-blossom">🌸 Kirschblüten</option>
-              <option value="foggy-forest">🌲 Nebliger Wald</option>
-              <option value="mountain-snow">🏔️ Schneeberge</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Glass effect toggle */}
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="settings-inline-toggle">
+          <div className="settings-inline-toggle" style={{ alignSelf: 'flex-start', marginTop: 24 }}>
             <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
             <input
               id="toggle-glass-modals"
@@ -115,7 +106,66 @@ export function GeneralPane({
               onChange={(e) => setGlassModals(e.target.checked)}
             />
           </div>
-          <div className="helper" style={{ alignSelf: 'center' }}>Transparente Fenster mit Unschärfe-Effekt</div>
+        </div>
+
+        {/* Hintergrundbild-Auswahl mit Vorschaubildern */}
+        <div className="field" style={{ marginTop: 16 }}>
+          <label>Hintergrundbild</label>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+            {(Object.keys(BG_IMAGES) as BackgroundImage[]).map((key) => {
+              const img = BG_IMAGES[key]
+              const isSelected = backgroundImage === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setBackgroundImage(key)}
+                  style={{
+                    width: 110,
+                    height: 75,
+                    borderRadius: 8,
+                    border: isSelected ? '3px solid var(--primary)' : '2px solid var(--border)',
+                    background: img.thumb ? `url(${img.thumb}) center/cover` : 'var(--surface-alt)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'border-color 0.2s, transform 0.15s',
+                    transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                    boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.3)' : 'none'
+                  }}
+                  title={img.label}
+                >
+                  {!img.thumb && (
+                    <span style={{ 
+                      position: 'absolute', 
+                      inset: 0, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      fontSize: 28,
+                      color: 'var(--text-dim)'
+                    }}>
+                      {img.emoji}
+                    </span>
+                  )}
+                  <span style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    color: 'white',
+                    fontSize: 10,
+                    padding: '3px 4px',
+                    textAlign: 'center',
+                  }}>
+                    {img.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="helper" style={{ marginTop: 8 }}>Wähle ein Hintergrundbild für die App.</div>
         </div>
       </div>
 
@@ -209,65 +259,6 @@ export function GeneralPane({
               checked={navIconColorMode === 'color'}
               onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
             />
-          </div>
-          
-          {/* Hintergrundbild-Auswahl */}
-          <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <label>Hintergrundbild</label>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-              {(Object.keys(BG_IMAGES) as BackgroundImage[]).map((key) => {
-                const img = BG_IMAGES[key]
-                const isSelected = backgroundImage === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setBackgroundImage(key)}
-                    style={{
-                      width: 100,
-                      height: 70,
-                      borderRadius: 8,
-                      border: isSelected ? '3px solid var(--accent)' : '2px solid var(--border)',
-                      background: img.thumb ? `url(${img.thumb}) center/cover` : 'var(--surface)',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      transition: 'border-color 0.2s, transform 0.1s',
-                      transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                    }}
-                    title={img.label}
-                  >
-                    {!img.thumb && (
-                      <span style={{ 
-                        position: 'absolute', 
-                        inset: 0, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        fontSize: 24 
-                      }}>
-                        🚫
-                      </span>
-                    )}
-                    <span style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      background: 'rgba(0,0,0,0.6)',
-                      color: 'white',
-                      fontSize: 10,
-                      padding: '2px 4px',
-                      textAlign: 'center',
-                      fontFamily: 'var(--font-pixel)',
-                    }}>
-                      {img.label}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="helper" style={{ marginTop: 8 }}>Wähle ein Hintergrundbild für die App.</div>
           </div>
         </div>
       </div>

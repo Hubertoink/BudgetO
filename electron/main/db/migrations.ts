@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 type DB = InstanceType<typeof Database>
 
-type Mig = { version: number; up: string }
+type Mig = { version: number; up: string | ((db: DB) => void) }
 
 export const MIGRATIONS: Mig[] = [
   {
@@ -429,100 +429,6 @@ export const MIGRATIONS: Mig[] = [
   {
     version: 21,
     up: `
-    -- Submissions: Vouchers submitted by members for review by the treasurer
-    CREATE TABLE IF NOT EXISTS submissions (
-      id INTEGER PRIMARY KEY,
-      external_id TEXT,
-      date TEXT NOT NULL,
-      type TEXT CHECK(type IN ('IN','OUT')) NOT NULL DEFAULT 'OUT',
-      description TEXT,
-      gross_amount NUMERIC NOT NULL DEFAULT 0,
-      category_hint TEXT,
-      counterparty TEXT,
-      submitted_by TEXT NOT NULL,
-      submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
-      status TEXT CHECK(status IN ('pending','approved','rejected')) NOT NULL DEFAULT 'pending',
-      reviewed_at TEXT,
-      reviewer_notes TEXT,
-      voucher_id INTEGER,
-      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS submission_attachments (
-      id INTEGER PRIMARY KEY,
-      submission_id INTEGER NOT NULL,
-      filename TEXT NOT NULL,
-      mime_type TEXT,
-      data BLOB NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY(submission_id) REFERENCES submissions(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
-    CREATE INDEX IF NOT EXISTS idx_submissions_date ON submissions(date);
-    CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission ON submission_attachments(submission_id);
-    `
-  },
-  {
-    version: 22,
-    up: `
-    -- Add sphere and payment_method to submissions
-    ALTER TABLE submissions ADD COLUMN sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB'));
-    ALTER TABLE submissions ADD COLUMN payment_method TEXT CHECK(payment_method IN ('BAR','BANK'));
-    `
-  },
-  {
-    version: 23,
-    up: `
-    -- Add partial budget/earmark amount columns to vouchers
-    -- When NULL, the full gross_amount is used
-    ALTER TABLE vouchers ADD COLUMN budget_amount REAL;
-    ALTER TABLE vouchers ADD COLUMN earmark_amount REAL;
-    `
-  },
-  {
-    version: 24,
-    up: `
-    -- Junction tables for multiple budgets/earmarks per voucher
-    CREATE TABLE IF NOT EXISTS voucher_budgets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
-      budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
-      amount REAL NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(voucher_id, budget_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_voucher_budgets_voucher ON voucher_budgets(voucher_id);
-    CREATE INDEX IF NOT EXISTS idx_voucher_budgets_budget ON voucher_budgets(budget_id);
-
-    CREATE TABLE IF NOT EXISTS voucher_earmarks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
-      earmark_id INTEGER NOT NULL REFERENCES earmarks(id) ON DELETE CASCADE,
-      amount REAL NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(voucher_id, earmark_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_voucher ON voucher_earmarks(voucher_id);
-    CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
-
-    -- Migrate existing budget assignments to junction table
-    INSERT INTO voucher_budgets (voucher_id, budget_id, amount)
-    SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
-    FROM vouchers
-    WHERE budget_id IS NOT NULL;
-
-    -- Migrate existing earmark assignments to junction table
-    INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount)
-    SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
-    FROM vouchers
-    WHERE earmark_id IS NOT NULL;
-    `
-  }
-  ,
-  {
-    version: 21,
-    up: `
     -- BudgetO: Add description field to tags for category explanations
     ALTER TABLE tags ADD COLUMN description TEXT;
     `
@@ -591,6 +497,341 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token);
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
     `
+  },
+  {
+    version: 25,
+    up: (db: DB) => {
+      const tableInfo = (table: string) => {
+        try {
+          return db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+        } catch {
+          return [] as Array<{ name: string }>
+        }
+      }
+      const hasColumn = (table: string, col: string) => tableInfo(table).some((c) => c.name === col)
+      const ensureColumn = (table: string, colDef: string, colName: string) => {
+        if (hasColumn(table, colName)) return
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${colDef};`)
+      }
+
+      // Ensure voucher split columns exist (used by multi-budget/earmark assignment)
+      ensureColumn('vouchers', 'budget_amount REAL', 'budget_amount')
+      ensureColumn('vouchers', 'earmark_amount REAL', 'earmark_amount')
+
+      // Ensure junction tables exist
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS voucher_budgets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+          budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+          amount REAL NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(voucher_id, budget_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_voucher_budgets_voucher ON voucher_budgets(voucher_id);
+        CREATE INDEX IF NOT EXISTS idx_voucher_budgets_budget ON voucher_budgets(budget_id);
+
+        CREATE TABLE IF NOT EXISTS voucher_earmarks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+          earmark_id INTEGER NOT NULL REFERENCES earmarks(id) ON DELETE CASCADE,
+          amount REAL NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(voucher_id, earmark_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_voucher ON voucher_earmarks(voucher_id);
+        CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
+      `)
+
+      // Migrate legacy single budget/earmark assignments into junction tables (idempotent via UNIQUE + OR IGNORE)
+      db.exec(`
+        INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
+        SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
+        FROM vouchers
+        WHERE budget_id IS NOT NULL;
+
+        INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
+        SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
+        FROM vouchers
+        WHERE earmark_id IS NOT NULL;
+      `)
+
+      // Ensure tags.description exists
+      ensureColumn('tags', 'description TEXT', 'description')
+
+      // Ensure module_config exists and has defaults
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS module_config (
+          id INTEGER PRIMARY KEY,
+          module_key TEXT UNIQUE NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          display_order INTEGER NOT NULL DEFAULT 0,
+          config_json TEXT,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        INSERT OR IGNORE INTO module_config (module_key, enabled, display_order) VALUES
+          ('budgets', 1, 1),
+          ('instructors', 0, 2),
+          ('cash-advance', 0, 3),
+          ('excel-import', 0, 4),
+          ('members', 1, 5),
+          ('earmarks', 1, 6),
+          ('invoices', 1, 7);
+      `)
+
+      // Ensure auth columns exist
+      ensureColumn('users', 'username TEXT', 'username')
+      ensureColumn('users', 'password_hash TEXT', 'password_hash')
+      ensureColumn('users', 'is_active INTEGER NOT NULL DEFAULT 1', 'is_active')
+      ensureColumn('users', 'last_login TEXT', 'last_login')
+      ensureColumn('users', 'email TEXT', 'email')
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;`)
+      db.exec(`UPDATE users SET username = 'admin', is_active = 1 WHERE id = 1 AND (username IS NULL OR username = '');`)
+
+      // Ensure sessions table exists
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+          id INTEGER PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          token TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          expires_at TEXT NOT NULL,
+          is_valid INTEGER NOT NULL DEFAULT 1,
+          FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
+      `)
+    }
+  },
+  {
+    version: 26,
+    up: `
+    -- BudgetO Phase 3: Übungsleiter
+    CREATE TABLE IF NOT EXISTS instructors (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      status TEXT CHECK(status IN ('ACTIVE','INACTIVE','PENDING')) NOT NULL DEFAULT 'ACTIVE',
+      yearly_cap NUMERIC,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_instructors_name ON instructors(name);
+
+    CREATE TABLE IF NOT EXISTS instructor_contracts (
+      id INTEGER PRIMARY KEY,
+      instructor_id INTEGER NOT NULL,
+      title TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      mime_type TEXT,
+      size INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(instructor_id) REFERENCES instructors(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_instructor_contracts_instructor ON instructor_contracts(instructor_id);
+
+    CREATE TABLE IF NOT EXISTS instructor_invoices (
+      id INTEGER PRIMARY KEY,
+      instructor_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      description TEXT,
+      amount NUMERIC NOT NULL,
+      voucher_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(instructor_id) REFERENCES instructors(id) ON DELETE CASCADE,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_instructor_invoices_instructor ON instructor_invoices(instructor_id);
+    CREATE INDEX IF NOT EXISTS idx_instructor_invoices_date ON instructor_invoices(date);
+    `
+  },
+  // BudgetO Phase 3.1: Add file attachment columns to instructor_invoices
+  {
+    version: 27,
+    up: (db: DB) => {
+      const cols = db.prepare("PRAGMA table_info(instructor_invoices)").all() as Array<{ name: string }>
+      if (!cols.some(c => c.name === 'file_name')) {
+        db.exec('ALTER TABLE instructor_invoices ADD COLUMN file_name TEXT')
+      }
+      if (!cols.some(c => c.name === 'file_path')) {
+        db.exec('ALTER TABLE instructor_invoices ADD COLUMN file_path TEXT')
+      }
+      if (!cols.some(c => c.name === 'mime_type')) {
+        db.exec('ALTER TABLE instructor_invoices ADD COLUMN mime_type TEXT')
+      }
+      if (!cols.some(c => c.name === 'file_size')) {
+        db.exec('ALTER TABLE instructor_invoices ADD COLUMN file_size INTEGER')
+      }
+    }
+  },
+  // BudgetO Phase 4: Cash Advances (Barvorschüsse)
+  {
+    version: 28,
+    up: `
+    -- Minimal cost centers table (needed for optional FK in cash_advances)
+    CREATE TABLE IF NOT EXISTS cost_centers (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+
+    -- Main cash advance table
+    CREATE TABLE IF NOT EXISTS cash_advances (
+      id INTEGER PRIMARY KEY,
+      order_number TEXT NOT NULL UNIQUE,
+      employee_name TEXT NOT NULL,
+      purpose TEXT,
+      total_amount REAL NOT NULL DEFAULT 0,
+      status TEXT CHECK(status IN ('OPEN','RESOLVED','OVERDUE')) NOT NULL DEFAULT 'OPEN',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT,
+      due_date TEXT,
+      notes TEXT,
+      cost_center_id INTEGER,
+      FOREIGN KEY(cost_center_id) REFERENCES cost_centers(id)
+    );
+
+    -- Partial cash advances (Teil-Barvorschüsse)
+    CREATE TABLE IF NOT EXISTS partial_cash_advances (
+      id INTEGER PRIMARY KEY,
+      cash_advance_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      issued_at TEXT NOT NULL DEFAULT (datetime('now')),
+      description TEXT,
+      FOREIGN KEY(cash_advance_id) REFERENCES cash_advances(id) ON DELETE CASCADE
+    );
+
+    -- Settlements/Receipts for cash advances (Abrechnungen)
+    CREATE TABLE IF NOT EXISTS cash_advance_settlements (
+      id INTEGER PRIMARY KEY,
+      cash_advance_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      settled_at TEXT NOT NULL DEFAULT (datetime('now')),
+      description TEXT,
+      receipt_file_name TEXT,
+      receipt_file_path TEXT,
+      receipt_mime_type TEXT,
+      voucher_id INTEGER,
+      FOREIGN KEY(cash_advance_id) REFERENCES cash_advances(id) ON DELETE CASCADE,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cash_advances_status ON cash_advances(status);
+    CREATE INDEX IF NOT EXISTS idx_cash_advances_order_number ON cash_advances(order_number);
+    CREATE INDEX IF NOT EXISTS idx_partial_cash_advances_ca_id ON partial_cash_advances(cash_advance_id);
+    CREATE INDEX IF NOT EXISTS idx_cash_advance_settlements_ca_id ON cash_advance_settlements(cash_advance_id);
+    `
+  },
+  {
+    version: 29,
+    up: `
+    -- Create cost_centers table if it doesn't exist (fixes FK constraint for existing DBs)
+    CREATE TABLE IF NOT EXISTS cost_centers (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+    `
+  },
+  {
+    version: 30,
+    up: (db: DB) => {
+      // Add new columns to partial_cash_advances for employee tracking and settlement
+      const cols = db.prepare("PRAGMA table_info(partial_cash_advances)").all() as Array<{ name: string }>
+      const hasRecipient = cols.some((c) => c.name === 'recipient_name')
+      
+      if (!hasRecipient) {
+        db.exec('ALTER TABLE partial_cash_advances ADD COLUMN recipient_name TEXT')
+        db.exec('ALTER TABLE partial_cash_advances ADD COLUMN settled_amount REAL')
+        db.exec('ALTER TABLE partial_cash_advances ADD COLUMN settled_at TEXT')
+        db.exec('ALTER TABLE partial_cash_advances ADD COLUMN is_settled INTEGER NOT NULL DEFAULT 0')
+      }
+      
+      // Add annual_budgets table for Jahresbudget concept
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS annual_budgets (
+          id INTEGER PRIMARY KEY,
+          year INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          cost_center_id INTEGER,
+          description TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT,
+          FOREIGN KEY(cost_center_id) REFERENCES cost_centers(id),
+          UNIQUE(year, cost_center_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_annual_budgets_year ON annual_budgets(year);
+      `)
+    }
+  },
+  {
+    version: 31,
+    up(db: DB) {
+      // Custom Categories for modular sphere replacement
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS custom_categories (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          color TEXT,
+          description TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_custom_categories_active ON custom_categories(is_active);
+      `)
+      
+      // Add category_id to vouchers (nullable for backwards compatibility)
+      const cols = db.prepare("PRAGMA table_info(vouchers)").all() as Array<{ name: string }>
+      if (!cols.some(c => c.name === 'category_id')) {
+        db.exec('ALTER TABLE vouchers ADD COLUMN category_id INTEGER REFERENCES custom_categories(id)')
+      }
+    }
+  },
+  // ============================================================================
+  // Migration 32: Add missing columns to users table for full auth support
+  // ============================================================================
+  {
+    version: 32,
+    up(db: DB) {
+      const cols = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+      const existingCols = new Set(cols.map(c => c.name))
+      
+      // Add missing columns one by one (SQLite limitation)
+      if (!existingCols.has('username')) {
+        db.exec('ALTER TABLE users ADD COLUMN username TEXT')
+      }
+      if (!existingCols.has('email')) {
+        db.exec('ALTER TABLE users ADD COLUMN email TEXT')
+      }
+      if (!existingCols.has('password_hash')) {
+        db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT')
+      }
+      if (!existingCols.has('is_active')) {
+        db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+      }
+      if (!existingCols.has('last_login')) {
+        db.exec('ALTER TABLE users ADD COLUMN last_login TEXT')
+      }
+      
+      // Ensure the default Admin user is active
+      db.exec("UPDATE users SET is_active = 1 WHERE id = 1")
+      
+      // Create index for username lookup
+      db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+    }
   }
 ]
 
@@ -633,7 +874,11 @@ export function applyMigrations(db: DB) {
     
     try {
       const exec = db.transaction(() => {
-        db.exec(mig.up)
+        if (typeof mig.up === 'function') {
+          mig.up(db)
+        } else {
+          db.exec(mig.up)
+        }
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       })
       exec()

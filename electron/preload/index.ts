@@ -227,6 +227,96 @@ contextBridge.exposeInMainWorld('api', {
             ipcRenderer.on('organizations:switched', handler)
             return () => ipcRenderer.removeListener('organizations:switched', handler)
         }
+    },
+    // BudgetO Phase 3: Übungsleiter (Instructors)
+    instructors: {
+        list: (payload?: any) => ipcRenderer.invoke('instructors.list', payload),
+        get: (payload: { id: number }) => ipcRenderer.invoke('instructors.get', payload),
+        create: (payload: { name: string; status?: string; yearlyCap?: number | null; notes?: string | null }) => 
+            ipcRenderer.invoke('instructors.create', payload),
+        update: (payload: { id: number; name?: string; status?: string; yearlyCap?: number | null; notes?: string | null }) => 
+            ipcRenderer.invoke('instructors.update', payload),
+        delete: (payload: { id: number }) => ipcRenderer.invoke('instructors.delete', payload),
+        contracts: {
+            add: (payload: { instructorId: number; title?: string | null; startDate?: string | null; endDate?: string | null; fileName: string; dataBase64: string; mimeType?: string | null }) => 
+                ipcRenderer.invoke('instructors.contracts.add', payload),
+            delete: (payload: { contractId: number }) => ipcRenderer.invoke('instructors.contracts.delete', payload),
+            read: (payload: { contractId: number }) => ipcRenderer.invoke('instructors.contracts.read', payload),
+            open: (payload: { contractId: number }) => ipcRenderer.invoke('instructors.contracts.open', payload)
+        },
+        invoices: {
+            add: (payload: { instructorId: number; date: string; description?: string | null; amount: number; voucherId?: number | null; fileName?: string | null; dataBase64?: string | null; mimeType?: string | null }) => 
+                ipcRenderer.invoke('instructors.invoices.add', payload),
+            delete: (payload: { invoiceId: number }) => ipcRenderer.invoke('instructors.invoices.delete', payload),
+            open: (payload: { invoiceId: number }) => ipcRenderer.invoke('instructors.invoices.open', payload)
+        },
+        yearlySummary: (payload: { instructorId: number; year: number }) => ipcRenderer.invoke('instructors.yearlySummary', payload)
+    },
+    // BudgetO Phase 4: Barvorschüsse (Cash Advances)
+    cashAdvances: {
+        list: (payload?: { status?: string; search?: string; limit?: number; offset?: number }) => 
+            ipcRenderer.invoke('cashAdvances.list', payload),
+        getById: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.getById', payload),
+        create: (payload: { orderNumber: string; employeeName: string; purpose?: string | null; totalAmount: number; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
+            ipcRenderer.invoke('cashAdvances.create', payload),
+        update: (payload: { id: number; orderNumber?: string; employeeName?: string; purpose?: string | null; totalAmount?: number; status?: string; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
+            ipcRenderer.invoke('cashAdvances.update', payload),
+        delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.delete', payload),
+        nextOrderNumber: () => ipcRenderer.invoke('cashAdvances.nextOrderNumber'),
+        stats: () => ipcRenderer.invoke('cashAdvances.stats'),
+        partials: {
+            add: (payload: { cashAdvanceId: number; recipientName: string; amount: number; issuedAt?: string; description?: string | null }) => 
+                ipcRenderer.invoke('cashAdvances.partials.add', payload),
+            settle: (payload: { id: number; settledAmount: number; settledAt?: string }) => 
+                ipcRenderer.invoke('cashAdvances.partials.settle', payload),
+            delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.partials.delete', payload)
+        },
+        settlements: {
+            add: (payload: { cashAdvanceId: number; amount: number; settledAt?: string; description?: string | null; voucherId?: number | null; fileName?: string | null; dataBase64?: string | null; mimeType?: string | null }) => 
+                ipcRenderer.invoke('cashAdvances.settlements.add', payload),
+            delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.settlements.delete', payload),
+            open: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.settlements.open', payload)
+        }
+    },
+    // BudgetO: Jahresbudget (Annual Budgets)
+    annualBudgets: {
+        get: (payload: { year: number; costCenterId?: number | null }) => 
+            ipcRenderer.invoke('annualBudgets.get', payload),
+        list: (payload?: { year?: number }) => 
+            ipcRenderer.invoke('annualBudgets.list', payload),
+        upsert: (payload: { year: number; amount: number; costCenterId?: number | null; description?: string | null }) => 
+            ipcRenderer.invoke('annualBudgets.upsert', payload),
+        delete: (payload: { id: number }) => 
+            ipcRenderer.invoke('annualBudgets.delete', payload),
+        usage: (payload: { year: number; costCenterId?: number | null }) => 
+            ipcRenderer.invoke('annualBudgets.usage', payload)
+    },
+    // BudgetO: Benutzerdefinierte Kategorien (Custom Categories)
+    customCategories: {
+        list: (payload?: { includeInactive?: boolean; includeUsage?: boolean }) => 
+            ipcRenderer.invoke('customCategories.list', payload),
+        get: (payload: { id: number }) => 
+            ipcRenderer.invoke('customCategories.get', payload),
+        create: (payload: { name: string; color?: string | null; description?: string | null; sortOrder?: number }) => 
+            ipcRenderer.invoke('customCategories.create', payload),
+        update: (payload: { id: number; name?: string; color?: string | null; description?: string | null; sortOrder?: number; isActive?: boolean }) => 
+            ipcRenderer.invoke('customCategories.update', payload),
+        delete: (payload: { id: number }) => 
+            ipcRenderer.invoke('customCategories.delete', payload),
+        usageCount: (payload: { id: number }) => 
+            ipcRenderer.invoke('customCategories.usageCount', payload),
+        reorder: (payload: { orderedIds: number[] }) => 
+            ipcRenderer.invoke('customCategories.reorder', payload)
+    },
+    // BudgetO: API Server (Multi-User/Network Mode)
+    server: {
+        getConfig: () => ipcRenderer.invoke('server.getConfig'),
+        setConfig: (payload: { mode?: string; port?: number; serverAddress?: string; autoStart?: boolean }) => 
+            ipcRenderer.invoke('server.setConfig', payload),
+        getStatus: () => ipcRenderer.invoke('server.getStatus'),
+        start: () => ipcRenderer.invoke('server.start'),
+        stop: () => ipcRenderer.invoke('server.stop'),
+        testConnection: (payload: { address: string }) => ipcRenderer.invoke('server.testConnection', payload)
     }
 })
 

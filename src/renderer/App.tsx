@@ -5,6 +5,8 @@ import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
 import InvoicesView from './views/InvoicesView'
 import MembersView from './views/Mitglieder/MembersView'
+import InstructorsView from './views/Instructors/InstructorsView'
+import CashAdvancesView from './views/CashAdvances/CashAdvancesView'
 import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
@@ -34,6 +36,8 @@ import LoginModal from './components/auth/LoginModal'
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
+import { NetworkStatus } from './components/layout/NetworkStatus'
+import { UserIndicator } from './components/layout/UserIndicator'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
@@ -739,17 +743,22 @@ function AppInner() {
                     </div>
                 ) : null}
                 {isTopNav && <div />}
-                {/* Window controls */}
-                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
-                    <button className="btn ghost icon-btn" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
-                    </button>
-                    <button className="btn ghost icon-btn" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
-                    </button>
-                    <button className="btn danger icon-btn" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
-                    </button>
+                {/* User indicator and Network status */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
+                    <UserIndicator />
+                    <NetworkStatus />
+                    {/* Window controls */}
+                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                        <button className="btn ghost icon-btn" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
+                        </button>
+                        <button className="btn ghost icon-btn" title="Maximieren / Wiederherstellen" aria-label="Maximieren" onClick={() => window.api?.window?.toggleMaximize?.()}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>
+                        </button>
+                        <button className="btn danger icon-btn" title="Schließen" aria-label="Schließen" onClick={() => window.api?.window?.close?.()}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2"/></svg>
+                        </button>
+                    </div>
                 </div>
             </header>
             {!isTopNav && (
@@ -936,6 +945,14 @@ function AppInner() {
                         <MembersView />
                     )}
 
+                    {activePage === 'Übungsleiter' && (
+                        <InstructorsView />
+                    )}
+
+                    {activePage === 'Barvorschüsse' && (
+                        <CashAdvancesView />
+                    )}
+
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
                     )}
@@ -963,7 +980,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>
@@ -1859,9 +1876,11 @@ export default function App() {
     return (
         <UIPreferencesProvider>
             <ModuleProvider>
-                <ToastProvider>
-                    <AppInner />
-                </ToastProvider>
+                <AuthProvider>
+                    <ToastProvider>
+                        <AppInner />
+                    </ToastProvider>
+                </AuthProvider>
             </ModuleProvider>
         </UIPreferencesProvider>
     )

@@ -17,11 +17,13 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'table', icon: '📋', label: 'Tabelle' },
     { key: 'modules', icon: '🧩', label: 'Module' },
     { key: 'users', icon: '👥', label: 'Benutzer' },
-    { key: 'storage', icon: '🗄️', label: 'Speicher & Backup' },
+    { key: 'server', icon: '🌐', label: 'Netzwerk' },
+    { key: 'storage', icon: '💾', label: 'Speicher & Backup' },
     { key: 'import', icon: '📥', label: 'Import' },
-    { key: 'org', icon: '🏢', label: 'Organisation' },
+    { key: 'org', icon: '🏢', label: 'Sachgebiet' },
     { key: 'tags', icon: '🏷️', label: 'Tags' },
-    { key: 'yearEnd', icon: '📆', label: 'Jahresabschluss' },
+    { key: 'categories', icon: '📁', label: 'Kategorien' },
+    { key: 'yearEnd', icon: '📊', label: 'Jahresabschluss' },
   ]
 
   return (

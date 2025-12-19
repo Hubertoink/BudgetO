@@ -22,6 +22,13 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z" />
         </svg>
       )
+    case 'Barvorschüsse':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 1a9 9 0 0 0-9 9c0 3.87 2.45 7.16 5.88 8.44V23l3.12-1.56L15.12 23v-4.56A9.02 9.02 0 0 0 21 10a9 9 0 0 0-9-9zm0 2a7 7 0 0 1 7 7c0 2.76-1.6 5.14-3.92 6.27V14h-6.16v2.27A7 7 0 0 1 5 10a7 7 0 0 1 7-7z" />
+          <path d="M11 6h2v2h-2V6zm0 4h2v2h-2v-2z" opacity="0.75" />
+        </svg>
+      )
     case 'Mitglieder':
       return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -38,6 +45,13 @@ export function getNavIcon(key: NavKey): React.ReactNode {
       return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" />
+        </svg>
+      )
+    case 'Übungsleiter':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+          <path d="M20 9V7h-2v2h-2v2h2v2h2v-2h2V9h-2z" />
         </svg>
       )
     case 'Einreichungen':
@@ -74,9 +88,11 @@ export const navIconPalette: Record<NavKey, string> = {
   Dashboard: '#7C4DFF',
   Buchungen: '#2962FF',
   Verbindlichkeiten: '#00B8D4',
+  Barvorschüsse: '#00C853',
   Mitglieder: '#26A69A',
   Budgets: '#00C853',
   Zweckbindungen: '#FFD600',
+  Übungsleiter: '#FF5722',
   Einreichungen: '#FF7043',
   Belege: '#FF9100',
   Reports: '#F50057',

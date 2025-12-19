@@ -6,9 +6,9 @@ type NavIconColorMode = 'color' | 'mono'
 type DateFormat = 'de' | 'iso'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
 
-const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow']
+const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'mountain-clouds', 'snowy-landscape', 'snow-houses']
 
 // Glassmorphism: transparent modals with blur
 

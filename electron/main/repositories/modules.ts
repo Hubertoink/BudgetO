@@ -13,6 +13,7 @@ export type ModuleKey =
   | 'members' 
   | 'earmarks' 
   | 'invoices'
+  | 'custom-categories'
 
 export interface ModuleConfig {
   id: number
@@ -82,6 +83,13 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: 'Rechnungsverwaltung mit Zahlungsverfolgung',
     icon: 'document-text',
     navKey: 'Verbindlichkeiten'
+  },
+  {
+    key: 'custom-categories',
+    name: 'Eigene Kategorien',
+    description: 'Ersetzt die festen Sphären durch flexible, benutzerdefinierte Kategorien',
+    icon: 'folder',
+    navKey: undefined // Accessed via Settings > Kategorien
   }
 ]
 

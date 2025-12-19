@@ -4,6 +4,7 @@ import JournalTable from './components/JournalTable'
 import BatchEarmarkModal from '../../components/modals/BatchEarmarkModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
+import { useModules } from '../../context/ModuleContext'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
@@ -200,12 +201,23 @@ export default function JournalView({
     // Modal states
     const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
-    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
+    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; categoryId?: number | null }) | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
+
+    // ==================== CUSTOM CATEGORIES ====================
+    const { isModuleEnabled } = useModules()
+    const useCategoriesModule = isModuleEnabled('custom-categories')
+    const [customCategories, setCustomCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    
+    useEffect(() => {
+        if (useCategoriesModule) {
+            window.api?.customCategories?.list?.()?.then(cats => setCustomCategories(cats || []))
+        }
+    }, [useCategoriesModule])
 
     // ==================== TAG COUNTS ====================
     // Use usage counts from tagDefs (loaded with includeUsage: true in App.tsx)
@@ -635,6 +647,7 @@ export default function JournalView({
                                         description: editRow.description ?? null, 
                                         type: editRow.type, 
                                         sphere: editRow.sphere, 
+                                        categoryId: editRow.categoryId ?? null,
                                         // Legacy fields (kept for backwards compatibility, first item from arrays)
                                         earmarkId: earmarksArr.length > 0 ? earmarksArr[0].earmarkId : null, 
                                         earmarkAmount: earmarksArr.length > 0 ? earmarksArr[0].amount : null,
@@ -718,14 +731,27 @@ export default function JournalView({
                                                 </div>
                                             </div>
                                             <div className="field">
-                                                <label>Sphäre</label>
-                                                <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
-                                                    <option value="">—</option>
-                                                    <option value="IDEELL">IDEELL</option>
-                                                    <option value="ZWECK">ZWECK</option>
-                                                    <option value="VERMOEGEN">VERMOEGEN</option>
-                                                    <option value="WGB">WGB</option>
-                                                </select>
+                                                <label>{useCategoriesModule ? 'Kategorie' : 'Sphäre'}</label>
+                                                {useCategoriesModule ? (
+                                                    <select 
+                                                        value={editRow.categoryId ?? ''} 
+                                                        disabled={editRow.type === 'TRANSFER'} 
+                                                        onChange={(e) => setEditRow({ ...editRow, categoryId: e.target.value ? Number(e.target.value) : undefined, sphere: undefined })}
+                                                    >
+                                                        <option value="">— Keine Kategorie —</option>
+                                                        {customCategories.map(cat => (
+                                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
+                                                        <option value="">—</option>
+                                                        <option value="IDEELL">IDEELL</option>
+                                                        <option value="ZWECK">ZWECK</option>
+                                                        <option value="VERMOEGEN">VERMOEGEN</option>
+                                                        <option value="WGB">WGB</option>
+                                                    </select>
+                                                )}
                                             </div>
                                             {editRow.type === 'TRANSFER' ? (
                                                 <div className="field">

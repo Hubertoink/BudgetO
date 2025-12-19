@@ -103,7 +103,8 @@ function getModuleEmoji(key: string): string {
     'excel-import': '📥',
     'members': '👥',
     'earmarks': '🏷️',
-    'invoices': '📄'
+    'invoices': '📄',
+    'custom-categories': '📂'
   }
   return emojis[key] || '📦'
 }

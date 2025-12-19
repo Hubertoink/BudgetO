@@ -200,6 +200,14 @@ declare global {
                 openPath: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
                 openExternal: (url: string) => Promise<{ ok: boolean; error?: string | null }>
             }
+            server: {
+                getConfig: () => Promise<{ mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }>
+                setConfig: (config: { mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }) => Promise<{ ok: boolean }>
+                getStatus: () => Promise<{ running: boolean; port?: number; connectedClients?: number }>
+                start: () => Promise<{ ok: boolean; port?: number; error?: string }>
+                stop: () => Promise<{ ok: boolean }>
+                testConnection: (host: string, port: number) => Promise<{ ok: boolean; error?: string; version?: string }>
+            }
         }
     }
 }

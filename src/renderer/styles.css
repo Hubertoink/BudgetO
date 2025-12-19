@@ -2029,6 +2029,8 @@ textarea:focus {
 .icon-color-Mitglieder { color: #26A69A; }
 .icon-color-Budgets { color: #00C853; }
 .icon-color-Zweckbindungen { color: #FFD600; }
+.icon-color-Übungsleiter { color: #FF5722; }
+.icon-color-Barvorschüsse { color: #00C853; }
 .icon-color-Belege { color: #FF9100; }
 .icon-color-Reports { color: #F50057; }
 .icon-color-Einstellungen { color: #9C27B0; }
@@ -3225,16 +3227,16 @@ html[data-background-image]:not([data-background-image="none"]) body {
     z-index: 1;
 }
 
-html[data-background-image="cherry-blossom"]::before {
-    background-image: url('./assets/a_close_up_of_a_tree_branch_with_pink_flowers.jpg');
+html[data-background-image="mountain-clouds"]::before {
+    background-image: url('./assets/a_mountain_with_snow_and_clouds.jpg');
 }
 
-html[data-background-image="foggy-forest"]::before {
-    background-image: url('./assets/a_foggy_forest_with_trees.png');
+html[data-background-image="snowy-landscape"]::before {
+    background-image: url('./assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg');
 }
 
-html[data-background-image="mountain-snow"]::before {
-    background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+html[data-background-image="snow-houses"]::before {
+    background-image: url('./assets/a_snow_covered_houses_and_a_street_light.png');
 }
 
 /* ========================================
@@ -3563,14 +3565,14 @@ html[data-glass-modals="true"] .flyout-arrow {
     color: var(--muted);
 }
 
-.background-preview.bg-cherry-blossom {
-    background-image: url('./assets/a_close_up_of_a_tree_branch_with_pink_flowers.jpg');
+.background-preview.bg-mountain-clouds {
+    background-image: url('./assets/a_mountain_with_snow_and_clouds.jpg');
 }
 
-.background-preview.bg-foggy-forest {
-    background-image: url('./assets/a_foggy_forest_with_trees.png');
+.background-preview.bg-snowy-landscape {
+    background-image: url('./assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg');
 }
 
-.background-preview.bg-mountain-snow {
-    background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+.background-preview.bg-snow-houses {
+    background-image: url('./assets/a_snow_covered_houses_and_a_street_light.png');
 }

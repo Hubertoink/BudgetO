@@ -1583,6 +1583,373 @@ export function registerIpcHandlers() {
     ipcMain.handle('organizations.activeAppearance', async () => {
         return getActiveOrganizationAppearance()
     })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // BudgetO Phase 3: Übungsleiter (Instructors)
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    ipcMain.handle('instructors.list', async (_e, payload) => {
+        const { InstructorsListInput, InstructorsListOutput } = await import('./schemas')
+        const { listInstructors } = await import('../repositories/instructors')
+        const parsed = InstructorsListInput.parse(payload)
+        const res = listInstructors(parsed || {})
+        return InstructorsListOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.get', async (_e, payload) => {
+        const { InstructorGetInput, InstructorGetOutput } = await import('./schemas')
+        const { getInstructorById } = await import('../repositories/instructors')
+        const parsed = InstructorGetInput.parse(payload)
+        const res = getInstructorById(parsed.id)
+        return InstructorGetOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.create', async (_e, payload) => {
+        const { InstructorCreateInput, InstructorCreateOutput } = await import('./schemas')
+        const { createInstructor } = await import('../repositories/instructors')
+        const parsed = InstructorCreateInput.parse(payload)
+        const res = createInstructor(parsed)
+        return InstructorCreateOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.update', async (_e, payload) => {
+        const { InstructorUpdateInput, InstructorUpdateOutput } = await import('./schemas')
+        const { updateInstructor } = await import('../repositories/instructors')
+        const parsed = InstructorUpdateInput.parse(payload)
+        const res = updateInstructor(parsed)
+        return InstructorUpdateOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.delete', async (_e, payload) => {
+        const { InstructorDeleteInput, InstructorDeleteOutput } = await import('./schemas')
+        const { deleteInstructor } = await import('../repositories/instructors')
+        const parsed = InstructorDeleteInput.parse(payload)
+        const res = deleteInstructor(parsed.id)
+        return InstructorDeleteOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.contracts.add', async (_e, payload) => {
+        const { InstructorContractAddInput, InstructorContractAddOutput } = await import('./schemas')
+        const { addContract } = await import('../repositories/instructors')
+        const parsed = InstructorContractAddInput.parse(payload)
+        const res = addContract(parsed)
+        return InstructorContractAddOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.contracts.delete', async (_e, payload) => {
+        const { InstructorContractDeleteInput, InstructorContractDeleteOutput } = await import('./schemas')
+        const { deleteContract } = await import('../repositories/instructors')
+        const parsed = InstructorContractDeleteInput.parse(payload)
+        const res = deleteContract(parsed.contractId)
+        return InstructorContractDeleteOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.contracts.read', async (_e, payload) => {
+        const { InstructorContractReadInput, InstructorContractReadOutput } = await import('./schemas')
+        const { getContractFile } = await import('../repositories/instructors')
+        const parsed = InstructorContractReadInput.parse(payload)
+        const file = getContractFile(parsed.contractId)
+        if (!file) throw new Error('Vertrag nicht gefunden')
+        let src = file.filePath
+        if (!fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, path.basename(src))
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!fs.existsSync(src)) throw new Error('Vertragsdatei nicht gefunden')
+        const buff = fs.readFileSync(src)
+        const dataBase64 = Buffer.from(buff).toString('base64')
+        return InstructorContractReadOutput.parse({ fileName: file.fileName, mimeType: file.mimeType, dataBase64 })
+    })
+    
+    ipcMain.handle('instructors.contracts.open', async (_e, payload) => {
+        const { InstructorContractReadInput } = await import('./schemas')
+        const { getContractFile } = await import('../repositories/instructors')
+        const parsed = InstructorContractReadInput.parse(payload)
+        const file = getContractFile(parsed.contractId)
+        if (!file) throw new Error('Vertrag nicht gefunden')
+        let src = file.filePath
+        if (!fs.existsSync(src)) {
+            const alt = path.join(getAppDataDir().filesDir, path.basename(src))
+            if (fs.existsSync(alt)) src = alt
+        }
+        if (!fs.existsSync(src)) throw new Error('Vertragsdatei nicht gefunden')
+        const res = await shell.openPath(src)
+        return { ok: !res }
+    })
+    
+    ipcMain.handle('instructors.invoices.add', async (_e, payload) => {
+        const { InstructorInvoiceAddInput, InstructorInvoiceAddOutput } = await import('./schemas')
+        const { addInstructorInvoice } = await import('../repositories/instructors')
+        const parsed = InstructorInvoiceAddInput.parse(payload)
+        const res = addInstructorInvoice(parsed)
+        return InstructorInvoiceAddOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.invoices.delete', async (_e, payload) => {
+        const { InstructorInvoiceDeleteInput, InstructorInvoiceDeleteOutput } = await import('./schemas')
+        const { deleteInstructorInvoice } = await import('../repositories/instructors')
+        const parsed = InstructorInvoiceDeleteInput.parse(payload)
+        const res = deleteInstructorInvoice(parsed.invoiceId)
+        return InstructorInvoiceDeleteOutput.parse(res)
+    })
+    
+    ipcMain.handle('instructors.invoices.open', async (_e, payload) => {
+        const { getInvoiceFile } = await import('../repositories/instructors')
+        const { invoiceId } = payload
+        const file = getInvoiceFile(invoiceId)
+        if (!file) throw new Error('Rechnungsdatei nicht gefunden')
+        const src = file.filePath
+        if (!fs.existsSync(src)) throw new Error('Rechnungsdatei nicht gefunden')
+        const res = await shell.openPath(src)
+        return { ok: !res }
+    })
+    
+    ipcMain.handle('instructors.yearlySummary', async (_e, payload) => {
+        const { InstructorYearlySummaryInput, InstructorYearlySummaryOutput } = await import('./schemas')
+        const { getInstructorYearlySummary } = await import('../repositories/instructors')
+        const parsed = InstructorYearlySummaryInput.parse(payload)
+        const res = getInstructorYearlySummary(parsed.instructorId, parsed.year)
+        return InstructorYearlySummaryOutput.parse(res)
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Annual Budgets (Jahresbudget)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    ipcMain.handle('annualBudgets.get', async (_e, payload) => {
+        const { getAnnualBudget } = await import('../repositories/annualBudgets')
+        const { year, costCenterId } = payload || {}
+        const res = getAnnualBudget({ year, costCenterId })
+        return res
+    })
+
+    ipcMain.handle('annualBudgets.list', async (_e, payload) => {
+        const { listAnnualBudgets } = await import('../repositories/annualBudgets')
+        const { year } = payload || {}
+        const res = listAnnualBudgets({ year })
+        return { budgets: res }
+    })
+
+    ipcMain.handle('annualBudgets.upsert', async (_e, payload) => {
+        const { upsertAnnualBudget } = await import('../repositories/annualBudgets')
+        const { year, amount, costCenterId, description } = payload
+        const res = upsertAnnualBudget({ year, amount, costCenterId, description })
+        return res
+    })
+
+    ipcMain.handle('annualBudgets.delete', async (_e, payload) => {
+        const { deleteAnnualBudget } = await import('../repositories/annualBudgets')
+        const { id } = payload
+        const res = deleteAnnualBudget(id)
+        return res
+    })
+
+    ipcMain.handle('annualBudgets.usage', async (_e, payload) => {
+        const { getAnnualBudgetUsage } = await import('../repositories/annualBudgets')
+        const { year, costCenterId } = payload
+        const res = getAnnualBudgetUsage({ year, costCenterId })
+        return res
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Custom Categories (Benutzerdefinierte Kategorien)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    ipcMain.handle('customCategories.list', async (_e, payload) => {
+        const { listCustomCategories } = await import('../repositories/customCategories')
+        const { includeInactive, includeUsage } = payload || {}
+        const categories = listCustomCategories({ includeInactive, includeUsage })
+        return { categories }
+    })
+
+    ipcMain.handle('customCategories.get', async (_e, payload) => {
+        const { getCustomCategory } = await import('../repositories/customCategories')
+        const { id } = payload
+        const category = getCustomCategory(id)
+        return { category }
+    })
+
+    ipcMain.handle('customCategories.create', async (_e, payload) => {
+        const { createCustomCategory } = await import('../repositories/customCategories')
+        const { name, color, description, sortOrder } = payload
+        const res = createCustomCategory({ name, color, description, sortOrder })
+        return res
+    })
+
+    ipcMain.handle('customCategories.update', async (_e, payload) => {
+        const { updateCustomCategory } = await import('../repositories/customCategories')
+        const { id, name, color, description, sortOrder, isActive } = payload
+        const res = updateCustomCategory({ id, name, color, description, sortOrder, isActive })
+        return res
+    })
+
+    ipcMain.handle('customCategories.delete', async (_e, payload) => {
+        const { deleteCustomCategory } = await import('../repositories/customCategories')
+        const { id } = payload
+        const res = deleteCustomCategory(id)
+        return res
+    })
+
+    ipcMain.handle('customCategories.usageCount', async (_e, payload) => {
+        const { getCategoryUsageCount } = await import('../repositories/customCategories')
+        const { id } = payload
+        const count = getCategoryUsageCount(id)
+        return { count }
+    })
+
+    ipcMain.handle('customCategories.reorder', async (_e, payload) => {
+        const { reorderCustomCategories } = await import('../repositories/customCategories')
+        const { orderedIds } = payload
+        const res = reorderCustomCategories(orderedIds)
+        return res
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cash Advances (Barvorschüsse) - Phase 4
+    // ─────────────────────────────────────────────────────────────────────────
+
+    ipcMain.handle('cashAdvances.list', async (_e, payload) => {
+        const { CashAdvancesListInput, CashAdvancesListOutput } = await import('./schemas')
+        const { listCashAdvances } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvancesListInput.parse(payload || {})
+        const res = listCashAdvances(parsed)
+        return CashAdvancesListOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.getById', async (_e, payload) => {
+        const { CashAdvanceGetByIdInput, CashAdvanceGetByIdOutput } = await import('./schemas')
+        const { getCashAdvanceById } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceGetByIdInput.parse(payload)
+        const res = getCashAdvanceById(parsed.id)
+        return CashAdvanceGetByIdOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.create', async (_e, payload) => {
+        const { CashAdvanceCreateInput, CashAdvanceCreateOutput } = await import('./schemas')
+        const { createCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceCreateInput.parse(payload)
+        const res = createCashAdvance(parsed)
+        return CashAdvanceCreateOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.update', async (_e, payload) => {
+        const { CashAdvanceUpdateInput, CashAdvanceUpdateOutput } = await import('./schemas')
+        const { updateCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceUpdateInput.parse(payload)
+        const res = updateCashAdvance(parsed)
+        return CashAdvanceUpdateOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.delete', async (_e, payload) => {
+        const { CashAdvanceDeleteInput, CashAdvanceDeleteOutput } = await import('./schemas')
+        const { deleteCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceDeleteInput.parse(payload)
+        const res = deleteCashAdvance(parsed.id)
+        return CashAdvanceDeleteOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.nextOrderNumber', async () => {
+        const { getNextOrderNumber } = await import('../repositories/cashAdvances')
+        const orderNumber = getNextOrderNumber()
+        return { orderNumber }
+    })
+
+    ipcMain.handle('cashAdvances.stats', async () => {
+        const { CashAdvanceStatsOutput } = await import('./schemas')
+        const { getCashAdvanceStats } = await import('../repositories/cashAdvances')
+        const res = getCashAdvanceStats()
+        return CashAdvanceStatsOutput.parse(res)
+    })
+
+    // Partial cash advances
+    ipcMain.handle('cashAdvances.partials.add', async (_e, payload) => {
+        const { PartialCashAdvanceAddInput, PartialCashAdvanceAddOutput } = await import('./schemas')
+        const { addPartialCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = PartialCashAdvanceAddInput.parse(payload)
+        const res = addPartialCashAdvance(parsed)
+        return PartialCashAdvanceAddOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.partials.settle', async (_e, payload) => {
+        const { PartialCashAdvanceSettleInput, PartialCashAdvanceSettleOutput } = await import('./schemas')
+        const { settlePartialCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = PartialCashAdvanceSettleInput.parse(payload)
+        const res = settlePartialCashAdvance(parsed)
+        return PartialCashAdvanceSettleOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.partials.delete', async (_e, payload) => {
+        const { PartialCashAdvanceDeleteInput, PartialCashAdvanceDeleteOutput } = await import('./schemas')
+        const { deletePartialCashAdvance } = await import('../repositories/cashAdvances')
+        const parsed = PartialCashAdvanceDeleteInput.parse(payload)
+        const res = deletePartialCashAdvance(parsed.id)
+        return PartialCashAdvanceDeleteOutput.parse(res)
+    })
+
+    // Settlements
+    ipcMain.handle('cashAdvances.settlements.add', async (_e, payload) => {
+        const { CashAdvanceSettlementAddInput, CashAdvanceSettlementAddOutput } = await import('./schemas')
+        const { addSettlement } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceSettlementAddInput.parse(payload)
+        const res = addSettlement(parsed)
+        return CashAdvanceSettlementAddOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.settlements.delete', async (_e, payload) => {
+        const { CashAdvanceSettlementDeleteInput, CashAdvanceSettlementDeleteOutput } = await import('./schemas')
+        const { deleteSettlement } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceSettlementDeleteInput.parse(payload)
+        const res = deleteSettlement(parsed.id)
+        return CashAdvanceSettlementDeleteOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.settlements.open', async (_e, payload) => {
+        const { CashAdvanceSettlementOpenInput } = await import('./schemas')
+        const { getSettlementFile } = await import('../repositories/cashAdvances')
+        const parsed = CashAdvanceSettlementOpenInput.parse(payload)
+        const file = getSettlementFile(parsed.id)
+        if (!file) throw new Error('Beleg nicht gefunden')
+        const src = file.filePath
+        if (!fs.existsSync(src)) throw new Error('Beleg nicht gefunden')
+        const res = await shell.openPath(src)
+        return { ok: !res }
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // API Server (Multi-User/Network Mode)
+    // ─────────────────────────────────────────────────────────────────────────
+    
+    ipcMain.handle('server.getConfig', async () => {
+        const { getServerConfig, getLocalIPs } = await import('../services/apiServer')
+        const config = getServerConfig()
+        return { ...config, localIPs: getLocalIPs() }
+    })
+    
+    ipcMain.handle('server.setConfig', async (_e, payload) => {
+        const { setServerConfig } = await import('../services/apiServer')
+        return setServerConfig(payload)
+    })
+    
+    ipcMain.handle('server.getStatus', async () => {
+        const { getServerStatus, getLocalIPs } = await import('../services/apiServer')
+        return { ...getServerStatus(), localIPs: getLocalIPs() }
+    })
+    
+    ipcMain.handle('server.start', async () => {
+        const { startServer } = await import('../services/apiServer')
+        return startServer()
+    })
+    
+    ipcMain.handle('server.stop', async () => {
+        const { stopServer } = await import('../services/apiServer')
+        await stopServer()
+        return { success: true }
+    })
+    
+    ipcMain.handle('server.testConnection', async (_e, payload: { address: string }) => {
+        const { testConnection } = await import('../services/apiServer')
+        return testConnection(payload.address)
+    })
 }
     // Get single submission
 

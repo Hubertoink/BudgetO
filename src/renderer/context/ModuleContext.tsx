@@ -13,6 +13,7 @@ export type ModuleKey =
   | 'members' 
   | 'earmarks' 
   | 'invoices'
+  | 'custom-categories'
 
 export interface ModuleInfo {
   key: ModuleKey
@@ -134,5 +135,6 @@ export const MODULE_NAV_MAP: Record<ModuleKey, string | undefined> = {
   'excel-import': undefined,
   'members': 'Mitglieder',
   'earmarks': 'Zweckbindungen',
-  'invoices': 'Verbindlichkeiten'
+  'invoices': 'Verbindlichkeiten',
+  'custom-categories': undefined
 }

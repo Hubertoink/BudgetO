@@ -31,7 +31,7 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
         aria-labelledby="confirm-switch-title"
       >
         <header className="flex justify-between items-center mb-12">
-          <h2 id="confirm-switch-title" style={{ margin: 0 }}>Organisation wechseln?</h2>
+          <h2 id="confirm-switch-title" style={{ margin: 0 }}>Sachgebiet wechseln?</h2>
           <button className="btn icon-btn" onClick={onCancel} aria-label="Schließen">✕</button>
         </header>
 
@@ -40,7 +40,7 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
         </p>
         
         <div className="helper" style={{ marginBottom: 16 }}>
-          Die App wird neu geladen und verwendet dann die Datenbank der gewählten Organisation.
+          Die App wird neu geladen und verwendet dann die Datenbank des gewählten Sachgebiets.
         </div>
 
         <div className="flex justify-end gap-8">

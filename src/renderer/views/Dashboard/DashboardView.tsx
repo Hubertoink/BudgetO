@@ -9,6 +9,7 @@ import ReportsCashBars from './charts/ReportsCashBars'
 import EarmarkDetailCard from './EarmarkDetailCard'
 import BudgetDetailCard from './BudgetDetailCard'
 import SphereShareCard from './SphereShareCard'
+import AnnualBudgetCard from './AnnualBudgetCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
 
@@ -372,6 +373,8 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           <>
             {/* Alle Komponenten untereinander in einer Spalte */}
             <div style={{ display: 'grid', gap: 12 }}>
+              {/* Jahresbudget Widget - nur anzeigen wenn Budget definiert */}
+              <AnnualBudgetCard year={y} />
               <BalanceAreaChart {...balanceFilters} />
               {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
               {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
