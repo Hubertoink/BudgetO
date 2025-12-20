@@ -192,6 +192,29 @@ function registerHandlers() {
     const { listUsers } = await import('../repositories/users')
     return { users: listUsers(body) }
   })
+
+  // Settings: simple key/value
+  apiHandlers.set('settings.get', async (body, authUser) => {
+    const { isAuthRequired } = await import('../repositories/users')
+    if (isAuthRequired()) {
+      if (!authUser) throw new Error('Unauthorized')
+      if (authUser.role !== 'ADMIN' && authUser.role !== 'KASSE') throw new Error('Forbidden')
+    }
+    const { getSetting } = await import('./settings')
+    const value = getSetting(body.key)
+    return { value }
+  })
+
+  apiHandlers.set('settings.set', async (body, authUser) => {
+    const { isAuthRequired } = await import('../repositories/users')
+    if (isAuthRequired()) {
+      if (!authUser) throw new Error('Unauthorized')
+      if (authUser.role !== 'ADMIN' && authUser.role !== 'KASSE') throw new Error('Forbidden')
+    }
+    const { setSetting } = await import('./settings')
+    setSetting(body.key, body.value)
+    return { ok: true }
+  })
   
   apiHandlers.set('users.get', async (body) => {
     const { getUserById } = await import('../repositories/users')

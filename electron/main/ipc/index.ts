@@ -1541,11 +1541,23 @@ export function registerIpcHandlers() {
     // Settings: simple key/value
     ipcMain.handle('settings.get', async (_e, payload) => {
         const parsed = SettingsGetInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return SettingsGetOutput.parse(await remoteCall(cfg.serverAddress, 'settings.get', parsed))
+        }
         const value = getSetting(parsed.key)
         return SettingsGetOutput.parse({ value })
     })
     ipcMain.handle('settings.set', async (_e, payload) => {
         const parsed = SettingsSetInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return SettingsSetOutput.parse(await remoteCall(cfg.serverAddress, 'settings.set', parsed))
+        }
         setSetting(parsed.key, parsed.value)
         return SettingsSetOutput.parse({ ok: true })
     })
@@ -1834,6 +1846,13 @@ export function registerIpcHandlers() {
             return { ok: true }
         }
 
+        return { ok: true }
+    })
+
+    // Allow renderer to restore client-mode token after reload
+    ipcMain.handle('auth.setToken', async (_e, payload: { token: string | null }) => {
+        const { setClientAuthToken } = await import('../services/apiServer')
+        setClientAuthToken(typeof payload?.token === 'string' ? payload.token : null)
         return { ok: true }
     })
 

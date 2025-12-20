@@ -204,6 +204,7 @@ declare global {
                 login: (payload: { username: string; password: string }) => Promise<{ success: boolean; user?: any; error?: string; token?: string }>
                 isRequired: () => Promise<{ required: boolean }>
                 logout: () => Promise<any>
+                setToken: (payload: { token: string | null }) => Promise<{ ok: boolean }>
                 setInitialPassword: (payload: { userId: number; password: string }) => Promise<{ success: boolean }>
                 changePassword: (payload: { userId: number; currentPassword: string; newPassword: string }) => Promise<{ success: boolean; error?: string }>
                 clearPassword: (payload: { userId: number; currentPassword: string }) => Promise<{ success: boolean; error?: string }>

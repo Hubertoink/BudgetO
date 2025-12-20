@@ -42,6 +42,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 // Storage key for persisting user session
 const USER_STORAGE_KEY = 'budgeto_current_user'
+const TOKEN_STORAGE_KEY = 'budgeto_auth_token'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -64,6 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function init() {
       try {
         setIsLoading(true)
+
+        // Restore client-mode token early so protected API calls work after reload.
+        try {
+          const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+          if (storedToken) {
+            await (window as any).api?.auth?.setToken?.({ token: storedToken })
+          }
+        } catch {
+          // ignore
+        }
         
         // Check if authentication is required
         const required = await refreshAuthRequired()
@@ -140,6 +151,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await (window as any).api?.auth?.login?.({ username, password })
       
       if (result?.success && result?.user) {
+        const token = typeof result?.token === 'string' ? result.token : null
+        if (token) {
+          sessionStorage.setItem(TOKEN_STORAGE_KEY, token)
+          try {
+            await (window as any).api?.auth?.setToken?.({ token })
+          } catch {
+            // ignore
+          }
+        }
         setUser(result.user)
         sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(result.user))
         window.dispatchEvent(new Event('auth-changed'))
@@ -154,9 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     // Invalidate server/main-process session token (best-effort)
-    try { void (window as any).api?.auth?.logout?.({}) } catch {}
+    try { void (window as any).api?.auth?.logout?.() } catch {}
+    try { void (window as any).api?.auth?.setToken?.({ token: null }) } catch {}
     setUser(null)
     sessionStorage.removeItem(USER_STORAGE_KEY)
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY)
     window.dispatchEvent(new Event('auth-changed'))
   }, [])
 
