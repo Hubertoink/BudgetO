@@ -80,6 +80,9 @@ export function ServerPane({ notify }: ServerPaneProps) {
       setSaving(true)
       await (window as any).api?.server?.setConfig?.(config)
       notify('success', 'Einstellungen gespeichert')
+      // Let other parts of the app (AuthContext, status pills, etc.) react immediately.
+      try { window.dispatchEvent(new Event('server-config-changed')) } catch {}
+      try { window.dispatchEvent(new Event('auth-changed')) } catch {}
       // Reload to confirm saved values
       await loadConfig()
     } catch (e: any) {

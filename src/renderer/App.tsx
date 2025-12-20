@@ -102,9 +102,59 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
 }
 
 function AppInner() {
-    const { authRequired, isAuthenticated, isLoading: authLoading } = useAuth()
+    const { authRequired, isAuthenticated, isLoading: authLoading, logout } = useAuth()
     // Use toast context
     const { notify } = useToast()
+
+    const [serverMode, setServerMode] = useState<'local' | 'server' | 'client'>('local')
+
+    // Track server mode so we can offer client-specific UX (cancel login -> local mode)
+    useEffect(() => {
+        let cancelled = false
+        const load = async () => {
+            try {
+                const cfg = await (window as any).api?.server?.getConfig?.()
+                const mode = cfg?.mode
+                if (!cancelled && (mode === 'local' || mode === 'server' || mode === 'client')) {
+                    setServerMode(mode)
+                }
+            } catch {
+                // ignore
+            }
+        }
+        void load()
+        const onChanged = () => { void load() }
+        window.addEventListener('server-config-changed', onChanged)
+        const interval = window.setInterval(load, 5000)
+        return () => {
+            cancelled = true
+            window.removeEventListener('server-config-changed', onChanged)
+            window.clearInterval(interval)
+        }
+    }, [])
+
+    const onCancelLogin = useCallback(async () => {
+        try {
+            await (window as any).api?.server?.setConfig?.({ mode: 'local' })
+        } catch {
+            // ignore
+        }
+        try { logout() } catch {}
+        try { notify('info', 'Zurück zum Lokalmodus') } catch {}
+        try { window.dispatchEvent(new Event('server-config-changed')) } catch {}
+    }, [logout, notify])
+
+    // If the server goes offline in client mode, fall back to local mode with a message.
+    useEffect(() => {
+        const onDisc = (e: any) => {
+            if (serverMode !== 'client') return
+            const msg = e?.detail?.message ? String(e.detail.message) : 'Server nicht erreichbar'
+            notify('error', `Server getrennt (${msg}) – zurück zu Lokalmodus`)
+            void onCancelLogin()
+        }
+        window.addEventListener('server-disconnected', onDisc as any)
+        return () => window.removeEventListener('server-disconnected', onDisc as any)
+    }, [serverMode, notify, onCancelLogin])
     
     // Use modules context for feature toggles
     const { isModuleEnabled } = useModules()
@@ -754,7 +804,11 @@ function AppInner() {
     const isTopNav = navLayout === 'top'
     return (
         <>
-            <LoginModal isOpen={!!authRequired && !authLoading && !isAuthenticated} allowClose={false} />
+            <LoginModal
+                isOpen={!!authRequired && !authLoading && !isAuthenticated}
+                allowClose={serverMode === 'client'}
+                onClose={serverMode === 'client' ? onCancelLogin : undefined}
+            />
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header

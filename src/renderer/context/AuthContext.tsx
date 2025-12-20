@@ -155,11 +155,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onAuthChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
     const onDataChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
+    const onServerConfigChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
     window.addEventListener('auth-changed', onAuthChanged)
     window.addEventListener('data-changed', onDataChanged)
+    window.addEventListener('server-config-changed', onServerConfigChanged)
     return () => {
       window.removeEventListener('auth-changed', onAuthChanged)
       window.removeEventListener('data-changed', onDataChanged)
+      window.removeEventListener('server-config-changed', onServerConfigChanged)
     }
   }, [refreshAuthRequired, refreshServerMode])
 

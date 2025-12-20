@@ -21,6 +21,7 @@ interface ServerStatus {
 export function NetworkStatus() {
   const [config, setConfig] = useState<ServerConfig | null>(null)
   const [status, setStatus] = useState<ServerStatus | null>(null)
+  const [clientOk, setClientOk] = useState<boolean | null>(null)
 
   useEffect(() => {
     loadStatus()
@@ -36,8 +37,29 @@ export function NetworkStatus() {
       if (cfg.mode === 'server') {
         const st = await window.api.server.getStatus()
         setStatus(st)
+        setClientOk(null)
       } else {
         setStatus(null)
+        if (cfg.mode === 'client') {
+          const addr = (cfg.serverAddress || '').trim()
+          if (!addr) {
+            setClientOk(false)
+          } else {
+            try {
+              const res = await (window as any).api?.server?.testConnection?.({ address: addr })
+              const ok = !!res?.success
+              setClientOk(ok)
+              if (!ok) {
+                try { window.dispatchEvent(new CustomEvent('server-disconnected', { detail: { address: addr, message: res?.message } })) } catch {}
+              }
+            } catch {
+              setClientOk(false)
+              try { window.dispatchEvent(new CustomEvent('server-disconnected', { detail: { address: addr, message: 'Server nicht erreichbar' } })) } catch {}
+            }
+          }
+        } else {
+          setClientOk(null)
+        }
       }
     } catch {
       // Ignore errors
@@ -65,11 +87,12 @@ export function NetworkStatus() {
     }
     if (config.mode === 'client') {
       const addr = (config.serverAddress || '').trim()
+      const okLabel = clientOk === false ? 'Offline' : 'Verbunden'
       return {
         label: 'Client',
-        detail: addr || 'Kein Server',
-        color: 'var(--info)',
-        active: true
+        detail: addr ? `${addr} · ${okLabel}` : 'Kein Server',
+        color: clientOk === false ? 'var(--danger)' : 'var(--info)',
+        active: clientOk !== false
       }
     }
     return null

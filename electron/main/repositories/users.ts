@@ -207,13 +207,17 @@ export interface LoginResult {
 export function createSession(userId: number): string {
   const d = getDb()
   const token = crypto.randomBytes(32).toString('hex')
+
+  // Session TTL: keep relatively short for network mode.
+  // Must always set expires_at due to NOT NULL constraint.
+  const TTL_DAYS = 7
   try {
     d.prepare(`
-      INSERT INTO user_sessions (token, user_id, created_at)
-      VALUES (?, ?, datetime('now'))
-    `).run(token, userId)
+      INSERT INTO user_sessions (token, user_id, created_at, expires_at, is_valid)
+      VALUES (?, ?, datetime('now'), datetime('now', ?), 1)
+    `).run(token, userId, `+${TTL_DAYS} days`)
   } catch {
-    // Fallback for schemas that include an expires_at column etc.
+    // Fallback for older schemas that don't have expires_at/is_valid
     d.prepare(`
       INSERT INTO user_sessions (token, user_id)
       VALUES (?, ?)
@@ -229,13 +233,24 @@ export function deleteSessionByToken(token: string): void {
 
 export function getUserBySessionToken(token: string): User | null {
   const d = getDb()
-  const row = d.prepare(`
-    SELECT u.id, u.name, u.username, u.email, u.role, u.is_active, u.created_at, u.updated_at, u.last_login
-    FROM user_sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.token = ? AND u.is_active = 1
-  `).get(token) as any
-  return row ? mapRowToUser(row) : null
+  try {
+    const row = d.prepare(`
+      SELECT u.id, u.name, u.username, u.email, u.role, u.is_active, u.created_at, u.updated_at, u.last_login
+      FROM user_sessions s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.token = ? AND u.is_active = 1 AND s.is_valid = 1 AND s.expires_at > datetime('now')
+    `).get(token) as any
+    return row ? mapRowToUser(row) : null
+  } catch {
+    // Fallback for older schemas
+    const row = d.prepare(`
+      SELECT u.id, u.name, u.username, u.email, u.role, u.is_active, u.created_at, u.updated_at, u.last_login
+      FROM user_sessions s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.token = ? AND u.is_active = 1
+    `).get(token) as any
+    return row ? mapRowToUser(row) : null
+  }
 }
 
 /**
