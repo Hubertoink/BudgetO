@@ -19,10 +19,18 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(0)
+  const lastToastRef = useRef<{ type: ToastType; text: string; at: number } | null>(null)
   const EXIT_MS = 220
 
   const notify = useCallback(
     (type: ToastType, text: string, ms = 4000, action?: { label: string; onClick: () => void }) => {
+      const now = Date.now()
+      const last = lastToastRef.current
+      if (last && last.type === type && last.text === text && now - last.at < 800) {
+        return
+      }
+      lastToastRef.current = { type, text, at: now }
+
       const id = ++nextId.current
       setToasts(prev => [...prev, { id, type, text, action, leaving: false }])
 

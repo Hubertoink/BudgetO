@@ -5,6 +5,7 @@ import BatchEarmarkModal from '../../components/modals/BatchEarmarkModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
 import { useModules } from '../../context/ModuleContext'
+import { useAuth } from '../../context/AuthContext'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
@@ -154,6 +155,8 @@ export default function JournalView({
     page: pageProp,
     setPage: setPageProp
 }: JournalViewProps) {
+    const { authRequired, isAuthenticated } = useAuth()
+    const allowData = !authRequired || isAuthenticated
     // ==================== STATE ====================
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])
@@ -337,6 +340,7 @@ export default function JournalView({
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
+        if (!allowData) return
         try {
             const offset = (activePage - 1) * journalLimit
             const res = await window.api?.vouchers?.list?.({
@@ -362,7 +366,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -371,6 +375,7 @@ export default function JournalView({
 
     // Hydrate column prefs from server
     useEffect(() => {
+        if (!allowData) return
         (async () => {
             try {
                 const c = await window.api?.settings?.get?.({ key: 'journal.cols' })
@@ -385,20 +390,23 @@ export default function JournalView({
                 }
             } catch { /* ignore */ }
         })()
-    }, [])
+    }, [allowData])
 
     // Persist column prefs
     useEffect(() => {
         try { localStorage.setItem('journalCols', JSON.stringify(cols)) } catch { }
+        if (!allowData) return
         try { window.api?.settings?.set?.({ key: 'journal.cols', value: JSON.stringify(cols) }) } catch { }
-    }, [cols])
+    }, [cols, allowData])
     useEffect(() => {
         try { localStorage.setItem('journalColsOrder', JSON.stringify(order)) } catch { }
+        if (!allowData) return
         try { window.api?.settings?.set?.({ key: 'journal.order', value: JSON.stringify(order) }) } catch { }
-    }, [order])
+    }, [order, allowData])
 
     // Load attachments when opening edit modal
     useEffect(() => {
+        if (!allowData) return
         if (editRow?.id) {
             setEditRowFilesLoading(true)
             ;(async () => {
@@ -411,7 +419,7 @@ export default function JournalView({
         } else {
             setEditRowFiles([])
         }
-    }, [editRow?.id])
+    }, [editRow?.id, allowData])
 
     // Keyboard shortcuts for edit modal (Ctrl+S to save, Esc to close)
     useEffect(() => {

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
+import { useAuth } from '../context/AuthContext'
 
 export default function ReceiptsView() {
+    const { authRequired, isAuthenticated } = useAuth()
+    const allowData = !authRequired || isAuthenticated
     const [rows, setRows] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string | null; fileCount?: number }>>([])
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(20)
@@ -10,6 +13,7 @@ export default function ReceiptsView() {
     const [attachmentsModal, setAttachmentsModal] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
 
     async function load() {
+        if (!allowData) return
         setLoading(true)
         try {
             const res = await window.api?.vouchers.list?.({ limit, offset: (page - 1) * limit, sort: 'DESC' })
