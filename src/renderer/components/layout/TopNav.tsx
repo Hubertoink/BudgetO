@@ -3,6 +3,7 @@ import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
 import type { NavKey } from '../../utils/navItems'
 import { useModules } from '../../context/ModuleContext'
+import { useAuth } from '../../context/AuthContext'
 
 interface TopNavProps {
   activePage: NavKey
@@ -13,16 +14,18 @@ interface TopNavProps {
 
 export function TopNav({ activePage, onNavigate, navIconColorMode, openInvoicesCount = 0 }: TopNavProps) {
   const { isModuleEnabled } = useModules()
+  const { canAccessSettings } = useAuth()
   
   // Filter nav items based on module enabled status
   const visibleItems = useMemo(() => {
     return navItems.filter(item => {
+      if (item.key === 'Einstellungen' && !canAccessSettings) return false
       // If no moduleKey, always show
       if (!item.moduleKey) return true
       // Otherwise, check if module is enabled
       return isModuleEnabled(item.moduleKey)
     })
-  }, [isModuleEnabled])
+  }, [isModuleEnabled, canAccessSettings])
 
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">

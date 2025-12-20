@@ -102,7 +102,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
 }
 
 function AppInner() {
-    const { authRequired, isAuthenticated, isLoading: authLoading, logout } = useAuth()
+    const { authRequired, isAuthenticated, isLoading: authLoading, logout, canAccessSettings } = useAuth()
     // Use toast context
     const { notify } = useToast()
 
@@ -270,6 +270,14 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+
+    // If the current user has no settings access, avoid leaving them on Einstellungen.
+    useEffect(() => {
+        if (!authLoading && isAuthenticated && activePage === 'Einstellungen' && !canAccessSettings) {
+            setActivePage('Buchungen')
+            try { notify('info', 'Keine Berechtigung für Einstellungen – wechsle zu Buchungen') } catch {}
+        }
+    }, [authLoading, isAuthenticated, activePage, canAccessSettings, notify])
     // When switching to Reports, bump a key to trigger chart re-measures
     const [reportsActivateKey, setReportsActivateKey] = useState(0)
     useEffect(() => {
