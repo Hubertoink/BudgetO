@@ -88,9 +88,8 @@ export function NetworkStatus() {
     }
   }
 
-  if (!config) return null
-
   const display = useMemo(() => {
+    if (!config) return null
     if (config.mode === 'local') {
       return {
         label: 'Lokal',
@@ -129,11 +128,7 @@ export function NetworkStatus() {
       }
     }
     return null
-  }, [config.mode, config.serverAddress, status?.connectedClients, status?.port, status?.running, clientOk, hasRemoteChanges])
-
-  if (!display) return null
-
-  const title = `Netzwerkmodus: ${display.label} – ${display.detail}${display.titleExtra ? ` (${display.titleExtra})` : ''}`
+  }, [config, status?.connectedClients, status?.port, status?.running, clientOk, hasRemoteChanges])
 
   const onClick = useCallback(async () => {
     if (!config) return
@@ -162,6 +157,10 @@ export function NetworkStatus() {
       }
     }
   }, [config, hasRemoteChanges, isBusy, status?.running])
+
+  if (!config || !display) return null
+
+  const title = `Netzwerkmodus: ${display.label} – ${display.detail}${display.titleExtra ? ` (${display.titleExtra})` : ''}`
 
   return (
     <div
