@@ -278,7 +278,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
 
       {/* Edit/Create Modal */}
       {editModal && createPortal(
-        <div className="modal-backdrop" onClick={() => setEditModal(null)}>
+        <div className="modal-overlay" onClick={() => setEditModal(null)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <ModalHeader 
               title={editModal.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'} 
@@ -382,7 +382,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && createPortal(
-        <div className="modal-backdrop" onClick={() => setDeleteConfirm(null)}>
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
             <ModalHeader title="Kategorie löschen?" onClose={() => setDeleteConfirm(null)} />
             <div style={{ display: 'grid', gap: 16, padding: 16, textAlign: 'center' }}>

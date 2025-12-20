@@ -38,6 +38,9 @@ interface JournalTableProps {
         date: string
         type: 'IN' | 'OUT' | 'TRANSFER'
         sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+        categoryId?: number | null
+        categoryName?: string | null
+        categoryColor?: string | null
         description?: string | null
         paymentMethod?: 'BAR' | 'BANK' | null
         transferFrom?: 'BAR' | 'BANK' | null
@@ -51,6 +54,7 @@ interface JournalTableProps {
         earmarkCode?: string | null
         budgetId?: number | null
         budgetLabel?: string | null
+        budgetColor?: string | null
         tags?: string[]
     }>
     order: string[]
@@ -69,6 +73,9 @@ interface JournalTableProps {
         transferTo?: 'BAR' | 'BANK' | null
         type?: 'IN' | 'OUT' | 'TRANSFER'
         sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+        categoryId?: number | null
+        categoryName?: string | null
+        categoryColor?: string | null
         earmarkId?: number | null
         budgetId?: number | null
         tags?: string[]
@@ -86,6 +93,8 @@ interface JournalTableProps {
     highlightId?: number | null
     lockedUntil?: string | null
     onRowDoubleClick?: (row: any) => void
+    budgetUsage?: Record<number, { planned: number; spent: number; inflow: number; remaining: number; percent: number; color?: string | null }>
+    useCategoriesModule?: boolean
 }
 
 export default function JournalTable({
@@ -107,10 +116,13 @@ export default function JournalTable({
     onBudgetClick,
     highlightId,
     lockedUntil,
-    onRowDoubleClick
+    onRowDoubleClick,
+    budgetUsage,
+    useCategoriesModule = false
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
+    const [hoverBudget, setHoverBudget] = useState<number | null>(null)
     
     // Column resize state
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
@@ -214,7 +226,7 @@ export default function JournalTable({
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('sphere')}>Sphäre {renderSortIcon('sphere')}</th>
+                        : k === 'sphere' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('sphere')}>Kategorie {renderSortIcon('sphere')}</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'earmark' ? <th key={k} className="sortable" align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('earmark')}>🎯 {renderSortIcon('earmark')}</th>
                                     : k === 'budget' ? <th key={k} className="sortable" align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('budget')}>💰 {renderSortIcon('budget')}</th>
@@ -269,7 +281,7 @@ export default function JournalTable({
                 {isLocked(r.date) ? (
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null, categoryColor: r.categoryColor ?? null, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -279,7 +291,27 @@ export default function JournalTable({
         ) : k === 'type' ? (
             <td key={k}><span className={`badge ${r.type.toLowerCase()}`}>{r.type}</span></td>
         ) : k === 'sphere' ? (
-            <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
+            <td key={k}>
+                {r.type === 'TRANSFER' ? '' : (
+                    r.categoryId ? (
+                        <span
+                            className="badge"
+                            style={{
+                                background: r.categoryColor || 'var(--surface-alt)',
+                                color: contrastText(r.categoryColor || undefined),
+                                border: r.categoryColor ? `1px solid ${r.categoryColor}` : undefined
+                            }}
+                            title={r.categoryName || 'Kategorie'}
+                        >
+                            {r.categoryName || 'Kategorie'}
+                        </span>
+                    ) : useCategoriesModule ? (
+                        <span className="text-muted">—</span>
+                    ) : (
+                        <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>
+                    )
+                )}
+            </td>
         ) : k === 'description' ? (
             <td key={k}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -351,15 +383,59 @@ export default function JournalTable({
                     const bg = (r as any).budgetColor || undefined
                     const fg = contrastText(bg)
                     const id = r.budgetId as number | null | undefined
+                    const usage = id ? budgetUsage?.[id] : undefined
+                    const tooltip = usage ? `Budgetiert: ${eurFmt.format(usage.planned)} • Netto: ${eurFmt.format(usage.spent - usage.inflow)} • Verfügbar: ${eurFmt.format(usage.remaining)} (${usage.percent.toFixed(1)}%)` : `Nach Budget ${r.budgetLabel} filtern`
+                    const hoverActive = usage && hoverBudget === id
+                    const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
+                    const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : usage.color || bg || 'var(--accent)') : (bg || 'var(--accent)')
                     return (
-                        <button
-                            className="badge-budget"
-                            title={`Nach Budget ${r.budgetLabel} filtern`}
-                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                            onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
-                        >
-                            {r.budgetLabel}
-                        </button>
+                        <div style={{ position: 'relative', display: 'inline-block' }} onMouseEnter={() => setHoverBudget(id || null)} onMouseLeave={() => setHoverBudget(null)}>
+                            <button
+                                className="badge-budget"
+                                title={tooltip}
+                                style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
+                                onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
+                            >
+                                {r.budgetLabel}
+                            </button>
+                            {usage && (
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        top: '110%',
+                                        left: '50%',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 10,
+                                        padding: '10px 12px',
+                                        minWidth: 220,
+                                        boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
+                                        opacity: hoverActive ? 1 : 0,
+                                        pointerEvents: hoverActive ? 'auto' : 'none',
+                                        transition: 'opacity 0.15s ease, transform 0.15s ease',
+                                        transformOrigin: 'top',
+                                        zIndex: 20,
+                                        transform: hoverActive ? 'translate(-50%, 0)' : 'translate(-50%, -6px)'
+                                    }}
+                                    role="tooltip"
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                                        <div style={{ fontWeight: 600 }}>{r.budgetLabel}</div>
+                                        <div style={{ fontSize: 12, color: barColor }}>{usage.percent.toFixed(1)}%</div>
+                                    </div>
+                                    <div style={{ height: 8, background: 'var(--muted)', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                                        <div style={{ height: '100%', width: `${barPct}%`, background: barColor, transition: 'width 0.2s ease' }} />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, fontSize: 12 }}>
+                                        <div><div className="helper">Budget</div><div style={{ fontWeight: 600 }}>{eurFmt.format(usage.planned)}</div></div>
+                                        <div><div className="helper">Verfügbar</div><div style={{ fontWeight: 600, color: usage.remaining < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(usage.remaining)}</div></div>
+                                        <div><div className="helper">Ausgaben netto</div><div style={{ fontWeight: 500 }}>{eurFmt.format(usage.spent - usage.inflow)}</div></div>
+                                        <div><div className="helper">Brutto-Ausgaben</div><div style={{ fontWeight: 500 }}>{eurFmt.format(usage.spent)}</div></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )
                 })()
             ) : ''}</td>

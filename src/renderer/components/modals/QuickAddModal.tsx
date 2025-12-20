@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import TagsEditor from '../TagsEditor'
-import type { QA } from '../../hooks/useQuickAdd'
+import type { QA, BudgetAssignment, EarmarkAssignment } from '../../hooks/useQuickAdd'
 
 interface QuickAddModalProps {
     qa: QA
@@ -18,6 +18,8 @@ interface QuickAddModalProps {
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
+    customCategories?: Array<{ id: number; name: string; color?: string | null }>
+    useCategoriesModule?: boolean
 }
 
 /**
@@ -41,7 +43,9 @@ export default function QuickAddModal({
     budgetsForEdit,
     earmarks,
     tagDefs,
-    descSuggest
+    descSuggest,
+    customCategories = [],
+    useCategoriesModule = false
 }: QuickAddModalProps) {
     return (
         <div className="modal-overlay">
@@ -103,7 +107,23 @@ export default function QuickAddModal({
                                         ))}
                                     </div>
                                 </div>
-                                {/* Sphäre ausgeblendet für BudgetO - nicht relevant für Jugendförderung */}
+                                {/* Kategorie - gleiche Position wie im Edit-Modal */}
+                                {useCategoriesModule && customCategories.length > 0 && (
+                                    <div className="field">
+                                        <label>Kategorie</label>
+                                        <select 
+                                            value={(qa as any).categoryId ?? ''} 
+                                            disabled={qa.type === 'TRANSFER'}
+                                            onChange={(e) => setQa({ ...qa, categoryId: e.target.value ? Number(e.target.value) : null } as any)} 
+                                            aria-label="Kategorie auswählen"
+                                        >
+                                            <option value="">— Keine Kategorie —</option>
+                                            {customCategories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field">
                                         <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -217,23 +237,173 @@ export default function QuickAddModal({
                                 )}
                             </div>
                             <div className="row">
-                                <div className="field">
-                                    <label>Budget</label>
-                                    <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Budget auswählen">
-                                        <option value="">—</option>
-                                        {budgetsForEdit.map(b => (
-                                            <option key={b.id} value={b.id}>{b.label}</option>
-                                        ))}
-                                    </select>
+                                {/* Budget Zuordnungen (mehrfach möglich) */}
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        Budget
+                                        <button
+                                            type="button"
+                                            className="btn ghost"
+                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                            onClick={() => {
+                                                const currentBudgets = qa.budgets || []
+                                                setQa({ ...qa, budgets: [...currentBudgets, { budgetId: 0, amount: (qa as any).grossAmount || 0 }] })
+                                            }}
+                                            title="Weiteres Budget hinzufügen"
+                                        >+</button>
+                                    </label>
+                                    {(() => {
+                                        const budgetsList = qa.budgets || []
+                                        const budgetIds = budgetsList.filter((b: BudgetAssignment) => b.budgetId).map((b: BudgetAssignment) => b.budgetId)
+                                        const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
+                                        const totalBudgetAmount = budgetsList.reduce((sum: number, b: BudgetAssignment) => sum + (b.amount || 0), 0)
+                                        const grossAmt = Number((qa as any).grossAmount) || 0
+                                        const exceedsTotal = totalBudgetAmount > grossAmt * 1.001
+                                        return budgetsList.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {budgetsList.map((ba: BudgetAssignment, idx: number) => {
+                                                    const isDuplicate = budgetIds.filter((id: number) => id === ba.budgetId).length > 1
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <select
+                                                                style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
+                                                                value={ba.budgetId || ''}
+                                                                onChange={(e) => {
+                                                                    const newBudgets = [...budgetsList]
+                                                                    newBudgets[idx] = { ...newBudgets[idx], budgetId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    setQa({ ...qa, budgets: newBudgets })
+                                                                }}
+                                                            >
+                                                                <option value="">— Budget wählen —</option>
+                                                                {budgetsForEdit.map(b => (
+                                                                    <option key={b.id} value={b.id}>{b.label}</option>
+                                                                ))}
+                                                            </select>
+                                                            <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                <input
+                                                                    className="input"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={ba.amount ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const newBudgets = [...budgetsList]
+                                                                        newBudgets[idx] = { ...newBudgets[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                        setQa({ ...qa, budgets: newBudgets })
+                                                                    }}
+                                                                    title="Betrag für dieses Budget"
+                                                                />
+                                                                <span className="adorn-suffix">€</span>
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                className="btn ghost"
+                                                                style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                onClick={() => {
+                                                                    const newBudgets = budgetsList.filter((_: any, i: number) => i !== idx)
+                                                                    setQa({ ...qa, budgets: newBudgets })
+                                                                }}
+                                                                title="Entfernen"
+                                                            >✕</button>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {hasDuplicateBudgets && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Ein Budget kann nur einmal zugeordnet werden</div>
+                                                )}
+                                                {exceedsTotal && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
+                                        )
+                                    })()}
                                 </div>
-                                <div className="field">
-                                    <label>Zweckbindung</label>
-                                    <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Zweckbindung auswählen">
-                                        <option value="">—</option>
-                                        {earmarks.map(em => (
-                                            <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                        ))}
-                                    </select>
+                            </div>
+                            <div className="row">
+                                {/* Zweckbindung Zuordnungen (mehrfach möglich) */}
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        Zweckbindung
+                                        <button
+                                            type="button"
+                                            className="btn ghost"
+                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                            onClick={() => {
+                                                const currentEarmarks = qa.earmarksAssigned || []
+                                                setQa({ ...qa, earmarksAssigned: [...currentEarmarks, { earmarkId: 0, amount: (qa as any).grossAmount || 0 }] })
+                                            }}
+                                            title="Weitere Zweckbindung hinzufügen"
+                                        >+</button>
+                                    </label>
+                                    {(() => {
+                                        const earmarksList = qa.earmarksAssigned || []
+                                        const earmarkIds = earmarksList.filter((e: EarmarkAssignment) => e.earmarkId).map((e: EarmarkAssignment) => e.earmarkId)
+                                        const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
+                                        const totalEarmarkAmount = earmarksList.reduce((sum: number, e: EarmarkAssignment) => sum + (e.amount || 0), 0)
+                                        const grossAmt = Number((qa as any).grossAmount) || 0
+                                        const exceedsTotal = totalEarmarkAmount > grossAmt * 1.001
+                                        return earmarksList.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {earmarksList.map((ea: EarmarkAssignment, idx: number) => {
+                                                    const isDuplicate = earmarkIds.filter((id: number) => id === ea.earmarkId).length > 1
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <select
+                                                                style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
+                                                                value={ea.earmarkId || ''}
+                                                                onChange={(e) => {
+                                                                    const newEarmarks = [...earmarksList]
+                                                                    newEarmarks[idx] = { ...newEarmarks[idx], earmarkId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    setQa({ ...qa, earmarksAssigned: newEarmarks })
+                                                                }}
+                                                            >
+                                                                <option value="">— Zweckbindung wählen —</option>
+                                                                {earmarks.map(em => (
+                                                                    <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                                                ))}
+                                                            </select>
+                                                            <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                <input
+                                                                    className="input"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={ea.amount ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const newEarmarks = [...earmarksList]
+                                                                        newEarmarks[idx] = { ...newEarmarks[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                        setQa({ ...qa, earmarksAssigned: newEarmarks })
+                                                                    }}
+                                                                    title="Betrag für diese Zweckbindung"
+                                                                />
+                                                                <span className="adorn-suffix">€</span>
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                className="btn ghost"
+                                                                style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                onClick={() => {
+                                                                    const newEarmarks = earmarksList.filter((_: any, i: number) => i !== idx)
+                                                                    setQa({ ...qa, earmarksAssigned: newEarmarks })
+                                                                }}
+                                                                title="Entfernen"
+                                                            >✕</button>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {hasDuplicateEarmarks && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Eine Zweckbindung kann nur einmal zugeordnet werden</div>
+                                                )}
+                                                {exceedsTotal && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </div>

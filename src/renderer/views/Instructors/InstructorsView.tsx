@@ -446,37 +446,23 @@ export default function InstructorsView() {
                       }
                     }}
                   >
-                    {/* Verbindungspfeil für ausgewähltes Item */}
+                    {/* Ausgewählter Indikator */}
                     {detail?.id === r.id && (
                       <div style={{
                         position: 'absolute',
-                        right: -20,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        zIndex: 10
-                      }}>
-                        <div style={{
-                          width: 12,
-                          height: 2,
-                          background: 'var(--primary)'
-                        }} />
-                        <div style={{
-                          width: 0,
-                          height: 0,
-                          borderTop: '8px solid transparent',
-                          borderBottom: '8px solid transparent',
-                          borderLeft: '10px solid var(--primary)'
-                        }} />
-                      </div>
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 4,
+                        background: 'var(--primary)',
+                        borderRadius: '8px 0 0 8px'
+                      }} aria-hidden="true" />
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 20 }}>👤</span>
                       <div>
-                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontWeight: 500 }}>
                           {r.name}
-                          <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>→</span>
                         </div>
                         {r.yearlyCap != null && (
                           <div className="helper" style={{ fontSize: 12 }}>

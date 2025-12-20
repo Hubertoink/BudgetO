@@ -348,11 +348,11 @@ export default function CashAdvancesView() {
   )
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 0, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 16, alignItems: 'start' }}>
       <div style={{ gridColumn: '1 / -1' }}>{header}</div>
 
       {/* List */}
-      <div className="card" style={{ padding: 12, borderTopRightRadius: selectedId ? 0 : undefined, borderBottomRightRadius: selectedId ? 0 : undefined }}>
+      <div className="card" style={{ padding: 12 }}>
         <div style={{ display: 'grid', gap: 10 }}>
           <input
             className="input"
@@ -477,9 +477,6 @@ export default function CashAdvancesView() {
       <div className="card" style={{ 
         padding: 16, 
         minHeight: 420, 
-        marginLeft: -1,
-        borderTopLeftRadius: selectedId ? 0 : undefined,
-        borderBottomLeftRadius: selectedId ? 0 : undefined,
         borderLeft: selectedId ? '3px solid var(--accent)' : undefined
       }}>
         {!selectedId ? (

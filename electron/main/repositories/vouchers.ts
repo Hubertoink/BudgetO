@@ -113,10 +113,15 @@ export function createVoucher(input: {
 
         let id: number | null = null
         let lastVoucherNo: string = ''
-        // Retry a few times in case of rare UNIQUE collisions on voucher_no/seq
+        // BudgetO: Sequenz pro Tag (nicht pro Sphäre) - bis zu 9999 Buchungen/Tag
+        const maxSeqRow = d.prepare(
+            'SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM vouchers WHERE date = ?'
+        ).get(input.date) as { maxSeq: number }
+        let seq = maxSeqRow.maxSeq + 1
+        
+        // Retry a few times in case of rare UNIQUE collisions
         for (let attempt = 0; attempt < 5; attempt++) {
-            const seq = nextVoucherSequence(d, year, input.sphere)
-            const voucherNo = makeVoucherNo(year, input.date, input.sphere, seq)
+            const voucherNo = makeVoucherNo(year, input.date, '', seq)
             lastVoucherNo = voucherNo
             try {
                 const info = stmt.run(
@@ -143,13 +148,20 @@ export function createVoucher(input: {
                     input.createdBy ?? null
                 )
                 id = Number(info.lastInsertRowid)
+                
+                // Update sequence table to stay in sync
+                d.prepare(
+                    'INSERT INTO voucher_sequences(year, sphere, last_seq_no) VALUES(?,?,?) ON CONFLICT(year, sphere) DO UPDATE SET last_seq_no = MAX(excluded.last_seq_no, voucher_sequences.last_seq_no)'
+                ).run(year, input.sphere, seq)
+                
                 break
             } catch (e: any) {
                 const msg = String(e?.message || '')
                 const code = String((e as any)?.code || '')
                 const isUnique = code.includes('SQLITE_CONSTRAINT') || /UNIQUE constraint failed/i.test(msg)
                 if (!isUnique) throw e
-                // otherwise, retry (generate next sequence)
+                // Increment seq and retry
+                seq++
                 if (attempt === 4) throw new Error('Konnte Belegnummer nicht vergeben (UNIQUE). Bitte erneut versuchen.')
             }
         }
@@ -231,7 +243,10 @@ export function listRecentVouchers(limit = 20) {
     const d = getDb()
     const rows = (d
         .prepare(
-            `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
+            `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.category_id as categoryId,
+                            (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
+                            (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
+                            v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
                             v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                             (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                             v.earmark_id as earmarkId,
@@ -296,7 +311,10 @@ export function listVouchersAdvanced(filters: {
 }) {
     const d = getDb()
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
-    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.category_id as categoryId,
+                                        (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
+                                        (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
+                                        v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,

@@ -105,6 +105,40 @@ function AppInner() {
     // Use toast context
     const { notify } = useToast()
     
+    // Use modules context for feature toggles
+    const { isModuleEnabled } = useModules()
+    const useCategoriesModule = isModuleEnabled('custom-categories')
+    
+    // Custom categories for Quick-Add modal
+    const [customCategories, setCustomCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    useEffect(() => {
+        if (!useCategoriesModule) {
+            setCustomCategories([])
+            return
+        }
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.customCategories?.list?.()
+                const list = Array.isArray(res) ? res : Array.isArray(res?.rows) ? res.rows : Array.isArray(res?.categories) ? res.categories : []
+                if (!cancelled) setCustomCategories(list)
+            } catch { if (!cancelled) setCustomCategories([]) }
+        })()
+        const onChanged = () => {
+            if (useCategoriesModule) {
+                (async () => {
+                    try {
+                        const res = await (window as any).api?.customCategories?.list?.()
+                        const list = Array.isArray(res) ? res : Array.isArray(res?.rows) ? res.rows : Array.isArray(res?.categories) ? res.categories : []
+                        setCustomCategories(list)
+                    } catch { setCustomCategories([]) }
+                })()
+            }
+        }
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [useCategoriesModule])
+    
     // Use UI preferences context
     const {
         navLayout,
@@ -322,7 +356,7 @@ function AppInner() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles } = useQuickAdd(
+    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, closeModal } = useQuickAdd(
         today, 
         async (p: any) => {
         try {
@@ -964,7 +998,7 @@ function AppInner() {
                     qa={qa}
                     setQa={setQa}
                     onSave={onQuickSave}
-                    onClose={() => setQuickAdd(false)}
+                    onClose={closeModal}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}
@@ -976,6 +1010,8 @@ function AppInner() {
                     earmarks={earmarks}
                     tagDefs={tagDefs}
                     descSuggest={descSuggest}
+                    customCategories={customCategories}
+                    useCategoriesModule={useCategoriesModule}
                 />
             )}
             {/* removed: Confirm mark as paid modal */}

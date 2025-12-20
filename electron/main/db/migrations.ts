@@ -76,7 +76,7 @@ export const MIGRATIONS: Mig[] = [
       voucher_no TEXT NOT NULL UNIQUE,
       date TEXT NOT NULL,
       type TEXT CHECK(type IN ('IN','OUT','TRANSFER')) NOT NULL,
-      sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL,
+      sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL DEFAULT 'IDEELL',
       account_id INTEGER,
       category_id INTEGER,
       project_id INTEGER,
@@ -101,7 +101,8 @@ export const MIGRATIONS: Mig[] = [
       FOREIGN KEY(reversed_by_id) REFERENCES vouchers(id),
       FOREIGN KEY(original_id) REFERENCES vouchers(id)
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_voucher_seq ON vouchers(year, seq_no);
+    -- BudgetO: Unique index on (date, seq_no) for per-day numbering (up to 9999/day)
+    -- sphere is kept for backward compatibility but not used in numbering
 
     CREATE TABLE IF NOT EXISTS voucher_files (
       id INTEGER PRIMARY KEY,
@@ -175,9 +176,10 @@ export const MIGRATIONS: Mig[] = [
   {
     version: 6,
     up: `
-    -- Switch unique constraint from (year, seq_no) to (year, sphere, seq_no) for per-sphere numbering
+    -- BudgetO: Per-day numbering - unique on (date, seq_no)
     DROP INDEX IF EXISTS idx_voucher_seq;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_voucher_seq_per_sphere ON vouchers(year, sphere, seq_no);
+    DROP INDEX IF EXISTS idx_voucher_seq_per_sphere;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_voucher_seq_per_day ON vouchers(date, seq_no);
     `
   }
   ,
@@ -831,6 +833,22 @@ export const MIGRATIONS: Mig[] = [
       
       // Create index for username lookup
       db.exec('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+    }
+  },
+  // ============================================================================
+  // Migration 33: BudgetO - Wechsel von Sphären zu Kategorien
+  // Belegnummerierung jetzt pro Tag: YYYY-MM-DD_NNNN (bis 9999 Buchungen/Tag)
+  // sphere bleibt als Fallback-Feld, ist aber nicht mehr Teil der Nummerierung
+  // ============================================================================
+  {
+    version: 33,
+    up(db: DB) {
+      // Drop old sphere-based unique indexes
+      db.exec('DROP INDEX IF EXISTS idx_voucher_seq')
+      db.exec('DROP INDEX IF EXISTS idx_voucher_seq_per_sphere')
+      
+      // Create new unique index on (date, seq_no) for per-day numbering
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_voucher_seq_per_day ON vouchers(date, seq_no)')
     }
   }
 ]

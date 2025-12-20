@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+type BudgetAssignment = { budgetId: number; amount: number }
+type EarmarkAssignment = { earmarkId: number; amount: number }
 
 type QA = {
     date: string
@@ -15,7 +18,24 @@ type QA = {
     budgetId?: number | null
     earmarkId?: number | null
     tags?: string[]
+    categoryId?: number | null
+    // Extended: multiple budgets/earmarks with amounts
+    budgets?: BudgetAssignment[]
+    earmarksAssigned?: EarmarkAssignment[]
 }
+
+const initialQa = (today: string): QA => ({
+    date: today, 
+    type: 'OUT', 
+    sphere: 'IDEELL', 
+    mode: 'GROSS',
+    grossAmount: 100,
+    vatRate: 0, 
+    description: '', 
+    paymentMethod: 'BAR',
+    budgets: [],
+    earmarksAssigned: []
+})
 
 /**
  * useQuickAdd Hook
@@ -30,18 +50,20 @@ export function useQuickAdd(
     notify?: (type: 'success' | 'error' | 'info', text: string) => void
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
-    const [qa, setQa] = useState<QA>({ 
-        date: today, 
-        type: 'IN', 
-        sphere: 'IDEELL', 
-        // Standard = BRUTTO laut Anforderung
-        mode: 'GROSS',
-        grossAmount: 100,
-        vatRate: 0, 
-        description: '', 
-        paymentMethod: 'BAR'
-    })
+    const [qa, setQa] = useState<QA>(initialQa(today))
     const [files, setFiles] = useState<File[]>([])
+
+    // Reset function to clear the form
+    const resetForm = useCallback(() => {
+        setQa(initialQa(today))
+        setFiles([])
+    }, [today])
+
+    // Close modal and reset form
+    const closeModal = useCallback(() => {
+        setQuickAdd(false)
+        resetForm()
+    }, [resetForm])
 
     function onDropFiles(fileList: FileList | null) {
         if (!fileList) return
@@ -87,9 +109,21 @@ export function useQuickAdd(
             delete payload.grossAmount
         }
         
-        if (typeof (qa as any).earmarkId === 'number') payload.earmarkId = (qa as any).earmarkId
-        if (typeof (qa as any).budgetId === 'number') payload.budgetId = (qa as any).budgetId
-        if (Array.isArray((qa as any).tags)) payload.tags = (qa as any).tags
+        // Category (custom categories module)
+        if (typeof qa.categoryId === 'number') {
+            payload.categoryId = qa.categoryId
+        }
+        
+        if (Array.isArray(qa.tags)) payload.tags = qa.tags
+        
+        // Multiple budgets support
+        if (qa.budgets && qa.budgets.length > 0) {
+            payload.budgets = qa.budgets.filter(b => b.budgetId > 0)
+        }
+        // Multiple earmarks support
+        if (qa.earmarksAssigned && qa.earmarksAssigned.length > 0) {
+            payload.earmarksAssigned = qa.earmarksAssigned.filter(e => e.earmarkId > 0)
+        }
 
         // Convert attachments to Base64
         if (files.length) {
@@ -109,18 +143,7 @@ export function useQuickAdd(
 
         const res = await create(payload)
         if (res) {
-            setQuickAdd(false)
-            setFiles([])
-            setQa({ 
-                date: today, 
-                type: 'IN', 
-                sphere: 'IDEELL', 
-                mode: 'GROSS',
-                grossAmount: 100,
-                vatRate: 0, 
-                description: '', 
-                paymentMethod: 'BAR'
-            })
+            closeModal()
         }
     }
 
@@ -166,7 +189,7 @@ export function useQuickAdd(
             }
             if (e.key === 'Escape') { 
                 if (quickAdd) { 
-                    setQuickAdd(false)
+                    closeModal()
                     e.preventDefault() 
                 } 
                 return 
@@ -174,11 +197,11 @@ export function useQuickAdd(
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [qa, files, quickAdd, onQuickSave, onOpenFilePicker])
+    }, [qa, files, quickAdd, onQuickSave, onOpenFilePicker, closeModal])
 
     const openFilePicker = () => onOpenFilePicker?.()
 
-    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles }
+    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, closeModal }
 }
 
-export type { QA }
+export type { QA, BudgetAssignment, EarmarkAssignment }

@@ -16,6 +16,9 @@ type VoucherRow = {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number | null
+    categoryName?: string | null
+    categoryColor?: string | null
     description?: string | null
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
@@ -31,11 +34,21 @@ type VoucherRow = {
     budgetId?: number | null
     budgetLabel?: string | null
     budgetAmount?: number | null
+    budgetColor?: string | null
     fileCount?: number
     tags?: string[]
     // Multiple assignments
     budgets?: BudgetAssignment[]
     earmarksAssigned?: EarmarkAssignment[]
+}
+
+type BudgetUsageInfo = {
+    planned: number
+    spent: number
+    inflow: number
+    remaining: number
+    percent: number
+    color?: string | null
 }
 
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
@@ -201,7 +214,7 @@ export default function JournalView({
     // Modal states
     const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
-    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; categoryId?: number | null }) | null>(null)
+    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
@@ -212,12 +225,82 @@ export default function JournalView({
     const { isModuleEnabled } = useModules()
     const useCategoriesModule = isModuleEnabled('custom-categories')
     const [customCategories, setCustomCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    const categoryMap = useMemo(() => {
+        const map = new Map<number, { id: number; name: string; color?: string | null }>()
+        const list = Array.isArray(customCategories) ? customCategories : []
+        list.forEach((c) => map.set(c.id, c))
+        return map
+    }, [customCategories])
     
     useEffect(() => {
-        if (useCategoriesModule) {
-            window.api?.customCategories?.list?.()?.then(cats => setCustomCategories(cats || []))
+        if (!useCategoriesModule) return
+        const loadCategories = () => {
+            window.api?.customCategories?.list?.()?.then((cats: any) => {
+                const fromCategories = Array.isArray(cats?.categories) ? cats.categories : null
+                const fromRows = Array.isArray(cats?.rows) ? cats.rows : null
+                const list = Array.isArray(cats) ? cats : fromCategories || fromRows || []
+                setCustomCategories(list)
+            })
         }
+        loadCategories()
+        window.addEventListener('data-changed', loadCategories)
+        return () => window.removeEventListener('data-changed', loadCategories)
     }, [useCategoriesModule])
+
+    // ==================== BUDGET LOOKUPS ====================
+    const [budgetMeta, setBudgetMeta] = useState<Record<number, { planned: number; color?: string | null; label?: string }>>({})
+    const [budgetUsage, setBudgetUsage] = useState<Record<number, BudgetUsageInfo>>({})
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await window.api?.budgets?.list?.({})
+                if (res?.rows && !cancelled) {
+                    const map: Record<number, { planned: number; color?: string | null; label?: string }> = {}
+                    ;(res.rows as any[]).forEach((b) => {
+                        if (!b?.id) return
+                        map[b.id] = {
+                            planned: Number(b.amountPlanned || 0),
+                            color: b.color || null,
+                            label: (b.name && String(b.name)) || (b.label && String(b.label)) || (b.categoryName && String(b.categoryName)) || `Budget ${b.year || ''}`.trim()
+                        }
+                    })
+                    setBudgetMeta(map)
+                }
+            } catch { /* ignore */ }
+        })()
+        return () => { cancelled = true }
+    }, [])
+
+    useEffect(() => {
+        const ids = Array.from(new Set(rows.map(r => r.budgetId).filter((id): id is number => typeof id === 'number')))
+            .filter((id) => !budgetUsage[id])
+        if (!ids.length) return
+
+        let cancelled = false
+        ;(async () => {
+            const updates: Record<number, BudgetUsageInfo> = {}
+            for (const id of ids) {
+                try {
+                    const u = await window.api?.budgets?.usage?.({ budgetId: id })
+                    const meta = budgetMeta[id]
+                    const planned = meta?.planned ?? Number((u as any)?.planned || (u as any)?.amountPlanned || 0)
+                    const spent = Math.max(0, Number((u as any)?.spent || 0))
+                    const inflow = Math.max(0, Number((u as any)?.inflow || 0))
+                    const net = spent - inflow
+                    const remaining = planned - net
+                    const percent = planned > 0 ? Math.min(200, Math.max(0, Math.round((net / planned) * 1000) / 10)) : 0
+                    updates[id] = { planned, spent, inflow, remaining, percent, color: meta?.color ?? (u as any)?.color ?? null }
+                } catch {
+                    const meta = budgetMeta[id]
+                    updates[id] = { planned: meta?.planned ?? 0, spent: 0, inflow: 0, remaining: meta?.planned ?? 0, percent: 0, color: meta?.color ?? null }
+                }
+            }
+            if (!cancelled && Object.keys(updates).length) setBudgetUsage(prev => ({ ...prev, ...updates }))
+        })()
+        return () => { cancelled = true }
+    }, [rows, budgetMeta, budgetUsage])
 
     // ==================== TAG COUNTS ====================
     // Use usage counts from tagDefs (loaded with includeUsage: true in App.tsx)
@@ -236,7 +319,7 @@ export default function JournalView({
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
         if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
-        if (activeFilterSphere) list.push({ key: 'sphere', label: `Sphäre: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
+        if (activeFilterSphere) list.push({ key: 'sphere', label: `Kategorie: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
         if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
         if (activeFilterEarmark != null) {
@@ -413,8 +496,8 @@ export default function JournalView({
                 </button>
                 <button
                     className="btn ghost"
-                    title="Sphäre / Zweckbindung / Budget filtern"
-                    aria-label="Sphäre / Zweckbindung / Budget filtern"
+                    title="Kategorie / Zweckbindung / Budget filtern"
+                    aria-label="Kategorie / Zweckbindung / Budget filtern"
                     onClick={() => setShowMetaFilter(true)}
                     style={{ display: 'grid', placeItems: 'center' }}
                 >
@@ -511,6 +594,7 @@ export default function JournalView({
                         tagDefs={tagDefs}
                         eurFmt={eurFmt}
                         fmtDate={fmtDate}
+                        budgetUsage={budgetUsage}
                         onEdit={(r) => setEditRow({
                             ...r,
                             // Modus-Inferenz: Wenn Netto-Betrag gespeichert wurde (>0) => NETTO, sonst BRUTTO
@@ -548,6 +632,7 @@ export default function JournalView({
                             await loadRecent()
                         }}
                         onRowDoubleClick={(row) => setInfoVoucher(row)}
+                        useCategoriesModule={useCategoriesModule}
                     />
                 </div>
 
@@ -700,7 +785,9 @@ export default function JournalView({
                                             })()
                                             const sphere = editRow.sphere
                                             const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                            return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
+                                            const categoryName = editRow.categoryId ? categoryMap.get(editRow.categoryId)?.name : null
+                                            const catOrSphere = useCategoriesModule ? (categoryName || 'Kategorie') : (sphere || '—')
+                                            return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {catOrSphere}</>
                                         })()}
                                     </div>
                                 </div>
@@ -731,7 +818,7 @@ export default function JournalView({
                                                 </div>
                                             </div>
                                             <div className="field">
-                                                <label>{useCategoriesModule ? 'Kategorie' : 'Sphäre'}</label>
+                                                <label>{useCategoriesModule ? 'Kategorie' : 'Kategorie (Sphäre)'}</label>
                                                 {useCategoriesModule ? (
                                                     <select 
                                                         value={editRow.categoryId ?? ''} 
