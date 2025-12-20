@@ -215,8 +215,13 @@ declare global {
                 getStatus: () => Promise<{ running: boolean; port?: number; connectedClients?: number }>
                 start: () => Promise<{ ok: boolean; port?: number; error?: string }>
                 stop: () => Promise<{ ok: boolean }>
-                testConnection: (host: string, port: number) => Promise<{ ok: boolean; error?: string; version?: string }>
+                testConnection: (payload: { address: string }) => Promise<{ success: boolean; message: string }>
             }
         }
     }
+}
+
+declare module '*.css' {
+    const css: string
+    export default css
 }

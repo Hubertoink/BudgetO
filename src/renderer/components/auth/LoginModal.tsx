@@ -14,6 +14,7 @@ interface LoginModalProps {
 
 export function LoginModal({ isOpen, onClose, allowClose = false }: LoginModalProps) {
   const { login, isLoading: authLoading } = useAuth()
+  const [serverInfo, setServerInfo] = useState<{ mode: 'local' | 'server' | 'client'; address?: string } | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -33,6 +34,31 @@ export function LoginModal({ isOpen, onClose, allowClose = false }: LoginModalPr
       setUsername('')
       setPassword('')
       setError('')
+      setServerInfo(null)
+    }
+  }, [isOpen])
+
+  // Load server mode/address to show context (esp. client mode uses remote DB)
+  useEffect(() => {
+    let cancelled = false
+    if (!isOpen) return
+    ;(async () => {
+      try {
+        const cfg = await (window as any).api?.server?.getConfig?.()
+        if (cancelled) return
+        const mode = cfg?.mode
+        const address = (cfg?.serverAddress || cfg?.host || '').trim()
+        if (mode === 'local' || mode === 'server' || mode === 'client') {
+          setServerInfo({ mode, address: address || undefined })
+        } else {
+          setServerInfo(null)
+        }
+      } catch {
+        if (!cancelled) setServerInfo(null)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
   }, [isOpen])
 
@@ -55,7 +81,9 @@ export function LoginModal({ isOpen, onClose, allowClose = false }: LoginModalPr
       const result = await login(username.trim(), password)
       
       if (result.success) {
-        if (onClose) onClose()
+        // Do not call onClose here.
+        // In client-mode, onClose means "Abbrechen" (fallback to local).
+        // The modal will close automatically once auth state updates.
       } else {
         setError(result.error || 'Anmeldung fehlgeschlagen')
         setPassword('')
@@ -91,6 +119,13 @@ export function LoginModal({ isOpen, onClose, allowClose = false }: LoginModalPr
             <h1 id="login-title">BudgetO</h1>
           </div>
           <p className="login-subtitle">Bitte anmelden</p>
+          {serverInfo?.mode === 'client' ? (
+            <div className="login-remote-hint" role="note">
+              <div><strong>Hinweis:</strong> Du greifst auf eine <strong>andere Datenbank</strong> (Remote-Server) zu.</div>
+              {serverInfo.address ? <div>Server: <strong>{serverInfo.address}</strong></div> : null}
+              <div>Wenn du abbrichst, wechselst du zurück in den Lokalmodus.</div>
+            </div>
+          ) : null}
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">

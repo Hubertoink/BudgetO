@@ -6,6 +6,7 @@
  */
 
 import http from 'node:http'
+import type net from 'node:net'
 import { URL } from 'node:url'
 import { networkInterfaces } from 'node:os'
 import fs from 'node:fs'
@@ -16,6 +17,7 @@ import { getDb, getAppDataDir } from '../db/database'
 // Server state
 let server: http.Server | null = null
 let connectedClients = 0
+const activeSockets = new Set<net.Socket>()
 
 // Client-mode auth token (kept in main process memory)
 let clientAuthToken: string | null = null
@@ -820,12 +822,19 @@ export async function startServer(): Promise<{ success: boolean; error?: string 
       }
       server = null
     })
-    
-    server.on('connection', () => {
-      connectedClients++
+
+    server.on('connection', (socket) => {
+      // Track active sockets instead of counting total connections ever seen.
+      activeSockets.add(socket)
+      connectedClients = activeSockets.size
+      socket.on('close', () => {
+        activeSockets.delete(socket)
+        connectedClients = activeSockets.size
+      })
     })
-    
+
     server.on('close', () => {
+      activeSockets.clear()
       connectedClients = 0
     })
     
