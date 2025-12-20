@@ -1,6 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../../components/ModalHeader'
+import { useAuth } from '../../../context/AuthContext'
 
 interface CustomCategory {
   id: number
@@ -22,6 +23,7 @@ interface CategoriesPaneProps {
  * Shows usage counts and warns before deleting categories with associated vouchers.
  */
 export function CategoriesPane({ notify }: CategoriesPaneProps) {
+  const { canWrite } = useAuth()
   const [categories, setCategories] = React.useState<CustomCategory[]>([])
   const [loading, setLoading] = React.useState(true)
   const [editModal, setEditModal] = React.useState<{
@@ -36,6 +38,13 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
     usageCount: number
   } | null>(null)
   const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!canWrite) {
+      setEditModal(null)
+      setDeleteConfirm(null)
+    }
+  }, [canWrite])
 
   async function loadCategories() {
     setLoading(true)
@@ -140,13 +149,17 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
             und erlauben eine flexible Einteilung nach deinen Bedürfnissen.
           </div>
         </div>
-        <button 
-          className="btn primary" 
-          onClick={() => setEditModal({ name: '', color: '#4CAF50', description: '' })} 
-          style={{ whiteSpace: 'nowrap' }}
-        >
-          + Neue Kategorie
-        </button>
+        {canWrite ? (
+          <button 
+            className="btn primary" 
+            onClick={() => setEditModal({ name: '', color: '#4CAF50', description: '' })} 
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            + Neue Kategorie
+          </button>
+        ) : (
+          <div className="helper" style={{ whiteSpace: 'nowrap' }}>Nur Anzeige</div>
+        )}
       </div>
 
       {/* Info Box */}
@@ -240,35 +253,39 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
                 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button 
-                    className="btn ghost" 
-                    onClick={() => toggleActive(cat)}
-                    title={cat.isActive ? 'Deaktivieren' : 'Aktivieren'}
-                    style={{ padding: '6px 8px', fontSize: 12 }}
-                  >
-                    {cat.isActive ? '👁️' : '👁️‍🗨️'}
-                  </button>
-                  <button 
-                    className="btn ghost" 
-                    onClick={() => setEditModal({
-                      id: cat.id,
-                      name: cat.name,
-                      color: cat.color || '#4CAF50',
-                      description: cat.description || ''
-                    })} 
-                    title="Bearbeiten"
-                    style={{ padding: '6px 8px', fontSize: 12 }}
-                  >
-                    ✏️
-                  </button>
-                  <button 
-                    className="btn ghost" 
-                    onClick={() => setDeleteConfirm({ id: cat.id, name: cat.name, usageCount: cat.usageCount ?? 0 })} 
-                    title="Löschen"
-                    style={{ padding: '6px 8px', fontSize: 12 }}
-                  >
-                    🗑️
-                  </button>
+                  {canWrite ? (
+                    <>
+                      <button 
+                        className="btn ghost" 
+                        onClick={() => toggleActive(cat)}
+                        title={cat.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                        style={{ padding: '6px 8px', fontSize: 12 }}
+                      >
+                        {cat.isActive ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                      <button 
+                        className="btn ghost" 
+                        onClick={() => setEditModal({
+                          id: cat.id,
+                          name: cat.name,
+                          color: cat.color || '#4CAF50',
+                          description: cat.description || ''
+                        })} 
+                        title="Bearbeiten"
+                        style={{ padding: '6px 8px', fontSize: 12 }}
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        className="btn ghost" 
+                        onClick={() => setDeleteConfirm({ id: cat.id, name: cat.name, usageCount: cat.usageCount ?? 0 })} 
+                        title="Löschen"
+                        style={{ padding: '6px 8px', fontSize: 12 }}
+                      >
+                        🗑️
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
             )
@@ -277,7 +294,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
       )}
 
       {/* Edit/Create Modal */}
-      {editModal && createPortal(
+      {editModal && canWrite && createPortal(
         <div className="modal-overlay" onClick={() => setEditModal(null)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <ModalHeader 
@@ -381,7 +398,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirm && createPortal(
+      {deleteConfirm && canWrite && createPortal(
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
             <ModalHeader title="Kategorie löschen?" onClose={() => setDeleteConfirm(null)} />

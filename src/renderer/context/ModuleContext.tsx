@@ -54,6 +54,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       console.error('Failed to load modules:', e)
       setError(e?.message || 'Failed to load modules')
+      setModules([])
     } finally {
       setLoading(false)
     }
@@ -65,7 +66,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     // Listen for module changes
     const handleModulesChanged = () => loadModules()
     window.addEventListener('modules-changed', handleModulesChanged)
-    return () => window.removeEventListener('modules-changed', handleModulesChanged)
+    // Reload after login/logout so modules are visible once authenticated
+    const handleAuthChanged = () => loadModules()
+    window.addEventListener('auth-changed', handleAuthChanged)
+    return () => {
+      window.removeEventListener('modules-changed', handleModulesChanged)
+      window.removeEventListener('auth-changed', handleAuthChanged)
+    }
   }, [loadModules])
 
   const enabledModules = modules

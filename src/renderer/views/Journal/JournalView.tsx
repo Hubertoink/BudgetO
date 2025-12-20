@@ -155,7 +155,7 @@ export default function JournalView({
     page: pageProp,
     setPage: setPageProp
 }: JournalViewProps) {
-    const { authRequired, isAuthenticated } = useAuth()
+    const { authRequired, isAuthenticated, canWrite } = useAuth()
     const allowData = !authRequired || isAuthenticated
     // ==================== STATE ====================
     // Pagination & Sorting
@@ -222,6 +222,11 @@ export default function JournalView({
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
+
+    // Readonly UX: never keep edit modal open
+    useEffect(() => {
+        if (editRow && !canWrite) setEditRow(null)
+    }, [editRow, canWrite])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
 
     // ==================== CUSTOM CATEGORIES ====================
@@ -603,6 +608,7 @@ export default function JournalView({
                         eurFmt={eurFmt}
                         fmtDate={fmtDate}
                         budgetUsage={budgetUsage}
+                        canWrite={canWrite}
                         onEdit={(r) => setEditRow({
                             ...r,
                             // Modus-Inferenz: Wenn Netto-Betrag gespeichert wurde (>0) => NETTO, sonst BRUTTO

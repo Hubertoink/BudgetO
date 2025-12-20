@@ -1,12 +1,15 @@
 import { useModules, ModuleInfo } from '../../../context/ModuleContext'
+import { useAuth } from '../../../context/AuthContext'
 
 /**
  * ModulesPane - Settings pane for enabling/disabling BudgetO modules
  */
 export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+  const { canWrite } = useAuth()
   const { modules, loading, setModuleEnabled } = useModules()
 
   const handleToggle = async (mod: ModuleInfo) => {
+    if (!canWrite) return
     try {
       await setModuleEnabled(mod.key, !mod.enabled)
       notify('success', `${mod.name} ${!mod.enabled ? 'aktiviert' : 'deaktiviert'}`, 2000)
@@ -31,6 +34,12 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
         Aktiviere oder deaktiviere Funktionsmodule nach Bedarf. 
         Deaktivierte Module werden aus der Navigation ausgeblendet.
       </p>
+
+      {!canWrite && (
+        <div className="card" style={{ padding: 12, background: 'var(--surface-alt)' }}>
+          <div className="helper">Nur Anzeige: Mit Leserechten können Module nicht geändert werden.</div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gap: 12 }}>
         {modules.map((mod) => (
@@ -76,6 +85,7 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
               <input
                 type="checkbox"
                 checked={mod.enabled}
+                disabled={!canWrite}
                 onChange={() => handleToggle(mod)}
               />
               <span className="slider" />

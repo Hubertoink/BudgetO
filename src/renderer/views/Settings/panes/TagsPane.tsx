@@ -1,15 +1,24 @@
 import React from 'react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
+import { useAuth } from '../../../context/AuthContext'
 
 /**
  * TagsPane - Tag Management
  * Displays existing tags with usage counts and allows opening the global tag manager.
  */
 export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDataVersion }: TagsPaneProps) {
+  const { canWrite } = useAuth()
   const [editTag, setEditTag] = React.useState<TagValue | null>(null)
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ id: number; name: string } | null>(null)
   const [busy, setBusy] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!canWrite) {
+      setEditTag(null)
+      setDeleteConfirm(null)
+    }
+  }, [canWrite])
 
   // Refresh tags with usage counts
   async function refreshTags() {
@@ -65,9 +74,13 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
           </div>
           <div className="helper">Verwalte Farben & Namen. Tags färben Buchungszeilen zur schnelleren visuellen Orientierung.</div>
         </div>
-        <button className="btn primary" onClick={() => setEditTag({ name: '', color: null })} style={{ whiteSpace: 'nowrap' }}>
-          + Neuer Tag
-        </button>
+        {canWrite ? (
+          <button className="btn primary" onClick={() => setEditTag({ name: '', color: null })} style={{ whiteSpace: 'nowrap' }}>
+            + Neuer Tag
+          </button>
+        ) : (
+          <div className="helper" style={{ whiteSpace: 'nowrap' }}>Nur Anzeige</div>
+        )}
       </div>
 
       {/* Tags Grid */}
@@ -127,21 +140,25 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button 
-                    className="btn btn-edit" 
-                    onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} 
-                    title="Bearbeiten"
-                  >
-                    ✎
-                  </button>
-                  <button 
-                    className="btn ghost" 
-                    onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
-                    title="Löschen"
-                    style={{ padding: '6px 8px' }}
-                  >
-                    🗑️
-                  </button>
+                  {canWrite ? (
+                    <>
+                      <button 
+                        className="btn btn-edit" 
+                        onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} 
+                        title="Bearbeiten"
+                      >
+                        ✎
+                      </button>
+                      <button 
+                        className="btn ghost" 
+                        onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
+                        title="Löschen"
+                        style={{ padding: '6px 8px' }}
+                      >
+                        🗑️
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
             )
@@ -149,7 +166,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
         </div>
       )}
 
-      {editTag && (
+      {editTag && canWrite && (
         <TagModal
           value={editTag}
           onClose={() => setEditTag(null)}
@@ -158,7 +175,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
         />
       )}
 
-      {deleteConfirm && (
+      {deleteConfirm && canWrite && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

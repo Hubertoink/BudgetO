@@ -851,6 +851,62 @@ export const MIGRATIONS: Mig[] = [
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_voucher_seq_per_day ON vouchers(date, seq_no)')
     }
   }
+  ,
+  {
+    version: 34,
+    up(db: DB) {
+      // Fix legacy FK: vouchers.category_id originally referenced categories(id)
+      // but BudgetO uses custom_categories(id). SQLite needs a table rebuild.
+      const fks = db.prepare('PRAGMA foreign_key_list(vouchers)').all() as Array<{ from: string; table: string }>
+      const catFk = fks.find((fk) => fk.from === 'category_id')
+      if (!catFk) return
+      if (catFk.table === 'custom_categories') return
+
+      const tableRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='vouchers'").get() as { sql?: string } | undefined
+      const tableSql = tableRow?.sql
+      if (!tableSql) return
+
+      const indexRows = db
+        .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='vouchers' AND sql IS NOT NULL")
+        .all() as Array<{ sql: string }>
+
+      // Disable FK checks during rebuild (migration runner already wraps in a transaction)
+      db.exec('PRAGMA foreign_keys = OFF;')
+      try {
+        let newSql = tableSql.replace(/CREATE TABLE\s+vouchers/i, 'CREATE TABLE vouchers__new')
+        // Replace only the legacy constraint; keep everything else unchanged
+        newSql = newSql.replace(
+          /FOREIGN KEY\(category_id\) REFERENCES categories\(id\)/i,
+          'FOREIGN KEY(category_id) REFERENCES custom_categories(id) ON DELETE SET NULL'
+        )
+
+        // If for some reason the legacy FK text is not present, abort safely
+        if (newSql === tableSql) {
+          return
+        }
+
+        db.exec(newSql)
+
+        const cols = db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>
+        const colNames = cols.map((c) => c.name)
+        const colList = colNames.map((n) => `"${n}"`).join(', ')
+        db.exec(`INSERT INTO vouchers__new(${colList}) SELECT ${colList} FROM vouchers;`)
+
+        db.exec('DROP TABLE vouchers;')
+        db.exec('ALTER TABLE vouchers__new RENAME TO vouchers;')
+
+        for (const idx of indexRows) {
+          // Most indexes are already IF NOT EXISTS; after DROP TABLE they are gone.
+          db.exec(idx.sql)
+        }
+
+      } catch (e) {
+        throw e
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON;')
+      }
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

@@ -253,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const role = user?.role
   const canWrite = role === 'ADMIN' || role === 'KASSE'
   const canManageUsers = role === 'ADMIN'
-  const canAccessSettings = role === 'ADMIN' || role === 'KASSE'
+  const canAccessSettings = role === 'ADMIN' || role === 'KASSE' || role === 'READONLY'
   const isAdmin = role === 'ADMIN'
   const isKassier = role === 'KASSE'
   const isReadonly = role === 'READONLY'

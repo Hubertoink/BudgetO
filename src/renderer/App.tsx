@@ -102,7 +102,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
 }
 
 function AppInner() {
-    const { authRequired, isAuthenticated, isLoading: authLoading, logout, canAccessSettings } = useAuth()
+    const { authRequired, isAuthenticated, isLoading: authLoading, logout, canAccessSettings, canWrite } = useAuth()
     // Use toast context
     const { notify } = useToast()
 
@@ -460,6 +460,13 @@ function AppInner() {
         load()
         return () => { alive = false }
     }, [quickAdd])
+
+    // Readonly UX: never show QuickAdd in readonly
+    useEffect(() => {
+        if (quickAdd && !canWrite) {
+            try { closeModal() } catch { /* ignore */ }
+        }
+    }, [quickAdd, canWrite, closeModal])
 
     async function createSampleVoucher() {
         try {
@@ -1058,7 +1065,7 @@ function AppInner() {
             </main>
 
 {/* Quick-Add Modal */}
-            {quickAdd && (
+            {quickAdd && canWrite && (
                 <QuickAddModal
                     qa={qa}
                     setQa={setQa}
@@ -1081,7 +1088,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
+            {canWrite && activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>

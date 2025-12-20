@@ -432,7 +432,11 @@ export function listVouchersAdvancedPaged(filters: {
         }
     })()
     const rows = d.prepare(
-        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere,
+            v.category_id as categoryId,
+            (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
+            (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
+            v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
@@ -769,6 +773,7 @@ export function updateVoucher(input: {
     date?: string
     type?: 'IN' | 'OUT' | 'TRANSFER'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number | null
     description?: string | null
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
@@ -784,8 +789,15 @@ export function updateVoucher(input: {
 }) {
     const d = getDb()
     const warnings: string[] = []
+
+    if (input.categoryId !== undefined && input.categoryId !== null) {
+        const exists = d.prepare('SELECT id FROM custom_categories WHERE id=?').get(input.categoryId) as any
+        if (!exists) throw new Error('Kategorie nicht gefunden')
+    }
+
     const current = d.prepare(`
-        SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
+         SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
+             category_id as categoryId,
                net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount,
                earmark_id as earmarkId, earmark_amount as earmarkAmount,
                budget_id as budgetId, budget_amount as budgetAmount,
@@ -855,6 +867,7 @@ export function updateVoucher(input: {
     if (input.date != null) { fields.push('date = ?'); params.push(input.date) }
     if (input.type != null) { fields.push('type = ?'); params.push(input.type) }
     if (input.sphere != null) { fields.push('sphere = ?'); params.push(input.sphere) }
+    if (input.categoryId !== undefined) { fields.push('category_id = ?'); params.push(input.categoryId) }
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
     if (input.paymentMethod !== undefined) { fields.push('payment_method = ?'); params.push(input.paymentMethod) }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
@@ -932,6 +945,7 @@ export function updateVoucher(input: {
     try {
         const after = d.prepare(`
             SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+                   category_id as categoryId,
                    earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
                    net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount
             FROM vouchers WHERE id=?

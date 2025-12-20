@@ -95,6 +95,7 @@ interface JournalTableProps {
     onRowDoubleClick?: (row: any) => void
     budgetUsage?: Record<number, { planned: number; spent: number; inflow: number; remaining: number; percent: number; color?: string | null }>
     useCategoriesModule?: boolean
+    canWrite?: boolean
 }
 
 export default function JournalTable({
@@ -118,7 +119,8 @@ export default function JournalTable({
     lockedUntil,
     onRowDoubleClick,
     budgetUsage,
-    useCategoriesModule = false
+    useCategoriesModule = false,
+    canWrite = true
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
@@ -138,29 +140,14 @@ export default function JournalTable({
         }
     }, [columnWidths])
 
-    // Handle resize start
-    const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        resizingCol.current = colKey
-        resizeStartX.current = e.clientX
-        
-        // Get current column width
-        const th = (e.target as HTMLElement).closest('th')
-        resizeStartWidth.current = th?.offsetWidth || 100
-        
-        document.addEventListener('mousemove', handleResizeMove)
-        document.addEventListener('mouseup', handleResizeEnd)
-        document.body.style.cursor = 'col-resize'
-        document.body.style.userSelect = 'none'
-    }, [])
-
     // Handle resize move
     const handleResizeMove = useCallback((e: MouseEvent) => {
-        if (!resizingCol.current || !tableRef.current) return
+        if (!resizingCol.current) return
+        if (!tableRef.current) return
+
         const delta = e.clientX - resizeStartX.current
         const newWidth = Math.max(40, resizeStartWidth.current + delta)
-        
+
         // Get container width to limit total table width
         const container = tableRef.current.parentElement
         if (container) {
@@ -168,17 +155,20 @@ export default function JournalTable({
             const currentTableWidth = tableRef.current.offsetWidth
             const currentColWidth = resizeStartWidth.current
             const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
-            
+
             // If table would exceed container, limit the column width
             if (projectedTableWidth > containerWidth && delta > 0) {
                 const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
                 if (maxNewWidth > 40) {
-                    setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(40, maxNewWidth) }))
+                    setColumnWidths(prev => ({
+                        ...prev,
+                        [resizingCol.current!]: Math.max(40, maxNewWidth)
+                    }))
                 }
                 return
             }
         }
-        
+
         setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
     }, [])
 
@@ -190,6 +180,33 @@ export default function JournalTable({
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
     }, [handleResizeMove])
+
+    // Handle resize start
+    const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        resizingCol.current = colKey
+        resizeStartX.current = e.clientX
+
+        // Get current column width
+        const th = (e.target as HTMLElement).closest('th')
+        resizeStartWidth.current = th?.offsetWidth || 100
+
+        document.addEventListener('mousemove', handleResizeMove)
+        document.addEventListener('mouseup', handleResizeEnd)
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+    }, [handleResizeEnd, handleResizeMove])
+
+    useEffect(() => {
+        return () => {
+            document.removeEventListener('mousemove', handleResizeMove)
+            document.removeEventListener('mouseup', handleResizeEnd)
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+        }
+    }, [handleResizeEnd, handleResizeMove])
 
     function onHeaderDragStart(e: React.DragEvent<HTMLTableCellElement>, idx: number) {
         dragIdx.current = idx
@@ -281,7 +298,9 @@ export default function JournalTable({
                 {isLocked(r.date) ? (
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null, categoryColor: r.categoryColor ?? null, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    canWrite ? (
+                        <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null, categoryColor: r.categoryColor ?? null, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    ) : null
                 )}
             </td>
         ) : k === 'date' ? (

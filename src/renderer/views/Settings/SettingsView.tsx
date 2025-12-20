@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { SettingsProps, TileKey } from './types'
 import { SettingsNav } from './SettingsNav'
 import { GeneralPane } from './panes/GeneralPane'
@@ -12,6 +12,7 @@ import { ModulesPane } from './panes/ModulesPane'
 import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
+import { useAuth } from '../../context/AuthContext'
 
 /**
  * SettingsView - Main Settings Container
@@ -21,6 +22,7 @@ import { YearEndPane } from './panes/YearEndPane'
  * Persists last visited pane in sessionStorage
  */
 export function SettingsView(props: SettingsProps) {
+  const { isReadonly } = useAuth()
   const [activeTile, setActiveTile] = useState<TileKey>(() => {
     try {
       const saved = sessionStorage.getItem('settingsActiveTile')
@@ -31,6 +33,32 @@ export function SettingsView(props: SettingsProps) {
   })
 
   const [appVersion, setAppVersion] = useState<string>('')
+
+  const visibleTiles = useMemo(() => {
+    const all: Array<{ key: TileKey; icon: string; label: string }> = [
+      { key: 'general', icon: '🖼️', label: 'Darstellung' },
+      { key: 'table', icon: '📋', label: 'Tabelle' },
+      { key: 'modules', icon: '🧩', label: 'Module' },
+      { key: 'users', icon: '👥', label: 'Benutzer' },
+      { key: 'server', icon: '🌐', label: 'Netzwerk' },
+      { key: 'storage', icon: '💾', label: 'Speicher & Backup' },
+      { key: 'import', icon: '📥', label: 'Import' },
+      { key: 'org', icon: '🏢', label: 'Sachgebiet' },
+      { key: 'tags', icon: '🏷️', label: 'Tags' },
+      { key: 'categories', icon: '📁', label: 'Kategorien' },
+      { key: 'yearEnd', icon: '📊', label: 'Jahresabschluss' },
+    ]
+    if (!isReadonly) return all
+    const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import'])
+    return all.filter(t => !hidden.has(t.key))
+  }, [isReadonly])
+
+  useEffect(() => {
+    const allowed = new Set(visibleTiles.map(t => t.key))
+    if (!allowed.has(activeTile)) {
+      setActiveTile(visibleTiles[0]?.key ?? 'general')
+    }
+  }, [activeTile, visibleTiles])
 
   useEffect(() => {
     try {
@@ -50,7 +78,7 @@ export function SettingsView(props: SettingsProps) {
     <div className="settings-container">
       <h1>Einstellungen</h1>
       
-      <SettingsNav active={activeTile} onSelect={setActiveTile} />
+      <SettingsNav active={activeTile} onSelect={setActiveTile} tiles={visibleTiles} />
       
       <div className="settings-content">
         {activeTile === 'general' && (

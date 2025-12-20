@@ -4,6 +4,7 @@ import { TileKey } from './types'
 interface SettingsNavProps {
   active: TileKey
   onSelect: (key: TileKey) => void
+  tiles?: Array<{ key: TileKey; icon: string; label: string }>
 }
 
 /**
@@ -11,8 +12,8 @@ interface SettingsNavProps {
  * 
  * File tab (Aktenreiter) layout for switching between settings categories
  */
-export function SettingsNav({ active, onSelect }: SettingsNavProps) {
-  const tiles: Array<{ key: TileKey; icon: string; label: string }> = [
+export function SettingsNav({ active, onSelect, tiles }: SettingsNavProps) {
+  const defaultTiles: Array<{ key: TileKey; icon: string; label: string }> = [
     { key: 'general', icon: '🖼️', label: 'Darstellung' },
     { key: 'table', icon: '📋', label: 'Tabelle' },
     { key: 'modules', icon: '🧩', label: 'Module' },
@@ -26,9 +27,11 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'yearEnd', icon: '📊', label: 'Jahresabschluss' },
   ]
 
+  const visibleTiles = (tiles ?? defaultTiles)
+
   return (
     <div className="settings-tabs">
-      {tiles.map((tile) => (
+      {visibleTiles.map((tile) => (
         <button
           key={tile.key}
           className={`settings-tab ${active === tile.key ? 'active' : ''}`}
