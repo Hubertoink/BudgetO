@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: color-mix(in oklab, #000 55%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,13 +15,44 @@
 }
 
 .login-modal {
-  background: var(--bg-primary, #ffffff);
+  position: relative;
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-2);
   width: 100%;
   max-width: 400px;
   padding: 2rem;
   animation: slideUp 0.3s ease-out;
+  overflow: hidden;
+}
+
+.login-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--login-bg-image);
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px);
+  transform: scale(1.05);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-modal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-modal > * {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes slideUp {
@@ -48,20 +79,24 @@
   margin-bottom: 0.5rem;
 }
 
-.login-logo-icon {
-  font-size: 2rem;
+.login-logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
 }
 
 .login-logo h1 {
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--primary, #2563eb);
+  color: var(--text);
 }
 
 .login-subtitle {
   margin: 0;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-dim);
   font-size: 0.95rem;
 }
 
@@ -76,10 +111,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: var(--error-bg, #fef2f2);
-  border: 1px solid var(--error-border, #fecaca);
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
   border-radius: 8px;
-  color: var(--error, #dc2626);
+  color: var(--danger);
   font-size: 0.9rem;
 }
 
@@ -96,32 +131,32 @@
 .form-group label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-primary, #1f2937);
+  color: var(--text);
 }
 
 .form-group input {
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border, #d1d5db);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 1rem;
   transition: border-color 0.2s, box-shadow 0.2s;
-  background: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #1f2937);
+  background: color-mix(in oklab, var(--surface) 86%, transparent);
+  color: var(--text);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--primary, #2563eb);
-  box-shadow: 0 0 0 3px var(--primary-light, rgba(37, 99, 235, 0.15));
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
 }
 
 .form-group input:disabled {
-  background: var(--bg-secondary, #f3f4f6);
+  background: color-mix(in oklab, var(--muted) 30%, transparent);
   cursor: not-allowed;
 }
 
 .form-group input::placeholder {
-  color: var(--text-muted, #9ca3af);
+  color: color-mix(in oklab, var(--text-dim) 85%, transparent);
 }
 
 .login-button {
@@ -130,7 +165,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.875rem 1.5rem;
-  background: var(--primary, #2563eb);
+  background: var(--accent);
   color: white;
   border: none;
   border-radius: 8px;
@@ -142,7 +177,7 @@
 }
 
 .login-button:hover:not(:disabled) {
-  background: var(--primary-dark, #1d4ed8);
+  filter: brightness(0.95);
 }
 
 .login-button:active:not(:disabled) {
@@ -157,8 +192,8 @@
 .login-cancel-button {
   padding: 0.75rem 1.5rem;
   background: transparent;
-  color: var(--text-secondary, #6b7280);
-  border: 1px solid var(--border, #d1d5db);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 500;
@@ -167,8 +202,7 @@
 }
 
 .login-cancel-button:hover:not(:disabled) {
-  background: var(--bg-secondary, #f3f4f6);
-  border-color: var(--border-dark, #9ca3af);
+  background: color-mix(in oklab, var(--muted) 25%, transparent);
 }
 
 .login-cancel-button:disabled {
@@ -195,27 +229,15 @@
   margin-top: 1.5rem;
   text-align: center;
   padding-top: 1rem;
-  border-top: 1px solid var(--border-light, #e5e7eb);
+  border-top: 1px solid var(--border);
 }
 
 .login-footer p {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-dim);
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .login-modal {
-    --bg-primary: #1f2937;
-    --bg-secondary: #374151;
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    --border: #4b5563;
-    --border-light: #374151;
-    --error-bg: #450a0a;
-    --error-border: #991b1b;
-    --error: #fca5a5;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .login-modal { animation: none; }
 }

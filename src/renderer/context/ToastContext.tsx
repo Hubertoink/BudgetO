@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 
 type ToastType = 'info' | 'success' | 'warn' | 'error'
 
@@ -7,6 +7,7 @@ interface Toast {
   type: ToastType
   text: string
   action?: { label: string; onClick: () => void }
+  leaving?: boolean
 }
 
 interface ToastContextValue {
@@ -17,13 +18,22 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
-  let nextId = 0
+  const nextId = useRef(0)
+  const EXIT_MS = 220
 
   const notify = useCallback(
     (type: ToastType, text: string, ms = 4000, action?: { label: string; onClick: () => void }) => {
-      const id = ++nextId
-      setToasts(prev => [...prev, { id, type, text, action }])
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ms)
+      const id = ++nextId.current
+      setToasts(prev => [...prev, { id, type, text, action, leaving: false }])
+
+      const leaveAt = Math.max(0, ms - EXIT_MS)
+      window.setTimeout(() => {
+        setToasts(prev => prev.map(t => (t.id === id ? { ...t, leaving: true } : t)))
+      }, leaveAt)
+
+      window.setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id))
+      }, ms)
     },
     []
   )
@@ -35,7 +45,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`toast ${t.type}`}
+            className={`toast ${t.type}${t.leaving ? ' leaving' : ''}`}
             role={t.type === 'error' || t.type === 'warn' ? 'alert' : 'status'}
           >
             <span>{t.text}</span>

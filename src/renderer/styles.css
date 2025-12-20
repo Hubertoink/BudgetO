@@ -138,6 +138,94 @@
 .swatches { display: flex; gap: 8px; margin-top: 8px; }
 .swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); }
 
+/* Topbar: Network status pill */
+.network-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--surface) 80%, transparent);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-dim);
+    max-width: 240px;
+    white-space: nowrap;
+}
+
+.network-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--ns-color, var(--text-dim));
+    box-shadow: var(--ns-glow, none);
+    flex: 0 0 auto;
+}
+
+.network-status__label {
+    font-weight: 600;
+    color: var(--text);
+    flex: 0 0 auto;
+}
+
+.network-status__sep {
+    opacity: 0.45;
+    flex: 0 0 auto;
+}
+
+.network-status__detail {
+    opacity: 0.75;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* Settings: Network pane */
+.server-status-card {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: color-mix(in oklab, var(--muted) 20%, transparent);
+}
+
+.server-status-card[data-running="true"] {
+    border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+}
+
+.server-connection-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.server-test-result {
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    background: color-mix(in oklab, var(--muted) 20%, transparent);
+    color: var(--text);
+}
+
+.server-test-result[data-success="true"] {
+    border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+    color: var(--success);
+}
+
+.server-test-result[data-success="false"] {
+    border-color: color-mix(in oklab, var(--danger) 45%, var(--border));
+    background: color-mix(in oklab, var(--danger) 10%, transparent);
+    color: var(--danger);
+}
+
 /* Storage pane specific */
 .storage-pane { display: grid; gap: 12px; }
 .storage-section { padding: 12px; display: grid; gap: 8px; }
@@ -1476,6 +1564,16 @@ tbody tr.row-flash {
     z-index: 9999;
 }
 
+@keyframes toastInFromBottom {
+    from { transform: translateY(14px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes toastOutToRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(120%); opacity: 0; }
+}
+
 .toast {
     background: color-mix(in oklab, var(--surface) 92%, transparent);
     border: 1px solid var(--border);
@@ -1489,6 +1587,17 @@ tbody tr.row-flash {
     align-items: flex-start;
     gap: 8px;
     flex-wrap: wrap; /* allow long text and action to wrap to the next line */
+    will-change: transform, opacity;
+    animation: toastInFromBottom 160ms ease-out;
+}
+
+.toast.leaving {
+    animation: toastOutToRight 220ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast { animation: none; }
+    .toast.leaving { animation: none; opacity: 0; }
 }
 
 .toast.success {

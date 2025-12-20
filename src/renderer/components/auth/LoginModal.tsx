@@ -2,6 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import './LoginModal.css'
 
+// Resolve app icon and background image for the login screen
+const appLogo: string = new URL('../../../../build/Icon.ico', import.meta.url).href
+const loginBg: string = new URL('../../assets/a_snow_covered_houses_and_a_street_light.png', import.meta.url).href
+
 interface LoginModalProps {
   isOpen: boolean
   onClose?: () => void
@@ -78,11 +82,12 @@ export function LoginModal({ isOpen, onClose, allowClose = false }: LoginModalPr
       aria-modal="true"
       aria-labelledby="login-title"
       onKeyDown={handleKeyDown}
+      style={{ ['--login-bg-image' as any]: `url(${loginBg})` }}
     >
       <div className="login-modal">
         <div className="login-modal-header">
           <div className="login-logo">
-            <span className="login-logo-icon">💰</span>
+            <img className="login-logo-img" src={appLogo} alt="BudgetO" />
             <h1 id="login-title">BudgetO</h1>
           </div>
           <p className="login-subtitle">Bitte anmelden</p>

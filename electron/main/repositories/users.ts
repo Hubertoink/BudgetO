@@ -200,6 +200,44 @@ export interface LoginResult {
   error?: string
 }
 
+// ============================================================================
+// Sessions (token-based, used by network mode HTTP API)
+// ============================================================================
+
+export function createSession(userId: number): string {
+  const d = getDb()
+  const token = crypto.randomBytes(32).toString('hex')
+  try {
+    d.prepare(`
+      INSERT INTO user_sessions (token, user_id, created_at)
+      VALUES (?, ?, datetime('now'))
+    `).run(token, userId)
+  } catch {
+    // Fallback for schemas that include an expires_at column etc.
+    d.prepare(`
+      INSERT INTO user_sessions (token, user_id)
+      VALUES (?, ?)
+    `).run(token, userId)
+  }
+  return token
+}
+
+export function deleteSessionByToken(token: string): void {
+  const d = getDb()
+  d.prepare('DELETE FROM user_sessions WHERE token = ?').run(token)
+}
+
+export function getUserBySessionToken(token: string): User | null {
+  const d = getDb()
+  const row = d.prepare(`
+    SELECT u.id, u.name, u.username, u.email, u.role, u.is_active, u.created_at, u.updated_at, u.last_login
+    FROM user_sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.token = ? AND u.is_active = 1
+  `).get(token) as any
+  return row ? mapRowToUser(row) : null
+}
+
 /**
  * Authenticate a user with username and password
  */
@@ -267,6 +305,35 @@ export function changePassword(userId: number, currentPassword: string, newPassw
   const newHash = hashPassword(newPassword)
   d.prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?").run(newHash, userId)
   
+  return { success: true }
+}
+
+/**
+ * Clear password for a user (requires current password if a password is set).
+ * Intended for switching back to local-only usage without authentication.
+ */
+export function clearPassword(userId: number, currentPassword: string): { success: boolean; error?: string } {
+  const d = getDb()
+  const row = d.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as any
+  if (!row) return { success: false, error: 'Benutzer nicht gefunden' }
+
+  if (row.password_hash) {
+    if (!currentPassword) return { success: false, error: 'Aktuelles Passwort ist erforderlich' }
+    if (!verifyPassword(currentPassword, row.password_hash)) {
+      return { success: false, error: 'Aktuelles Passwort ist falsch' }
+    }
+  }
+
+  d.prepare("UPDATE users SET password_hash = NULL, updated_at = datetime('now') WHERE id = ?").run(userId)
+  return { success: true }
+}
+
+/**
+ * Admin-only clear without knowing the current password.
+ */
+export function clearPasswordAdmin(userId: number): { success: boolean } {
+  const d = getDb()
+  d.prepare("UPDATE users SET password_hash = NULL, updated_at = datetime('now') WHERE id = ?").run(userId)
   return { success: true }
 }
 

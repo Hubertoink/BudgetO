@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useAuth, UserRole } from '../../context/AuthContext'
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -18,12 +18,26 @@ const ROLE_LABELS: Record<UserRole, string> = {
  */
 export function UserIndicator() {
   const { user, isLoading, logout } = useAuth()
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Ensure stable hook order; also close menu when session changes.
+    if (!user) setOpen(false)
+  }, [user])
   
-  if (isLoading) {
-    return null
-  }
-  
-  if (!user) {
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      const el = rootRef.current
+      if (!el) return
+      if (e.target instanceof Node && !el.contains(e.target)) setOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  if (isLoading || !user) {
     return null
   }
 
@@ -43,9 +57,11 @@ export function UserIndicator() {
         gap: 8,
         position: 'relative'
       }}
+      ref={rootRef}
     >
       {/* User Avatar/Badge */}
-      <div
+      <button
+        type="button"
         style={{
           width: 28,
           height: 28,
@@ -57,12 +73,16 @@ export function UserIndicator() {
           color: 'white',
           fontSize: 11,
           fontWeight: 600,
-          cursor: 'default'
+          cursor: 'pointer',
+          border: 'none',
+          padding: 0
         }}
         title={`${user.name} (${ROLE_LABELS[user.role]})`}
+        aria-label="Benutzermenü"
+        onClick={() => setOpen(v => !v)}
       >
         {initials}
-      </div>
+      </button>
       
       {/* User Name - hidden on small screens */}
       <div 
@@ -78,6 +98,37 @@ export function UserIndicator() {
           {ROLE_LABELS[user.role]}
         </span>
       </div>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Benutzeraktionen"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            minWidth: 180,
+            background: 'color-mix(in oklab, var(--surface) 92%, transparent)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: 8,
+            boxShadow: 'var(--shadow-1)',
+            zIndex: 9999
+          }}
+        >
+          <button
+            type="button"
+            className="btn"
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={() => {
+              setOpen(false)
+              logout()
+            }}
+          >
+            Abmelden
+          </button>
+        </div>
+      )}
     </div>
   )
 }

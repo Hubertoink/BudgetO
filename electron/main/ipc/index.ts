@@ -54,18 +54,49 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VoucherCreateOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.create', parsed))
+        }
+
         const res = createVoucher(parsed)
         return VoucherCreateOutput.parse(res)
     })
 
     ipcMain.handle('vouchers.reverse', async (_e, payload) => {
         const parsed = VoucherReverseInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VoucherReverseOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.reverse', parsed))
+        }
+
         const res = reverseVoucher(parsed.originalId, null)
         return VoucherReverseOutput.parse(res)
     })
 
     ipcMain.handle('reports.summary', async (_e, payload) => {
         const parsed = ReportsSummaryInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsSummaryOutput.parse(await remoteCall(cfg.serverAddress, 'reports.summary', {
+                paymentMethod: parsed.paymentMethod,
+                sphere: parsed.sphere,
+                type: parsed.type,
+                from: parsed.from,
+                to: parsed.to,
+                earmarkId: parsed.earmarkId,
+                q: (parsed as any).q,
+                tag: (parsed as any).tag
+            }))
+        }
+
         const summary = summarizeVouchers({
             paymentMethod: parsed.paymentMethod as any,
             sphere: parsed.sphere as any,
@@ -82,6 +113,20 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.monthly', async (_e, payload) => {
         const parsed = ReportsMonthlyInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsMonthlyOutput.parse(await remoteCall(cfg.serverAddress, 'reports.monthly', {
+                from: parsed.from,
+                to: parsed.to,
+                paymentMethod: parsed.paymentMethod,
+                sphere: parsed.sphere,
+                type: parsed.type
+            }))
+        }
+
         const buckets = monthlyVouchers({
             from: parsed.from,
             to: parsed.to,
@@ -94,6 +139,20 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.daily', async (_e, payload) => {
         const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return await remoteCall(cfg.serverAddress, 'reports.daily', {
+                from: parsed.from,
+                to: parsed.to,
+                paymentMethod: parsed.paymentMethod,
+                sphere: parsed.sphere,
+                type: parsed.type
+            })
+        }
+
         const buckets = dailyVouchers({
             from: parsed.from,
             to: parsed.to,
@@ -106,12 +165,31 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.cashBalance', async (_e, payload) => {
         const parsed = ReportsCashBalanceInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsCashBalanceOutput.parse(await remoteCall(cfg.serverAddress, 'reports.cashBalance', {
+                from: (parsed as any).from,
+                to: parsed.to,
+                sphere: parsed.sphere
+            }))
+        }
+
         const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any })
         return ReportsCashBalanceOutput.parse(res)
     })
 
     // Distinct voucher years
     ipcMain.handle('reports.years', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsYearsOutput.parse(await remoteCall(cfg.serverAddress, 'reports.years', {}))
+        }
+
         const years = listVoucherYears()
         return ReportsYearsOutput.parse({ years })
     })
@@ -593,6 +671,14 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('vouchers.list', async (_e, payload) => {
         const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return await remoteCall(cfg.serverAddress, 'vouchers.list', parsed)
+        }
+
         const { rows, total } = listVouchersAdvancedPaged({
             limit: parsed.limit,
             offset: parsed.offset ?? 0,
@@ -619,6 +705,14 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('vouchers.update', async (_e, payload) => {
         const parsed = VoucherUpdateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VoucherUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.update', parsed))
+        }
+
         const res = updateVoucher(parsed as any)
         // Handle multiple budget/earmark assignments if provided
         if (parsed.budgets !== undefined) {
@@ -632,32 +726,81 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('vouchers.delete', async (_e, payload) => {
         const parsed = VoucherDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VoucherDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.delete', parsed))
+        }
+
         const res = deleteVoucher(parsed.id)
         return VoucherDeleteOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignEarmark', async (_e, payload) => {
         const parsed = VouchersBatchAssignEarmarkInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersBatchAssignEarmarkOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignEarmark', parsed))
+        }
+
         const res = batchAssignEarmark(parsed as any)
         return VouchersBatchAssignEarmarkOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignBudget', async (_e, payload) => {
         const parsed = VouchersBatchAssignBudgetInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersBatchAssignBudgetOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignBudget', parsed))
+        }
+
         const res = batchAssignBudget(parsed as any)
         return VouchersBatchAssignBudgetOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignTags', async (_e, payload) => {
         const parsed = VouchersBatchAssignTagsInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersBatchAssignTagsOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignTags', parsed))
+        }
+
         const res = batchAssignTags(parsed as any)
         return VouchersBatchAssignTagsOutput.parse(res)
     })
     // Recent vouchers (simple list)
     ipcMain.handle('vouchers.recent', async (_e, payload) => {
         const parsed = VouchersRecentInput.parse(payload) ?? { limit: 10 }
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const res = await remoteCall(cfg.serverAddress, 'vouchers.list', { limit: parsed.limit, offset: 0, sort: 'DESC' })
+            return VouchersRecentOutput.parse({ rows: res?.rows || [] })
+        }
+
         const rows = listRecentVouchers(parsed.limit)
         return VouchersRecentOutput.parse({ rows })
     })
     ipcMain.handle('vouchers.clearAll', async (_e, payload) => {
         const parsed = VouchersClearAllInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersClearAllOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.clearAll', parsed))
+        }
+
         if (!parsed.confirm) throw new Error('Nicht bestätigt')
         // Safety: backup before destructive action
         try { await backup.makeBackup('preClearAll') } catch { /* ignore */ }
@@ -668,21 +811,53 @@ export function registerIpcHandlers() {
     // Zweckbindungen (bindings)
     ipcMain.handle('bindings.list', async (_e, payload) => {
         const parsed = BindingListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BindingListOutput.parse(await remoteCall(cfg.serverAddress, 'bindings.list', parsed ?? {}))
+        }
+
         const rows = listBindings(parsed ?? undefined)
         return BindingListOutput.parse({ rows })
     })
     ipcMain.handle('bindings.upsert', async (_e, payload) => {
         const parsed = BindingUpsertInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BindingUpsertOutput.parse(await remoteCall(cfg.serverAddress, 'bindings.upsert', parsed))
+        }
+
         const res = upsertBinding(parsed as any)
         return BindingUpsertOutput.parse({ id: res.id })
     })
     ipcMain.handle('bindings.delete', async (_e, payload) => {
         const parsed = BindingDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BindingDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'bindings.delete', parsed))
+        }
+
         const res = deleteBinding(parsed.id)
         return BindingDeleteOutput.parse(res)
     })
     ipcMain.handle('bindings.usage', async (_e, payload) => {
         const parsed = BindingUsageInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BindingUsageOutput.parse(await remoteCall(cfg.serverAddress, 'bindings.usage', parsed))
+        }
+
         const res = bindingUsage(parsed.earmarkId, { from: parsed.from, to: parsed.to, sphere: parsed.sphere as any })
         return BindingUsageOutput.parse(res)
     })
@@ -690,21 +865,53 @@ export function registerIpcHandlers() {
     // Budgets
     ipcMain.handle('budgets.upsert', async (_e, payload) => {
         const parsed = BudgetUpsertInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetUpsertOutput.parse(await remoteCall(cfg.serverAddress, 'budgets.upsert', parsed))
+        }
+
         const res = upsertBudget(parsed as any)
         return BudgetUpsertOutput.parse({ id: res.id })
     })
     ipcMain.handle('budgets.list', async (_e, payload) => {
         const parsed = BudgetListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetListOutput.parse(await remoteCall(cfg.serverAddress, 'budgets.list', parsed ?? {}))
+        }
+
         const rows = listBudgets(parsed ?? {})
         return BudgetListOutput.parse({ rows })
     })
     ipcMain.handle('budgets.delete', async (_e, payload) => {
         const parsed = BudgetDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'budgets.delete', parsed))
+        }
+
         const res = deleteBudget(parsed.id)
         return BudgetDeleteOutput.parse(res)
     })
     ipcMain.handle('budgets.usage', async (_e, payload) => {
         const parsed = BudgetUsageInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetUsageOutput.parse(await remoteCall(cfg.serverAddress, 'budgets.usage', parsed))
+        }
+
         const res = budgetUsage({ budgetId: parsed.budgetId, from: parsed.from, to: parsed.to })
         return BudgetUsageOutput.parse(res)
     })
@@ -744,6 +951,12 @@ export function registerIpcHandlers() {
     // Attachments
     ipcMain.handle('attachments.list', async (_e, payload) => {
         const parsed = AttachmentsListInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return AttachmentsListOutput.parse(await remoteCall(cfg.serverAddress, 'attachments.list', parsed))
+        }
         const files = listFilesForVoucher(parsed.voucherId)
         return AttachmentsListOutput.parse({
             files: files.map(f => ({ id: f.id, fileName: f.fileName, mimeType: f.mimeType ?? null, size: f.size ?? null, createdAt: f.createdAt }))
@@ -751,6 +964,22 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('attachments.open', async (_e, payload) => {
         const parsed = AttachmentOpenInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const r = await remoteCall(cfg.serverAddress, 'attachments.read', { fileId: parsed.fileId })
+            const ext = path.extname(r?.fileName || '') || '.bin'
+            const tmpDir = path.join(os.tmpdir(), 'BudgetO')
+            try { fs.mkdirSync(tmpDir, { recursive: true }) } catch { }
+            const tmpPath = path.join(tmpDir, `budgeto_${parsed.fileId}_${Date.now()}${ext}`)
+            fs.writeFileSync(tmpPath, Buffer.from(String(r?.dataBase64 || ''), 'base64'))
+            const res = await shell.openPath(tmpPath)
+            const ok = !res
+            return AttachmentOpenOutput.parse({ ok })
+        }
+
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
         const pathBase = path.basename(f.filePath || '')
@@ -762,6 +991,18 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('attachments.saveAs', async (_e, payload) => {
         const parsed = AttachmentSaveAsInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const r = await remoteCall(cfg.serverAddress, 'attachments.read', { fileId: parsed.fileId })
+            const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: r?.fileName || 'download.bin' })
+            if (save.canceled || !save.filePath) throw new Error('Abbruch')
+            fs.writeFileSync(save.filePath, Buffer.from(String(r?.dataBase64 || ''), 'base64'))
+            return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
+        }
+
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
         const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
@@ -778,6 +1019,14 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('attachments.read', async (_e, payload) => {
         const parsed = AttachmentReadInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return AttachmentReadOutput.parse(await remoteCall(cfg.serverAddress, 'attachments.read', { fileId: parsed.fileId }))
+        }
+
         const f = getFileById(parsed.fileId)
         if (!f) throw new Error('Datei nicht gefunden')
         const pathBase = path.basename(f.filePath || '')
@@ -793,11 +1042,27 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('attachments.add', async (_e, payload) => {
         const parsed = AttachmentAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return AttachmentAddOutput.parse(await remoteCall(cfg.serverAddress, 'attachments.add', parsed))
+        }
+
         const res = addFileToVoucher(parsed.voucherId, parsed.fileName, parsed.dataBase64, parsed.mimeType)
         return AttachmentAddOutput.parse(res)
     })
     ipcMain.handle('attachments.delete', async (_e, payload) => {
         const parsed = AttachmentDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return AttachmentDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'attachments.delete', parsed))
+        }
+
         const res = deleteVoucherFile(parsed.fileId)
         return AttachmentDeleteOutput.parse(res)
     })
@@ -1017,16 +1282,40 @@ export function registerIpcHandlers() {
     // Tags CRUD
     ipcMain.handle('tags.list', async (_e, payload) => {
         const parsed = TagsListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return TagsListOutput.parse(await remoteCall(cfg.serverAddress, 'tags.list', parsed ?? {}))
+        }
+
         const rows = listTags(parsed ?? undefined) as any
         return TagsListOutput.parse({ rows })
     })
     ipcMain.handle('tags.upsert', async (_e, payload) => {
         const parsed = TagUpsertInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return TagUpsertOutput.parse(await remoteCall(cfg.serverAddress, 'tags.upsert', parsed))
+        }
+
         const res = upsertTag(parsed)
         return TagUpsertOutput.parse({ id: res.id })
     })
     ipcMain.handle('tags.delete', async (_e, payload) => {
         const parsed = TagDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return TagDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'tags.delete', parsed))
+        }
+
         const res = deleteTag(parsed.id)
         return TagDeleteOutput.parse(res)
     })
@@ -1443,6 +1732,13 @@ export function registerIpcHandlers() {
     // BudgetO: Module System
     // =========================================================================
     ipcMain.handle('modules.list', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'modules.list', {})
+        }
+
         const { listModules, MODULE_DEFINITIONS } = await import('../repositories/modules')
         const configs = listModules()
         // Merge definitions with configs
@@ -1459,16 +1755,37 @@ export function registerIpcHandlers() {
     })
 
     ipcMain.handle('modules.setEnabled', async (_e, payload: { moduleKey: string; enabled: boolean }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'modules.setEnabled', payload)
+        }
+
         const { setModuleEnabled } = await import('../repositories/modules')
         return setModuleEnabled(payload.moduleKey as any, payload.enabled)
     })
 
     ipcMain.handle('modules.setConfig', async (_e, payload: { moduleKey: string; configJson: string | null }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'modules.setConfig', payload)
+        }
+
         const { setModuleConfig } = await import('../repositories/modules')
         return setModuleConfig(payload.moduleKey as any, payload.configJson)
     })
 
     ipcMain.handle('modules.getEnabled', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'modules.getEnabled', {})
+        }
+
         const { getEnabledModules } = await import('../repositories/modules')
         return { enabledModules: getEnabledModules() }
     })
@@ -1478,46 +1795,144 @@ export function registerIpcHandlers() {
     // =========================================================================
     
     ipcMain.handle('auth.login', async (_e, payload: { username: string; password: string }) => {
+        const { getServerConfig, remoteCall, setClientAuthToken } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const res = await remoteCall(cfg.serverAddress, 'auth.login', payload)
+            const token = typeof (res as any)?.token === 'string' ? (res as any).token : null
+            setClientAuthToken(token)
+            return res
+        }
+
         const { login } = await import('../repositories/users')
         return login(payload.username, payload.password)
     })
 
     ipcMain.handle('auth.isRequired', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'auth.isRequired', {})
+        }
+
         const { isAuthRequired } = await import('../repositories/users')
         return { required: isAuthRequired() }
     })
 
+    ipcMain.handle('auth.logout', async () => {
+        const { getServerConfig, remoteCall, setClientAuthToken } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            try {
+                await remoteCall(cfg.serverAddress, 'auth.logout', {})
+            } finally {
+                setClientAuthToken(null)
+            }
+            return { ok: true }
+        }
+
+        return { ok: true }
+    })
+
     ipcMain.handle('auth.setInitialPassword', async (_e, payload: { userId: number; password: string }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'auth.setInitialPassword', payload)
+        }
+
         const { setInitialPassword } = await import('../repositories/users')
         return setInitialPassword(payload.userId, payload.password)
     })
 
     ipcMain.handle('auth.changePassword', async (_e, payload: { userId: number; currentPassword: string; newPassword: string }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'auth.changePassword', payload)
+        }
+
         const { changePassword } = await import('../repositories/users')
         return changePassword(payload.userId, payload.currentPassword, payload.newPassword)
     })
 
+    ipcMain.handle('auth.clearPassword', async (_e, payload: { userId: number; currentPassword: string }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'auth.clearPassword', payload)
+        }
+
+        if (cfg.mode === 'server') {
+            throw new Error('Passwort kann im Server-Modus nicht entfernt werden')
+        }
+
+        const { clearPassword } = await import('../repositories/users')
+        return clearPassword(payload.userId, payload.currentPassword)
+    })
+
     ipcMain.handle('users.list', async (_e, payload?: { includeInactive?: boolean }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'users.list', payload ?? {})
+        }
+
         const { listUsers } = await import('../repositories/users')
         return { users: listUsers(payload) }
     })
 
     ipcMain.handle('users.get', async (_e, payload: { id: number }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'users.get', payload)
+        }
+
         const { getUserById } = await import('../repositories/users')
         return { user: getUserById(payload.id) }
     })
 
     ipcMain.handle('users.create', async (_e, payload: { name: string; username: string; password: string; email?: string; role: string }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'users.create', payload)
+        }
+
         const { createUser } = await import('../repositories/users')
         return { user: createUser(payload as any) }
     })
 
     ipcMain.handle('users.update', async (_e, payload: { id: number; name?: string; username?: string; password?: string; email?: string; role?: string; isActive?: boolean }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'users.update', payload)
+        }
+
         const { updateUser } = await import('../repositories/users')
         return { user: updateUser(payload as any) }
     })
 
     ipcMain.handle('users.delete', async (_e, payload: { id: number }) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'users.delete', payload)
+        }
+
         const { deleteUser } = await import('../repositories/users')
         return deleteUser(payload.id)
     })
@@ -1590,64 +2005,128 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('instructors.list', async (_e, payload) => {
         const { InstructorsListInput, InstructorsListOutput } = await import('./schemas')
-        const { listInstructors } = await import('../repositories/instructors')
         const parsed = InstructorsListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorsListOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.list', parsed || {}))
+        }
+
+        const { listInstructors } = await import('../repositories/instructors')
         const res = listInstructors(parsed || {})
         return InstructorsListOutput.parse(res)
     })
     
     ipcMain.handle('instructors.get', async (_e, payload) => {
         const { InstructorGetInput, InstructorGetOutput } = await import('./schemas')
-        const { getInstructorById } = await import('../repositories/instructors')
         const parsed = InstructorGetInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorGetOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.get', parsed))
+        }
+
+        const { getInstructorById } = await import('../repositories/instructors')
         const res = getInstructorById(parsed.id)
         return InstructorGetOutput.parse(res)
     })
     
     ipcMain.handle('instructors.create', async (_e, payload) => {
         const { InstructorCreateInput, InstructorCreateOutput } = await import('./schemas')
-        const { createInstructor } = await import('../repositories/instructors')
         const parsed = InstructorCreateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorCreateOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.create', parsed))
+        }
+
+        const { createInstructor } = await import('../repositories/instructors')
         const res = createInstructor(parsed)
         return InstructorCreateOutput.parse(res)
     })
     
     ipcMain.handle('instructors.update', async (_e, payload) => {
         const { InstructorUpdateInput, InstructorUpdateOutput } = await import('./schemas')
-        const { updateInstructor } = await import('../repositories/instructors')
         const parsed = InstructorUpdateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.update', parsed))
+        }
+
+        const { updateInstructor } = await import('../repositories/instructors')
         const res = updateInstructor(parsed)
         return InstructorUpdateOutput.parse(res)
     })
     
     ipcMain.handle('instructors.delete', async (_e, payload) => {
         const { InstructorDeleteInput, InstructorDeleteOutput } = await import('./schemas')
-        const { deleteInstructor } = await import('../repositories/instructors')
         const parsed = InstructorDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.delete', parsed))
+        }
+
+        const { deleteInstructor } = await import('../repositories/instructors')
         const res = deleteInstructor(parsed.id)
         return InstructorDeleteOutput.parse(res)
     })
     
     ipcMain.handle('instructors.contracts.add', async (_e, payload) => {
         const { InstructorContractAddInput, InstructorContractAddOutput } = await import('./schemas')
-        const { addContract } = await import('../repositories/instructors')
         const parsed = InstructorContractAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorContractAddOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.contracts.add', parsed))
+        }
+
+        const { addContract } = await import('../repositories/instructors')
         const res = addContract(parsed)
         return InstructorContractAddOutput.parse(res)
     })
     
     ipcMain.handle('instructors.contracts.delete', async (_e, payload) => {
         const { InstructorContractDeleteInput, InstructorContractDeleteOutput } = await import('./schemas')
-        const { deleteContract } = await import('../repositories/instructors')
         const parsed = InstructorContractDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorContractDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.contracts.delete', parsed))
+        }
+
+        const { deleteContract } = await import('../repositories/instructors')
         const res = deleteContract(parsed.contractId)
         return InstructorContractDeleteOutput.parse(res)
     })
     
     ipcMain.handle('instructors.contracts.read', async (_e, payload) => {
         const { InstructorContractReadInput, InstructorContractReadOutput } = await import('./schemas')
-        const { getContractFile } = await import('../repositories/instructors')
         const parsed = InstructorContractReadInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorContractReadOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.contracts.read', parsed))
+        }
+
+        const { getContractFile } = await import('../repositories/instructors')
         const file = getContractFile(parsed.contractId)
         if (!file) throw new Error('Vertrag nicht gefunden')
         let src = file.filePath
@@ -1663,8 +2142,23 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('instructors.contracts.open', async (_e, payload) => {
         const { InstructorContractReadInput } = await import('./schemas')
-        const { getContractFile } = await import('../repositories/instructors')
         const parsed = InstructorContractReadInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const r = await remoteCall(cfg.serverAddress, 'instructors.contracts.read', parsed)
+            const ext = path.extname(r?.fileName || '') || '.bin'
+            const tmpDir = path.join(os.tmpdir(), 'BudgetO')
+            try { fs.mkdirSync(tmpDir, { recursive: true }) } catch { }
+            const tmpPath = path.join(tmpDir, `budgeto_instructor_contract_${parsed.contractId}_${Date.now()}${ext}`)
+            fs.writeFileSync(tmpPath, Buffer.from(String(r?.dataBase64 || ''), 'base64'))
+            const res = await shell.openPath(tmpPath)
+            return { ok: !res }
+        }
+
+        const { getContractFile } = await import('../repositories/instructors')
         const file = getContractFile(parsed.contractId)
         if (!file) throw new Error('Vertrag nicht gefunden')
         let src = file.filePath
@@ -1679,23 +2173,55 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('instructors.invoices.add', async (_e, payload) => {
         const { InstructorInvoiceAddInput, InstructorInvoiceAddOutput } = await import('./schemas')
-        const { addInstructorInvoice } = await import('../repositories/instructors')
         const parsed = InstructorInvoiceAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorInvoiceAddOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.invoices.add', parsed))
+        }
+
+        const { addInstructorInvoice } = await import('../repositories/instructors')
         const res = addInstructorInvoice(parsed)
         return InstructorInvoiceAddOutput.parse(res)
     })
     
     ipcMain.handle('instructors.invoices.delete', async (_e, payload) => {
         const { InstructorInvoiceDeleteInput, InstructorInvoiceDeleteOutput } = await import('./schemas')
-        const { deleteInstructorInvoice } = await import('../repositories/instructors')
         const parsed = InstructorInvoiceDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorInvoiceDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.invoices.delete', parsed))
+        }
+
+        const { deleteInstructorInvoice } = await import('../repositories/instructors')
         const res = deleteInstructorInvoice(parsed.invoiceId)
         return InstructorInvoiceDeleteOutput.parse(res)
     })
     
     ipcMain.handle('instructors.invoices.open', async (_e, payload) => {
+        const invoiceId = Number((payload as any)?.invoiceId)
+        if (!Number.isFinite(invoiceId) || invoiceId <= 0) throw new Error('Ungültige invoiceId')
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const r = await remoteCall(cfg.serverAddress, 'instructors.invoices.read', { invoiceId })
+            const ext = path.extname(r?.fileName || '') || '.bin'
+            const tmpDir = path.join(os.tmpdir(), 'BudgetO')
+            try { fs.mkdirSync(tmpDir, { recursive: true }) } catch { }
+            const tmpPath = path.join(tmpDir, `budgeto_instructor_invoice_${invoiceId}_${Date.now()}${ext}`)
+            fs.writeFileSync(tmpPath, Buffer.from(String(r?.dataBase64 || ''), 'base64'))
+            const res = await shell.openPath(tmpPath)
+            return { ok: !res }
+        }
+
         const { getInvoiceFile } = await import('../repositories/instructors')
-        const { invoiceId } = payload
         const file = getInvoiceFile(invoiceId)
         if (!file) throw new Error('Rechnungsdatei nicht gefunden')
         const src = file.filePath
@@ -1706,8 +2232,16 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('instructors.yearlySummary', async (_e, payload) => {
         const { InstructorYearlySummaryInput, InstructorYearlySummaryOutput } = await import('./schemas')
-        const { getInstructorYearlySummary } = await import('../repositories/instructors')
         const parsed = InstructorYearlySummaryInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return InstructorYearlySummaryOutput.parse(await remoteCall(cfg.serverAddress, 'instructors.yearlySummary', parsed))
+        }
+
+        const { getInstructorYearlySummary } = await import('../repositories/instructors')
         const res = getInstructorYearlySummary(parsed.instructorId, parsed.year)
         return InstructorYearlySummaryOutput.parse(res)
     })
@@ -1717,36 +2251,76 @@ export function registerIpcHandlers() {
     // ─────────────────────────────────────────────────────────────────────────
 
     ipcMain.handle('annualBudgets.get', async (_e, payload) => {
-        const { getAnnualBudget } = await import('../repositories/annualBudgets')
         const { year, costCenterId } = payload || {}
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'annualBudgets.get', { year, costCenterId })
+        }
+
+        const { getAnnualBudget } = await import('../repositories/annualBudgets')
         const res = getAnnualBudget({ year, costCenterId })
         return res
     })
 
     ipcMain.handle('annualBudgets.list', async (_e, payload) => {
-        const { listAnnualBudgets } = await import('../repositories/annualBudgets')
         const { year } = payload || {}
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'annualBudgets.list', { year })
+        }
+
+        const { listAnnualBudgets } = await import('../repositories/annualBudgets')
         const res = listAnnualBudgets({ year })
         return { budgets: res }
     })
 
     ipcMain.handle('annualBudgets.upsert', async (_e, payload) => {
-        const { upsertAnnualBudget } = await import('../repositories/annualBudgets')
         const { year, amount, costCenterId, description } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'annualBudgets.upsert', { year, amount, costCenterId, description })
+        }
+
+        const { upsertAnnualBudget } = await import('../repositories/annualBudgets')
         const res = upsertAnnualBudget({ year, amount, costCenterId, description })
         return res
     })
 
     ipcMain.handle('annualBudgets.delete', async (_e, payload) => {
-        const { deleteAnnualBudget } = await import('../repositories/annualBudgets')
         const { id } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'annualBudgets.delete', { id })
+        }
+
+        const { deleteAnnualBudget } = await import('../repositories/annualBudgets')
         const res = deleteAnnualBudget(id)
         return res
     })
 
     ipcMain.handle('annualBudgets.usage', async (_e, payload) => {
-        const { getAnnualBudgetUsage } = await import('../repositories/annualBudgets')
         const { year, costCenterId } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'annualBudgets.usage', { year, costCenterId })
+        }
+
+        const { getAnnualBudgetUsage } = await import('../repositories/annualBudgets')
         const res = getAnnualBudgetUsage({ year, costCenterId })
         return res
     })
@@ -1756,50 +2330,106 @@ export function registerIpcHandlers() {
     // ─────────────────────────────────────────────────────────────────────────
 
     ipcMain.handle('customCategories.list', async (_e, payload) => {
-        const { listCustomCategories } = await import('../repositories/customCategories')
         const { includeInactive, includeUsage } = payload || {}
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.list', { includeInactive, includeUsage })
+        }
+
+        const { listCustomCategories } = await import('../repositories/customCategories')
         const categories = listCustomCategories({ includeInactive, includeUsage })
         return { categories }
     })
 
     ipcMain.handle('customCategories.get', async (_e, payload) => {
-        const { getCustomCategory } = await import('../repositories/customCategories')
         const { id } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.get', { id })
+        }
+
+        const { getCustomCategory } = await import('../repositories/customCategories')
         const category = getCustomCategory(id)
         return { category }
     })
 
     ipcMain.handle('customCategories.create', async (_e, payload) => {
-        const { createCustomCategory } = await import('../repositories/customCategories')
         const { name, color, description, sortOrder } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.create', { name, color, description, sortOrder })
+        }
+
+        const { createCustomCategory } = await import('../repositories/customCategories')
         const res = createCustomCategory({ name, color, description, sortOrder })
         return res
     })
 
     ipcMain.handle('customCategories.update', async (_e, payload) => {
-        const { updateCustomCategory } = await import('../repositories/customCategories')
         const { id, name, color, description, sortOrder, isActive } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.update', { id, name, color, description, sortOrder, isActive })
+        }
+
+        const { updateCustomCategory } = await import('../repositories/customCategories')
         const res = updateCustomCategory({ id, name, color, description, sortOrder, isActive })
         return res
     })
 
     ipcMain.handle('customCategories.delete', async (_e, payload) => {
-        const { deleteCustomCategory } = await import('../repositories/customCategories')
         const { id } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.delete', { id })
+        }
+
+        const { deleteCustomCategory } = await import('../repositories/customCategories')
         const res = deleteCustomCategory(id)
         return res
     })
 
     ipcMain.handle('customCategories.usageCount', async (_e, payload) => {
-        const { getCategoryUsageCount } = await import('../repositories/customCategories')
         const { id } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.usageCount', { id })
+        }
+
+        const { getCategoryUsageCount } = await import('../repositories/customCategories')
         const count = getCategoryUsageCount(id)
         return { count }
     })
 
     ipcMain.handle('customCategories.reorder', async (_e, payload) => {
-        const { reorderCustomCategories } = await import('../repositories/customCategories')
         const { orderedIds } = payload
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'customCategories.reorder', { orderedIds })
+        }
+
+        const { reorderCustomCategories } = await import('../repositories/customCategories')
         const res = reorderCustomCategories(orderedIds)
         return res
     })
@@ -1810,45 +2440,92 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('cashAdvances.list', async (_e, payload) => {
         const { CashAdvancesListInput, CashAdvancesListOutput } = await import('./schemas')
-        const { listCashAdvances } = await import('../repositories/cashAdvances')
         const parsed = CashAdvancesListInput.parse(payload || {})
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvancesListOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.list', parsed))
+        }
+
+        const { listCashAdvances } = await import('../repositories/cashAdvances')
         const res = listCashAdvances(parsed)
         return CashAdvancesListOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.getById', async (_e, payload) => {
         const { CashAdvanceGetByIdInput, CashAdvanceGetByIdOutput } = await import('./schemas')
-        const { getCashAdvanceById } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceGetByIdInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceGetByIdOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.getById', parsed))
+        }
+
+        const { getCashAdvanceById } = await import('../repositories/cashAdvances')
         const res = getCashAdvanceById(parsed.id)
         return CashAdvanceGetByIdOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.create', async (_e, payload) => {
         const { CashAdvanceCreateInput, CashAdvanceCreateOutput } = await import('./schemas')
-        const { createCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceCreateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceCreateOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.create', parsed))
+        }
+
+        const { createCashAdvance } = await import('../repositories/cashAdvances')
         const res = createCashAdvance(parsed)
         return CashAdvanceCreateOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.update', async (_e, payload) => {
         const { CashAdvanceUpdateInput, CashAdvanceUpdateOutput } = await import('./schemas')
-        const { updateCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceUpdateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.update', parsed))
+        }
+
+        const { updateCashAdvance } = await import('../repositories/cashAdvances')
         const res = updateCashAdvance(parsed)
         return CashAdvanceUpdateOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.delete', async (_e, payload) => {
         const { CashAdvanceDeleteInput, CashAdvanceDeleteOutput } = await import('./schemas')
-        const { deleteCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.delete', parsed))
+        }
+
+        const { deleteCashAdvance } = await import('../repositories/cashAdvances')
         const res = deleteCashAdvance(parsed.id)
         return CashAdvanceDeleteOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.nextOrderNumber', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'cashAdvances.nextOrderNumber', {})
+        }
+
         const { getNextOrderNumber } = await import('../repositories/cashAdvances')
         const orderNumber = getNextOrderNumber()
         return { orderNumber }
@@ -1856,6 +2533,13 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('cashAdvances.stats', async () => {
         const { CashAdvanceStatsOutput } = await import('./schemas')
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceStatsOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.stats', {}))
+        }
+
         const { getCashAdvanceStats } = await import('../repositories/cashAdvances')
         const res = getCashAdvanceStats()
         return CashAdvanceStatsOutput.parse(res)
@@ -1864,24 +2548,48 @@ export function registerIpcHandlers() {
     // Partial cash advances
     ipcMain.handle('cashAdvances.partials.add', async (_e, payload) => {
         const { PartialCashAdvanceAddInput, PartialCashAdvanceAddOutput } = await import('./schemas')
-        const { addPartialCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = PartialCashAdvanceAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return PartialCashAdvanceAddOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.partials.add', parsed))
+        }
+
+        const { addPartialCashAdvance } = await import('../repositories/cashAdvances')
         const res = addPartialCashAdvance(parsed)
         return PartialCashAdvanceAddOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.partials.settle', async (_e, payload) => {
         const { PartialCashAdvanceSettleInput, PartialCashAdvanceSettleOutput } = await import('./schemas')
-        const { settlePartialCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = PartialCashAdvanceSettleInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return PartialCashAdvanceSettleOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.partials.settle', parsed))
+        }
+
+        const { settlePartialCashAdvance } = await import('../repositories/cashAdvances')
         const res = settlePartialCashAdvance(parsed)
         return PartialCashAdvanceSettleOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.partials.delete', async (_e, payload) => {
         const { PartialCashAdvanceDeleteInput, PartialCashAdvanceDeleteOutput } = await import('./schemas')
-        const { deletePartialCashAdvance } = await import('../repositories/cashAdvances')
         const parsed = PartialCashAdvanceDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return PartialCashAdvanceDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.partials.delete', parsed))
+        }
+
+        const { deletePartialCashAdvance } = await import('../repositories/cashAdvances')
         const res = deletePartialCashAdvance(parsed.id)
         return PartialCashAdvanceDeleteOutput.parse(res)
     })
@@ -1889,24 +2597,55 @@ export function registerIpcHandlers() {
     // Settlements
     ipcMain.handle('cashAdvances.settlements.add', async (_e, payload) => {
         const { CashAdvanceSettlementAddInput, CashAdvanceSettlementAddOutput } = await import('./schemas')
-        const { addSettlement } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceSettlementAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceSettlementAddOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.settlements.add', parsed))
+        }
+
+        const { addSettlement } = await import('../repositories/cashAdvances')
         const res = addSettlement(parsed)
         return CashAdvanceSettlementAddOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.settlements.delete', async (_e, payload) => {
         const { CashAdvanceSettlementDeleteInput, CashAdvanceSettlementDeleteOutput } = await import('./schemas')
-        const { deleteSettlement } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceSettlementDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceSettlementDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.settlements.delete', parsed))
+        }
+
+        const { deleteSettlement } = await import('../repositories/cashAdvances')
         const res = deleteSettlement(parsed.id)
         return CashAdvanceSettlementDeleteOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.settlements.open', async (_e, payload) => {
         const { CashAdvanceSettlementOpenInput } = await import('./schemas')
-        const { getSettlementFile } = await import('../repositories/cashAdvances')
         const parsed = CashAdvanceSettlementOpenInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            const r = await remoteCall(cfg.serverAddress, 'cashAdvances.settlements.read', { id: parsed.id })
+            const ext = path.extname(r?.fileName || '') || '.bin'
+            const tmpDir = path.join(os.tmpdir(), 'BudgetO')
+            try { fs.mkdirSync(tmpDir, { recursive: true }) } catch { }
+            const tmpPath = path.join(tmpDir, `budgeto_cashadvance_settlement_${parsed.id}_${Date.now()}${ext}`)
+            fs.writeFileSync(tmpPath, Buffer.from(String(r?.dataBase64 || ''), 'base64'))
+            const res = await shell.openPath(tmpPath)
+            return { ok: !res }
+        }
+
+        const { getSettlementFile } = await import('../repositories/cashAdvances')
         const file = getSettlementFile(parsed.id)
         if (!file) throw new Error('Beleg nicht gefunden')
         const src = file.filePath

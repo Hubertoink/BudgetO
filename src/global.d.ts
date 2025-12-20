@@ -200,6 +200,14 @@ declare global {
                 openPath: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
                 openExternal: (url: string) => Promise<{ ok: boolean; error?: string | null }>
             }
+            auth: {
+                login: (payload: { username: string; password: string }) => Promise<{ success: boolean; user?: any; error?: string; token?: string }>
+                isRequired: () => Promise<{ required: boolean }>
+                logout: () => Promise<any>
+                setInitialPassword: (payload: { userId: number; password: string }) => Promise<{ success: boolean }>
+                changePassword: (payload: { userId: number; currentPassword: string; newPassword: string }) => Promise<{ success: boolean; error?: string }>
+                clearPassword: (payload: { userId: number; currentPassword: string }) => Promise<{ success: boolean; error?: string }>
+            }
             server: {
                 getConfig: () => Promise<{ mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }>
                 setConfig: (config: { mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }) => Promise<{ ok: boolean }>

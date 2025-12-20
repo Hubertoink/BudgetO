@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth, UserRole } from '../../../context/AuthContext'
 
 interface User {
@@ -35,6 +36,10 @@ export function UsersPane({ notify }: UsersPaneProps) {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [authRequired, setAuthRequired] = useState(false)
+
+  const PROJECT_SCOPE_ACK_KEY = 'budgeto_project_scope_ack_v1'
+  const [showProjectScope, setShowProjectScope] = useState(false)
+  const [pendingAddAfterScope, setPendingAddAfterScope] = useState(false)
   
   // Edit/Add modal state
   const [editUser, setEditUser] = useState<User | null>(null)
@@ -48,6 +53,14 @@ export function UsersPane({ notify }: UsersPaneProps) {
     confirmPassword: ''
   })
   const [saving, setSaving] = useState(false)
+
+  // Password modal state (separate from edit form)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordUser, setPasswordUser] = useState<User | null>(null)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [serverStatus, setServerStatus] = useState<any>(null)
+  const [showRemovePasswordConfirm, setShowRemovePasswordConfirm] = useState(false)
 
   const loadUsers = useCallback(async () => {
     try {
@@ -68,7 +81,7 @@ export function UsersPane({ notify }: UsersPaneProps) {
     loadUsers()
   }, [loadUsers])
 
-  const handleAdd = () => {
+  const startAddFlow = () => {
     setIsAddMode(true)
     setEditUser(null)
     setFormData({
@@ -79,6 +92,21 @@ export function UsersPane({ notify }: UsersPaneProps) {
       password: '',
       confirmPassword: ''
     })
+  }
+
+  const handleAdd = () => {
+    // Explain multi-user/auth implications once before creating users.
+    try {
+      const ack = localStorage.getItem(PROJECT_SCOPE_ACK_KEY)
+      if (!ack) {
+        setPendingAddAfterScope(true)
+        setShowProjectScope(true)
+        return
+      }
+    } catch {
+      // ignore storage issues
+    }
+    startAddFlow()
   }
 
   const handleEdit = (user: User) => {
@@ -99,18 +127,136 @@ export function UsersPane({ notify }: UsersPaneProps) {
     setIsAddMode(false)
   }
 
+  const openPasswordModal = async (user: User) => {
+    setPasswordUser(user)
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
+    setShowRemovePasswordConfirm(false)
+    try {
+      const st = await (window as any).api?.server?.getStatus?.()
+      setServerStatus(st)
+    } catch {
+      setServerStatus(null)
+    }
+    setShowPasswordModal(true)
+  }
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false)
+    setShowRemovePasswordConfirm(false)
+    setPasswordUser(null)
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
+    setPasswordSaving(false)
+  }
+
+  const handlePasswordSave = async () => {
+    if (!passwordUser) return
+
+    const isSelf = passwordUser.id === currentUser?.id
+    const isAdminReset = !isSelf
+
+    if (!passwordForm.newPassword) {
+      notify('error', 'Neues Passwort ist erforderlich')
+      return
+    }
+    if (passwordForm.newPassword.length < 6) {
+      notify('error', 'Passwort muss mindestens 6 Zeichen haben')
+      return
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      notify('error', 'Passwörter stimmen nicht überein')
+      return
+    }
+    if (isSelf && authRequired && !passwordForm.currentPassword) {
+      notify('error', 'Aktuelles Passwort ist erforderlich')
+      return
+    }
+
+    setPasswordSaving(true)
+    try {
+      if (isAdminReset) {
+        await (window as any).api?.auth?.setInitialPassword?.({
+          userId: passwordUser.id,
+          password: passwordForm.newPassword
+        })
+      } else {
+        const res = await (window as any).api?.auth?.changePassword?.({
+          userId: passwordUser.id,
+          currentPassword: passwordForm.currentPassword || '',
+          newPassword: passwordForm.newPassword
+        })
+        if (res?.success === false) {
+          throw new Error(res?.error || 'Fehler beim Ändern des Passworts')
+        }
+      }
+
+      notify('success', 'Passwort geändert')
+      await loadUsers()
+      if (isSelf) await refreshUser()
+      closePasswordModal()
+    } catch (e: any) {
+      notify('error', e?.message || 'Fehler beim Speichern')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
+  const handlePasswordRemove = async () => {
+    if (!passwordUser) return
+    const isSelf = passwordUser.id === currentUser?.id
+    if (!isSelf) return
+
+    const mode = (serverStatus as any)?.mode
+    if (mode !== 'local') {
+      notify('error', 'Passwort kann nur im Lokal-Modus entfernt werden')
+      return
+    }
+
+    if (authRequired && !passwordForm.currentPassword) {
+      notify('error', 'Aktuelles Passwort ist erforderlich')
+      return
+    }
+
+    setShowRemovePasswordConfirm(true)
+  }
+
+  const performPasswordRemove = async () => {
+    if (!passwordUser) return
+    const isSelf = passwordUser.id === currentUser?.id
+    if (!isSelf) return
+
+    setPasswordSaving(true)
+    try {
+      const res = await (window as any).api?.auth?.clearPassword?.({
+        userId: passwordUser.id,
+        currentPassword: passwordForm.currentPassword || ''
+      })
+      if (res?.success === false) {
+        throw new Error(res?.error || 'Fehler beim Entfernen des Passworts')
+      }
+      notify('success', 'Passwort entfernt')
+      await loadUsers()
+      await refreshUser()
+      setShowRemovePasswordConfirm(false)
+      closePasswordModal()
+    } catch (e: any) {
+      notify('error', e?.message || 'Fehler beim Entfernen')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
   const handleSave = async () => {
     // Validation
     if (!formData.name.trim()) {
       notify('error', 'Name ist erforderlich')
       return
     }
-    if (isAddMode || formData.password) {
+    if (isAddMode) {
       if (!formData.username.trim()) {
         notify('error', 'Benutzername ist erforderlich')
         return
       }
-      if (isAddMode && !formData.password) {
+      if (!formData.password) {
         notify('error', 'Passwort ist erforderlich')
         return
       }
@@ -147,14 +293,6 @@ export function UsersPane({ notify }: UsersPaneProps) {
         }
         await (window as any).api?.users?.update?.(updateData)
         
-        // If password changed, update it separately
-        if (formData.password) {
-          await (window as any).api?.auth?.changePassword?.({
-            userId: editUser.id,
-            newPassword: formData.password
-          })
-        }
-        
         notify('success', 'Benutzer aktualisiert')
         
         // Refresh current user if we edited ourselves
@@ -173,6 +311,10 @@ export function UsersPane({ notify }: UsersPaneProps) {
   }
 
   const handleToggleActive = async (user: User) => {
+    if (user.role === 'ADMIN') {
+      notify('error', 'Administrator kann nicht deaktiviert werden')
+      return
+    }
     if (user.id === currentUser?.id) {
       notify('error', 'Sie können sich nicht selbst deaktivieren')
       return
@@ -191,6 +333,10 @@ export function UsersPane({ notify }: UsersPaneProps) {
   }
 
   const handleDelete = async (user: User) => {
+    if (user.role === 'ADMIN') {
+      notify('error', 'Administrator kann nicht gelöscht werden')
+      return
+    }
     if (user.id === currentUser?.id) {
       notify('error', 'Sie können sich nicht selbst löschen')
       return
@@ -231,19 +377,154 @@ export function UsersPane({ notify }: UsersPaneProps) {
     )
   }
 
+  const passwordModalPortal =
+    showPasswordModal && passwordUser
+      ? createPortal(
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Passwort ändern" onClick={closePasswordModal}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0 }}>Passwort ändern</h2>
+                <button className="btn ghost" onClick={closePasswordModal} aria-label="Schließen">✕</button>
+              </div>
+
+              <div className="modal-grid" style={{ gap: 10 }}>
+                <div className="helper" style={{ marginTop: -6 }}>
+                  {passwordUser.id === currentUser?.id
+                    ? 'Geben Sie zuerst Ihr aktuelles Passwort ein, dann das neue.'
+                    : 'Admin-Reset: Setzt ein neues Passwort ohne aktuelles Passwort.'}
+                </div>
+
+                {passwordUser.id === currentUser?.id && (
+                  <div className="field">
+                    <label>Aktuelles Passwort {authRequired ? '*' : ''}</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      placeholder="Aktuelles Passwort"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
+
+                <div className="settings-row-2col" style={{ alignItems: 'end' }}>
+                  <div className="field">
+                    <label>Neues Passwort *</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      placeholder="Neues Passwort"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Passwort bestätigen *</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={passwordForm.confirmNewPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                      placeholder="Passwort wiederholen"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+
+                {passwordUser.id === currentUser?.id && (
+                  <div className="helper" style={{ marginTop: -2 }}>
+                    Passwort entfernen ist nur im <strong>Lokal</strong>-Modus verfügbar.
+                  </div>
+                )}
+
+                <div className="modal-actions-end" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    {passwordUser.id === currentUser?.id && (
+                      <button
+                        className="btn"
+                        onClick={handlePasswordRemove}
+                        disabled={passwordSaving || (serverStatus as any)?.mode !== 'local'}
+                        style={{ color: 'var(--error)' }}
+                        title={(serverStatus as any)?.mode !== 'local' ? 'Nur im Lokal-Modus' : 'Passwort entfernen'}
+                      >
+                        Passwort entfernen
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn" onClick={closePasswordModal} disabled={passwordSaving}>Abbrechen</button>
+                    <button className="btn primary" onClick={handlePasswordSave} disabled={passwordSaving}>
+                      {passwordSaving ? 'Speichern...' : 'Speichern'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null
+
+  const removePasswordConfirmPortal =
+    showRemovePasswordConfirm && passwordUser
+      ? createPortal(
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Passwort entfernen bestätigen"
+            style={{ zIndex: 6000 }}
+            onClick={() => setShowRemovePasswordConfirm(false)}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0 }}>Passwort entfernen</h2>
+                <button className="btn ghost" onClick={() => setShowRemovePasswordConfirm(false)} aria-label="Schließen">✕</button>
+              </div>
+              <div className="modal-grid" style={{ gap: 10 }}>
+                <div>
+                  Passwort wirklich entfernen? Danach ist keine Anmeldung mehr nötig (nur Lokal-Modus).
+                </div>
+                <div className="modal-actions-end" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => setShowRemovePasswordConfirm(false)} disabled={passwordSaving}>
+                    Abbrechen
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={performPasswordRemove}
+                    disabled={passwordSaving}
+                    style={{ color: 'var(--error)' }}
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null
+
   // Show edit/add form
   if (editUser || isAddMode) {
+    const isEditingSelf = !!editUser && editUser.id === currentUser?.id
     return (
-      <div className="stack gap-20">
-        <div>
-          <h2 style={{ margin: 0, marginBottom: 4 }}>{isAddMode ? 'Neuer Benutzer' : 'Benutzer bearbeiten'}</h2>
-          <p className="helper" style={{ margin: 0 }}>
-            {isAddMode ? 'Neuen Benutzer anlegen' : 'Benutzerdaten aktualisieren'}
-          </p>
-        </div>
-        
-        <div className="card" style={{ padding: 20 }}>
-          <div className="stack gap-16">
+      <>
+        {passwordModalPortal}
+        {removePasswordConfirmPortal}
+
+        <div className="stack gap-20">
+          <div>
+            <h2 style={{ margin: 0, marginBottom: 4 }}>{isAddMode ? 'Neuer Benutzer' : 'Benutzer bearbeiten'}</h2>
+            <p className="helper" style={{ margin: 0 }}>
+              {isAddMode ? 'Neuen Benutzer anlegen' : 'Benutzerdaten aktualisieren'}
+            </p>
+          </div>
+          
+          <div className="card" style={{ padding: 20 }}>
+          <div className="settings-row-2col" style={{ alignItems: 'end' }}>
             <div className="field">
               <label>Name *</label>
               <input
@@ -299,35 +580,55 @@ export function UsersPane({ notify }: UsersPaneProps) {
                 </div>
               )}
             </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-
-            <div className="field">
-              <label>{isAddMode ? 'Passwort *' : 'Neues Passwort'}</label>
-              <input
-                type="password"
-                className="input"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder={isAddMode ? 'Passwort' : 'Leer lassen für unverändert'}
-                autoComplete="new-password"
-              />
-            </div>
-
-            <div className="field">
-              <label>Passwort bestätigen</label>
-              <input
-                type="password"
-                className="input"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="Passwort wiederholen"
-                autoComplete="new-password"
-              />
-            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'flex-end' }}>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '14px 0' }} />
+
+          {isAddMode ? (
+            <div className="settings-row-2col" style={{ alignItems: 'end' }}>
+              <div className="field">
+                <label>Passwort *</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Passwort"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="field">
+                <label>Passwort bestätigen *</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  placeholder="Passwort wiederholen"
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 260 }}>
+                  <div style={{ fontWeight: 600 }}>Passwort</div>
+                  <div className="helper" style={{ margin: 0 }}>
+                    Passwortänderungen werden separat bestätigt.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" onClick={() => openPasswordModal(editUser!)}>
+                    Passwort ändern
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'flex-end', position: 'relative', zIndex: 2, pointerEvents: 'auto' }}>
             <button
               className="btn"
               onClick={handleCancel}
@@ -343,32 +644,100 @@ export function UsersPane({ notify }: UsersPaneProps) {
               {saving ? 'Speichern...' : 'Speichern'}
             </button>
           </div>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
     <div className="stack gap-20">
-      <div>
-        <h2 style={{ margin: 0, marginBottom: 4 }}>Benutzer</h2>
-        <p className="helper" style={{ margin: 0 }}>
-          Verwalten Sie Benutzer und deren Zugriffsrechte.
-          {!authRequired && (
-            <span style={{ color: 'var(--warning)' }}>
-              {' '}Authentifizierung ist aktuell deaktiviert.
-            </span>
-          )}
-        </p>
-      </div>
+      {passwordModalPortal}
+      {removePasswordConfirmPortal}
 
-      <button
-        className="btn primary"
-        onClick={handleAdd}
-        style={{ alignSelf: 'flex-start' }}
-      >
-        Neuer Benutzer
-      </button>
+      {showProjectScope &&
+        createPortal(
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Multi-User & Server – Hinweis"
+            onClick={() => {
+              setShowProjectScope(false)
+              setPendingAddAfterScope(false)
+            }}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0 }}>Multi-User & Server</h2>
+                <button className="btn ghost" onClick={() => { setShowProjectScope(false); setPendingAddAfterScope(false) }} aria-label="Schließen">✕</button>
+              </div>
+              <div className="modal-grid" style={{ gap: 10 }}>
+                <div className="helper" style={{ marginTop: -6 }}>
+                  Kurz erklärt, was das Anlegen von Benutzern bedeutet.
+                </div>
+                <div className="card" style={{ padding: 12 }}>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div>
+                      <strong>Lokal:</strong> Ohne Admin-Passwort ist keine Anmeldung nötig.
+                    </div>
+                    <div>
+                      <strong>Mit Benutzern + Passwort:</strong> BudgetO aktiviert Anmeldung (Login) und Rechte (Admin/Kassier/Nur Lesen).
+                    </div>
+                    <div>
+                      <strong>Multi-User:</strong> Dafür brauchst du einen PC im <strong>Server</strong>-Modus. Andere PCs verbinden sich im <strong>Client</strong>-Modus.
+                    </div>
+                    <div className="helper" style={{ margin: 0 }}>
+                      Einstellungen findest du unter „Einstellungen → Netzwerk“.
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-actions-end">
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setShowProjectScope(false)
+                      setPendingAddAfterScope(false)
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      try { localStorage.setItem(PROJECT_SCOPE_ACK_KEY, '1') } catch {}
+                      setShowProjectScope(false)
+                      const shouldAdd = pendingAddAfterScope
+                      setPendingAddAfterScope(false)
+                      if (shouldAdd) startAddFlow()
+                    }}
+                  >
+                    Verstanden
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 280, flex: '1 1 320px' }}>
+          <h2 style={{ margin: 0, marginBottom: 4 }}>Benutzer</h2>
+          <p className="helper" style={{ margin: 0 }}>
+            Verwalten Sie Benutzer und deren Zugriffsrechte.
+            {!authRequired && (
+              <span style={{ color: 'var(--warning)' }}>
+                {' '}Authentifizierung ist aktuell deaktiviert.
+              </span>
+            )}
+          </p>
+        </div>
+
+        <button className="btn primary" onClick={handleAdd}>
+          Neuer Benutzer
+        </button>
+      </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
         {users.map((user) => (
@@ -445,31 +814,35 @@ export function UsersPane({ notify }: UsersPaneProps) {
             {/* Actions */}
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
               <button
-                className="btn btn-sm"
+                className="btn btn-sm btn-edit"
                 onClick={() => handleEdit(user)}
                 title="Bearbeiten"
-                style={{ padding: '4px 10px' }}
+                aria-label="Bearbeiten"
               >
-                Bearbeiten
+                ✎
               </button>
-              <button
-                className="btn btn-sm"
-                onClick={() => handleToggleActive(user)}
-                title={user.isActive ? 'Deaktivieren' : 'Aktivieren'}
-                disabled={user.id === currentUser?.id}
-                style={{ padding: '4px 10px' }}
-              >
-                {user.isActive ? 'Deaktivieren' : 'Aktivieren'}
-              </button>
-              <button
-                className="btn btn-sm"
-                onClick={() => handleDelete(user)}
-                title="Löschen"
-                disabled={user.id === currentUser?.id}
-                style={{ padding: '4px 10px', color: 'var(--error)' }}
-              >
-                Löschen
-              </button>
+              {user.role !== 'ADMIN' && (
+                <>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleToggleActive(user)}
+                    title={user.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                    disabled={user.id === currentUser?.id}
+                    style={{ padding: '4px 10px' }}
+                  >
+                    {user.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleDelete(user)}
+                    title="Löschen"
+                    disabled={user.id === currentUser?.id}
+                    style={{ padding: '4px 10px', color: 'var(--error)' }}
+                  >
+                    Löschen
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ))}

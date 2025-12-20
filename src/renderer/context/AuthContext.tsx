@@ -48,6 +48,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [authRequired, setAuthRequired] = useState(false)
 
+  const refreshAuthRequired = useCallback(async () => {
+    try {
+      const authResult = await (window as any).api?.auth?.isRequired?.()
+      const required = authResult?.required ?? false
+      setAuthRequired(required)
+      return required
+    } catch {
+      return authRequired
+    }
+  }, [authRequired])
+
   // Check if auth is required and restore session on mount
   useEffect(() => {
     async function init() {
@@ -55,9 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(true)
         
         // Check if authentication is required
-        const authResult = await (window as any).api?.auth?.isRequired?.()
-        const required = authResult?.required ?? false
-        setAuthRequired(required)
+        const required = await refreshAuthRequired()
         
         // Try to restore session from storage
         const storedUser = sessionStorage.getItem(USER_STORAGE_KEY)
@@ -95,6 +104,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init()
   }, [])
 
+  useEffect(() => {
+    const onAuthChanged = () => { void refreshAuthRequired() }
+    const onDataChanged = () => { void refreshAuthRequired() }
+    window.addEventListener('auth-changed', onAuthChanged)
+    window.addEventListener('data-changed', onDataChanged)
+    return () => {
+      window.removeEventListener('auth-changed', onAuthChanged)
+      window.removeEventListener('data-changed', onDataChanged)
+    }
+  }, [refreshAuthRequired])
+
+  // If auth is not required, ensure we always have a selected user (admin) for local usage.
+  useEffect(() => {
+    async function ensureLocalUser() {
+      if (isLoading) return
+      if (authRequired) return
+      if (user) return
+      try {
+        const usersResult = await (window as any).api?.users?.list?.()
+        const adminUser = usersResult?.users?.find((u: any) => u.role === 'ADMIN' && u.isActive)
+        if (adminUser) {
+          setUser(adminUser)
+          sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser))
+        }
+      } catch {
+        // ignore
+      }
+    }
+    void ensureLocalUser()
+  }, [authRequired, user, isLoading])
+
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const result = await (window as any).api?.auth?.login?.({ username, password })
@@ -113,6 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    // Invalidate server/main-process session token (best-effort)
+    try { void (window as any).api?.auth?.logout?.({}) } catch {}
     setUser(null)
     sessionStorage.removeItem(USER_STORAGE_KEY)
     window.dispatchEvent(new Event('auth-changed'))

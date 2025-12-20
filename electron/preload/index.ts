@@ -199,8 +199,10 @@ contextBridge.exposeInMainWorld('api', {
     auth: {
         login: (payload: { username: string; password: string }) => ipcRenderer.invoke('auth.login', payload),
         isRequired: () => ipcRenderer.invoke('auth.isRequired'),
+        logout: () => ipcRenderer.invoke('auth.logout'),
         setInitialPassword: (payload: { userId: number; password: string }) => ipcRenderer.invoke('auth.setInitialPassword', payload),
-        changePassword: (payload: { userId: number; currentPassword: string; newPassword: string }) => ipcRenderer.invoke('auth.changePassword', payload)
+        changePassword: (payload: { userId: number; currentPassword: string; newPassword: string }) => ipcRenderer.invoke('auth.changePassword', payload),
+        clearPassword: (payload: { userId: number; currentPassword: string }) => ipcRenderer.invoke('auth.clearPassword', payload)
     },
     users: {
         list: (payload?: { includeInactive?: boolean }) => ipcRenderer.invoke('users.list', payload),

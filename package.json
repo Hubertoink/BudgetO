@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "test": "jest",
     "test:e2e": "playwright test",
-    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');cp.spawnSync('npm',['rebuild','better-sqlite3','--runtime=electron','--target='+v,'--disturl=https://electronjs.org/headers'],{stdio:'inherit',shell:true});\"",
+    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');cp.spawnSync('npm',['rebuild','better-sqlite3'],{stdio:'inherit',shell:true,env:{...process.env,npm_config_runtime:'electron',npm_config_target:v,npm_config_disturl:'https://electronjs.org/headers'}});\"",
     "postinstall": "playwright install",
     "package": "electron-builder -c electron-builder.yml",
     "start": "npm run dev"
@@ -41,9 +41,9 @@
     "@typescript-eslint/parser": "^8.7.0",
     "@vitejs/plugin-react": "^4.3.1",
     "baseline-browser-mapping": "^2.9.2",
-    "electron": "^30.0.0",
+    "electron": "^35.7.5",
     "electron-builder": "^24.13.3",
-    "electron-vite": "^2.3.0",
+    "electron-vite": "^5.0.0",
     "eslint": "^9.12.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -56,6 +56,6 @@
     "ts-jest": "^29.2.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
-    "vite": "^5.4.2"
+    "vite": "^6.1.7"
   }
 }

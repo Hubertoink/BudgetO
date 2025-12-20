@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 interface ServerConfig {
   mode: 'local' | 'server' | 'client'
   port: number
-  host: string
+  serverAddress?: string
   autoStart: boolean
 }
 
@@ -44,11 +44,17 @@ export function NetworkStatus() {
     }
   }
 
-  if (!config || config.mode === 'local') {
-    return null // Don't show anything in local mode
-  }
+  if (!config) return null
 
   const getModeDisplay = () => {
+    if (config.mode === 'local') {
+      return {
+        label: 'Lokal',
+        detail: 'Nur dieser PC',
+        color: 'var(--text-muted)',
+        active: true
+      }
+    }
     if (config.mode === 'server') {
       return {
         label: 'Server',
@@ -58,9 +64,10 @@ export function NetworkStatus() {
       }
     }
     if (config.mode === 'client') {
+      const addr = (config.serverAddress || '').trim()
       return {
         label: 'Client',
-        detail: `${config.host}:${config.port}`,
+        detail: addr || 'Kein Server',
         color: 'var(--info)',
         active: true
       }
@@ -73,30 +80,19 @@ export function NetworkStatus() {
 
   return (
     <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '4px 10px',
-        borderRadius: 6,
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        fontSize: 12,
-        color: 'var(--text-muted)'
-      }}
-      title={`Netzwerkmodus: ${display.label} - ${display.detail}`}
+      className="network-status"
+      style={
+        {
+          ['--ns-color' as any]: display.color,
+          ['--ns-glow' as any]: display.active ? `0 0 6px ${display.color}` : 'none'
+        } as any
+      }
+      title={`Netzwerkmodus: ${display.label} – ${display.detail}`}
     >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: display.color,
-          boxShadow: display.active ? `0 0 4px ${display.color}` : 'none'
-        }}
-      />
-      <span style={{ fontWeight: 500 }}>{display.label}</span>
-      <span style={{ opacity: 0.7 }}>{display.detail}</span>
+      <span className="network-status__dot" aria-hidden="true" />
+      <span className="network-status__label">{display.label}</span>
+      <span className="network-status__sep" aria-hidden="true">·</span>
+      <span className="network-status__detail">{display.detail}</span>
     </div>
   )
 }

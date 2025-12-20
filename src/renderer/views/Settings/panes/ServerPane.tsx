@@ -42,6 +42,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
   const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [authRequired, setAuthRequired] = useState<boolean>(false)
 
   // Load current config and status
   const loadConfig = useCallback(async () => {
@@ -61,6 +62,9 @@ export function ServerPane({ notify }: ServerPaneProps) {
       if (statusResult) {
         setStatus(statusResult)
       }
+
+      const authResult = await (window as any).api?.auth?.isRequired?.()
+      setAuthRequired(!!authResult?.required)
     } catch (e) {
       console.error('Failed to load server config:', e)
     }
@@ -87,7 +91,15 @@ export function ServerPane({ notify }: ServerPaneProps) {
 
   const handleStartServer = async () => {
     try {
+      if (!canStartServer) {
+        notify('error', startBlockedReason)
+        return
+      }
       setStarting(true)
+
+      // Ensure the main process uses the currently selected settings (mode/port) even if the user didn't click "Speichern" yet.
+      await (window as any).api?.server?.setConfig?.(config)
+
       const result = await (window as any).api?.server?.start?.()
       if (result?.success) {
         notify('success', 'Server gestartet')
@@ -142,8 +154,13 @@ export function ServerPane({ notify }: ServerPaneProps) {
     return <div className="helper">Lade Netzwerk-Einstellungen...</div>
   }
 
+  const canStartServer = authRequired
+  const startBlockedReason = canStartServer
+    ? ''
+    : 'Bevor der Server gestartet werden kann, muss ein Admin-Passwort gesetzt werden (Einstellungen → Benutzer).'
+
   return (
-    <div className="stack gap-20">
+    <div className="settings-pane">
       {/* Header */}
       <div>
         <h2 style={{ margin: 0, marginBottom: 4 }}>Netzwerk</h2>
@@ -153,90 +170,49 @@ export function ServerPane({ notify }: ServerPaneProps) {
       </div>
 
       {/* Mode Selection */}
-      <div className="card" style={{ padding: 16 }}>
-        <div style={{ marginBottom: 12, fontWeight: 500 }}>Betriebsmodus</div>
-        
-        <div className="stack gap-8">
-          {/* Local Mode */}
-          <label 
-            className={`card ${config.mode === 'local' ? 'card-selected' : ''}`}
-            style={{ 
-              padding: '10px 12px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              gap: 10, 
-              alignItems: 'center',
-              border: config.mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border)'
-            }}
+      <div className="settings-card settings-pane-card">
+        <div className="settings-title">Betriebsmodus</div>
+        <div className="settings-sub">
+          {config.mode === 'local' && 'Nur dieser PC (Standard)'}
+          {config.mode === 'server' && 'Andere PCs können sich verbinden'}
+          {config.mode === 'client' && 'Mit anderem Server verbinden'}
+        </div>
+        <div className="btn-group" role="group" aria-label="Betriebsmodus">
+          <button
+            type="button"
+            className={`btn-option ${config.mode === 'local' ? 'active' : ''}`}
+            onClick={() => setConfig({ ...config, mode: 'local' })}
           >
-            <input
-              type="radio"
-              name="serverMode"
-              checked={config.mode === 'local'}
-              onChange={() => setConfig({ ...config, mode: 'local' })}
-            />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 500 }}>Lokal</div>
-              <div className="helper">Nur dieser PC (Standard)</div>
-            </div>
-          </label>
-
-          {/* Server Mode */}
-          <label 
-            className={`card ${config.mode === 'server' ? 'card-selected' : ''}`}
-            style={{ 
-              padding: '10px 12px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              gap: 10, 
-              alignItems: 'center',
-              border: config.mode === 'server' ? '1px solid var(--primary)' : '1px solid var(--border)'
-            }}
+            Lokal
+          </button>
+          <button
+            type="button"
+            className={`btn-option ${config.mode === 'server' ? 'active' : ''}`}
+            onClick={() => setConfig({ ...config, mode: 'server' })}
           >
-            <input
-              type="radio"
-              name="serverMode"
-              checked={config.mode === 'server'}
-              onChange={() => setConfig({ ...config, mode: 'server' })}
-            />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 500 }}>Server</div>
-              <div className="helper">Andere PCs können sich verbinden</div>
-            </div>
-          </label>
-
-          {/* Client Mode */}
-          <label 
-            className={`card ${config.mode === 'client' ? 'card-selected' : ''}`}
-            style={{ 
-              padding: '10px 12px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              gap: 10, 
-              alignItems: 'center',
-              border: config.mode === 'client' ? '1px solid var(--primary)' : '1px solid var(--border)'
-            }}
+            Server
+          </button>
+          <button
+            type="button"
+            className={`btn-option ${config.mode === 'client' ? 'active' : ''}`}
+            onClick={() => setConfig({ ...config, mode: 'client' })}
           >
-            <input
-              type="radio"
-              name="serverMode"
-              checked={config.mode === 'client'}
-              onChange={() => setConfig({ ...config, mode: 'client' })}
-            />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 500 }}>Client</div>
-              <div className="helper">Mit anderem Server verbinden</div>
-            </div>
-          </label>
+            Client
+          </button>
         </div>
       </div>
 
       {/* Server Mode Settings */}
       {config.mode === 'server' && (
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ marginBottom: 12, fontWeight: 500 }}>Server-Konfiguration</div>
+        <div className="settings-card settings-pane-card">
+          <div className="settings-title">Server-Konfiguration</div>
+          {!canStartServer && (
+            <div className="helper helper-danger" style={{ marginTop: 6 }}>
+              {startBlockedReason}
+            </div>
+          )}
           
-          <div className="row" style={{ marginBottom: 16 }}>
+          <div className="row" style={{ marginTop: 12, marginBottom: 14, alignItems: 'end' }}>
             <div className="field">
               <label>Port</label>
               <input
@@ -250,38 +226,36 @@ export function ServerPane({ notify }: ServerPaneProps) {
               />
             </div>
             
-            <div className="field" style={{ display: 'flex', alignItems: 'center', paddingTop: 20 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+            <div className="field">
+              <label>Autostart</label>
+              <label className="label-row" style={{ cursor: 'pointer', margin: 0 }}>
                 <input
                   type="checkbox"
                   checked={config.autoStart}
-                  onChange={(e) => setConfig({ ...config, autoStart: e.target.checked })}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    if (next && !canStartServer) {
+                      notify('error', startBlockedReason)
+                      setConfig({ ...config, autoStart: false })
+                      return
+                    }
+                    setConfig({ ...config, autoStart: next })
+                  }}
                 />
-                Beim App-Start automatisch starten
+                <span>Beim App-Start automatisch starten</span>
               </label>
             </div>
           </div>
 
           {/* Server Status Card */}
-          <div 
-            style={{ 
-              padding: 12, 
-              borderRadius: 6,
-              background: status.running ? 'var(--success-bg, rgba(0,200,100,0.1))' : 'var(--bg-secondary)',
-              border: status.running ? '1px solid var(--success, #00c853)' : '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12
-            }}
-          >
+          <div className="server-status-card" data-running={status.running ? 'true' : 'false'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span 
                 style={{ 
                   width: 10, 
                   height: 10, 
                   borderRadius: '50%', 
-                  background: status.running ? 'var(--success, #00c853)' : 'var(--text-secondary)',
+                  background: status.running ? 'var(--success)' : 'var(--text-dim)',
                   flexShrink: 0
                 }} 
               />
@@ -289,9 +263,20 @@ export function ServerPane({ notify }: ServerPaneProps) {
                 <div style={{ fontWeight: 500 }}>
                   {status.running ? 'Server läuft' : 'Server gestoppt'}
                 </div>
-                {status.running && status.localIPs && status.localIPs.length > 0 && (
-                  <div className="helper" style={{ marginTop: 2 }}>
-                    Erreichbar unter: <code style={{ userSelect: 'all' }}>{status.localIPs[0]}:{config.port}</code>
+                {status.running && (
+                  <div className="helper" style={{ marginTop: 2, display: 'grid', gap: 4 }}>
+                    <div>
+                      Clients: <strong>{status.connectedClients ?? 0}</strong>
+                    </div>
+                    {status.localIPs && status.localIPs.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {status.localIPs.map((ip) => (
+                          <code key={ip} style={{ userSelect: 'all' }}>
+                            {ip}:{config.port}
+                          </code>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -301,6 +286,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
               className={`btn ${status.running ? '' : 'primary'}`}
               onClick={status.running ? handleStopServer : handleStartServer}
               disabled={starting}
+              title={!status.running && !canStartServer ? startBlockedReason : undefined}
               style={{ minWidth: 80 }}
             >
               {starting ? '...' : (status.running ? 'Stoppen' : 'Starten')}
@@ -311,17 +297,16 @@ export function ServerPane({ notify }: ServerPaneProps) {
 
       {/* Client Mode Settings */}
       {config.mode === 'client' && (
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ marginBottom: 12, fontWeight: 500 }}>Verbindung</div>
+        <div className="settings-card settings-pane-card">
+          <div className="settings-title">Verbindung</div>
           
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div className="server-connection-row" style={{ marginTop: 12, marginBottom: 12 }}>
             <input
               type="text"
               className="input"
               value={config.serverAddress}
               onChange={(e) => setConfig({ ...config, serverAddress: e.target.value })}
               placeholder="192.168.1.100:3847"
-              style={{ flex: 1 }}
             />
             <button className="btn" onClick={handleTestConnection}>
               Testen
@@ -329,15 +314,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
           </div>
 
           {testResult && (
-            <div 
-              style={{ 
-                padding: 10, 
-                borderRadius: 6,
-                background: testResult.success ? 'var(--success-bg)' : 'var(--danger-bg)',
-                color: testResult.success ? 'var(--success)' : 'var(--danger)',
-                fontSize: 13
-              }}
-            >
+            <div className="server-test-result" data-success={testResult.success ? 'true' : 'false'}>
               {testResult.message}
             </div>
           )}
@@ -349,7 +326,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
       )}
 
       {/* Save Button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="settings-pane-actions" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button 
           className="btn primary" 
           onClick={handleSave}

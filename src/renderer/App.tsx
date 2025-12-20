@@ -102,6 +102,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
 }
 
 function AppInner() {
+    const { authRequired, isAuthenticated, isLoading: authLoading } = useAuth()
     // Use toast context
     const { notify } = useToast()
     
@@ -752,6 +753,8 @@ function AppInner() {
     }
     const isTopNav = navLayout === 'top'
     return (
+        <>
+            <LoginModal isOpen={!!authRequired && !authLoading && !isAuthenticated} allowClose={false} />
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header
@@ -1166,6 +1169,7 @@ function AppInner() {
                 />
             )}
         </div>
+        </>
     )
 }
 // Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
