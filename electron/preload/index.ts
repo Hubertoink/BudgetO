@@ -320,6 +320,9 @@ contextBridge.exposeInMainWorld('api', {
         start: () => ipcRenderer.invoke('server.start'),
         stop: () => ipcRenderer.invoke('server.stop'),
         testConnection: (payload: { address: string }) => ipcRenderer.invoke('server.testConnection', payload)
+    },
+    meta: {
+        getChangeSeq: () => ipcRenderer.invoke('meta.getChangeSeq')
     }
 })
 

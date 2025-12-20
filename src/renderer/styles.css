@@ -154,6 +154,14 @@
     white-space: nowrap;
 }
 
+.network-status[data-clickable="true"] {
+    cursor: pointer;
+}
+
+.network-status[data-clickable="true"]:hover {
+    border-color: color-mix(in oklab, var(--ns-color, var(--accent)) 35%, var(--border));
+}
+
 .network-status__dot {
     width: 8px;
     height: 8px;

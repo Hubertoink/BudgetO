@@ -54,27 +54,47 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VoucherCreateOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.create', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = createVoucher(parsed)
+        bumpChangeSeq()
         return VoucherCreateOutput.parse(res)
     })
 
     ipcMain.handle('vouchers.reverse', async (_e, payload) => {
         const parsed = VoucherReverseInput.parse(payload)
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VoucherReverseOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.reverse', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = reverseVoucher(parsed.originalId, null)
+        bumpChangeSeq()
         return VoucherReverseOutput.parse(res)
     })
 
@@ -706,11 +726,20 @@ export function registerIpcHandlers() {
     ipcMain.handle('vouchers.update', async (_e, payload) => {
         const parsed = VoucherUpdateInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VoucherUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.update', parsed))
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
         }
 
         const res = updateVoucher(parsed as any)
@@ -721,59 +750,100 @@ export function registerIpcHandlers() {
         if (parsed.earmarks !== undefined) {
             setVoucherEarmarks(parsed.id, parsed.earmarks)
         }
+        bumpChangeSeq()
         return VoucherUpdateOutput.parse(res)
     })
 
     ipcMain.handle('vouchers.delete', async (_e, payload) => {
         const parsed = VoucherDeleteInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VoucherDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.delete', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = deleteVoucher(parsed.id)
+        bumpChangeSeq()
         return VoucherDeleteOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignEarmark', async (_e, payload) => {
         const parsed = VouchersBatchAssignEarmarkInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VouchersBatchAssignEarmarkOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignEarmark', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = batchAssignEarmark(parsed as any)
+        bumpChangeSeq()
         return VouchersBatchAssignEarmarkOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignBudget', async (_e, payload) => {
         const parsed = VouchersBatchAssignBudgetInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VouchersBatchAssignBudgetOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignBudget', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = batchAssignBudget(parsed as any)
+        bumpChangeSeq()
         return VouchersBatchAssignBudgetOutput.parse(res)
     })
     ipcMain.handle('vouchers.batchAssignTags', async (_e, payload) => {
         const parsed = VouchersBatchAssignTagsInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VouchersBatchAssignTagsOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.batchAssignTags', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         const res = batchAssignTags(parsed as any)
+        bumpChangeSeq()
         return VouchersBatchAssignTagsOutput.parse(res)
     })
     // Recent vouchers (simple list)
@@ -794,17 +864,27 @@ export function registerIpcHandlers() {
     ipcMain.handle('vouchers.clearAll', async (_e, payload) => {
         const parsed = VouchersClearAllInput.parse(payload)
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
         const cfg = getServerConfig()
         if (cfg.mode === 'client') {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return VouchersClearAllOutput.parse(await remoteCall(cfg.serverAddress, 'vouchers.clearAll', parsed))
         }
 
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
         if (!parsed.confirm) throw new Error('Nicht bestätigt')
         // Safety: backup before destructive action
         try { await backup.makeBackup('preClearAll') } catch { /* ignore */ }
         const res = clearAllVouchers()
+        bumpChangeSeq()
         return VouchersClearAllOutput.parse(res)
     })
 
@@ -2707,6 +2787,16 @@ export function registerIpcHandlers() {
     ipcMain.handle('server.testConnection', async (_e, payload: { address: string }) => {
         const { testConnection } = await import('../services/apiServer')
         return testConnection(payload.address)
+    })
+
+    ipcMain.handle('meta.getChangeSeq', async () => {
+        const { getServerConfig, remoteCall, getChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'meta.getChangeSeq', {})
+        }
+        return { seq: getChangeSeq() }
     })
 }
     // Get single submission

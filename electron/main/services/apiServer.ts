@@ -19,6 +19,17 @@ let server: http.Server | null = null
 let connectedClients = 0
 const activeSockets = new Set<net.Socket>()
 
+// Change sequence for lightweight "new data" detection across clients
+let changeSeq = 0
+
+export function bumpChangeSeq() {
+  changeSeq++
+}
+
+export function getChangeSeq() {
+  return changeSeq
+}
+
 // Client-mode auth token (kept in main process memory)
 let clientAuthToken: string | null = null
 
@@ -115,6 +126,11 @@ const apiHandlers: Map<string, ApiHandler> = new Map()
 
 // Register all API routes (mirrors IPC handlers)
 function registerHandlers() {
+  // Meta
+  apiHandlers.set('meta.getChangeSeq', async () => {
+    return { seq: getChangeSeq() }
+  })
+
   // Auth
   apiHandlers.set('auth.login', async (body) => {
     const { login, createSession } = await import('../repositories/users')
@@ -736,7 +752,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const mustAuth = isAuthRequired()
 
       let authUser: any = undefined
-      if (route !== 'auth.login' && route !== 'auth.isRequired' && route !== 'auth.logout') {
+      const isAuthFreeRoute = route === 'auth.login' || route === 'auth.isRequired' || route === 'auth.logout' || route === 'meta.getChangeSeq'
+      if (!isAuthFreeRoute) {
         if (mustAuth) {
           const authHeader = String(req.headers.authorization || '')
           const m = /^Bearer\s+(.+)$/i.exec(authHeader)
@@ -761,7 +778,32 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         authUser = token ? { token } : undefined
       }
 
+      const isWriteRoute = (r: string) => {
+        return (
+          r === 'vouchers.create' ||
+          r === 'vouchers.update' ||
+          r === 'vouchers.delete' ||
+          r === 'vouchers.reverse' ||
+          r === 'vouchers.batchAssignEarmark' ||
+          r === 'vouchers.batchAssignBudget' ||
+          r === 'vouchers.batchAssignTags' ||
+          r === 'vouchers.clearAll'
+        )
+      }
+
+      // Readonly users must never write
+      if (authUser?.role === 'READONLY' && isWriteRoute(route)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Forbidden' }))
+        return
+      }
+
       const result = await handler(body, authUser)
+
+      // Bump change sequence for lightweight update hints on clients.
+      if (isWriteRoute(route)) {
+        bumpChangeSeq()
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(result))
     } catch (e: any) {

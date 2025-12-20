@@ -210,12 +210,15 @@ declare global {
                 clearPassword: (payload: { userId: number; currentPassword: string }) => Promise<{ success: boolean; error?: string }>
             }
             server: {
-                getConfig: () => Promise<{ mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }>
-                setConfig: (config: { mode: 'local' | 'server' | 'client'; port: number; host: string; autoStart: boolean }) => Promise<{ ok: boolean }>
-                getStatus: () => Promise<{ running: boolean; port?: number; connectedClients?: number }>
+                getConfig: () => Promise<{ mode: 'local' | 'server' | 'client'; port: number; serverAddress?: string; host?: string; autoStart: boolean; localIPs?: string[] }>
+                setConfig: (config: { mode?: 'local' | 'server' | 'client'; port?: number; serverAddress?: string; host?: string; autoStart?: boolean }) => Promise<{ ok: boolean }>
+                getStatus: () => Promise<{ running: boolean; port?: number; connectedClients?: number; localIPs?: string[] }>
                 start: () => Promise<{ ok: boolean; port?: number; error?: string }>
                 stop: () => Promise<{ ok: boolean }>
                 testConnection: (payload: { address: string }) => Promise<{ success: boolean; message: string }>
+            }
+            meta: {
+                getChangeSeq: () => Promise<{ seq: number }>
             }
         }
     }
