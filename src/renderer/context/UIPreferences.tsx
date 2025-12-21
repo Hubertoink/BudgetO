@@ -47,10 +47,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'left' || stored === 'top' ? stored : 'left'
   })
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('sidebarCollapsed')
-    return stored === 'true'
-  })
+  // BudgetO: Sidebar is always compact (collapsed)
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean>(true)
+  const setSidebarCollapsed = (_val: boolean) => setSidebarCollapsedState(true)
 
   const [colorTheme, setColorThemeState] = useState<ColorTheme>('default')
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
@@ -174,7 +173,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [navLayout])
 
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed))
+    localStorage.setItem('sidebarCollapsed', 'true')
   }, [sidebarCollapsed])
 
   useEffect(() => {

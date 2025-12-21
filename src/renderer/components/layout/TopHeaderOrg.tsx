@@ -26,7 +26,7 @@ export default function TopHeaderOrg() {
     const text = [org || null, cashier || null].filter(Boolean).join(' | ')
     return (
         <div className="top-header-org">
-            <img className="top-header-org__logo" src={appLogo} alt="BudgetO" width={20} height={20} />
+            <img className="top-header-org__logo" src={appLogo} alt="BudgetO" width={24} height={24} />
             {text ? (
                 <div className="helper top-header-org__text" title={text}>{text}</div>
             ) : null}

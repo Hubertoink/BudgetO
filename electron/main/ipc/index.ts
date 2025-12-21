@@ -1057,6 +1057,14 @@ export function registerIpcHandlers() {
         return ImportExecuteOutput.parse(res as any)
     })
 
+    ipcMain.handle('imports.duplicates', async (_e, payload) => {
+        const { ImportDuplicatesInput, ImportDuplicatesOutput } = await import('./schemas')
+        const parsed = ImportDuplicatesInput.parse(payload)
+        const { getDuplicateCountsByKey } = await import('../services/imports')
+        const res = await getDuplicateCountsByKey(parsed.pairs)
+        return ImportDuplicatesOutput.parse(res as any)
+    })
+
     ipcMain.handle('imports.missingCategories', async (_e, payload) => {
         const { ImportMissingCategoriesInput, ImportMissingCategoriesOutput } = await import('./schemas')
         const parsed = ImportMissingCategoriesInput.parse(payload)

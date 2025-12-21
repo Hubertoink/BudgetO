@@ -38,6 +38,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
     connectedClients: 0,
     mode: 'local'
   })
+  const [loadedConfig, setLoadedConfig] = useState<ServerConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -49,13 +50,15 @@ export function ServerPane({ notify }: ServerPaneProps) {
     try {
       const result = await (window as any).api?.server?.getConfig?.()
       if (result) {
-        setConfig({
+        const next: ServerConfig = {
           mode: result.mode || 'local',
           port: result.port || DEFAULT_PORT,
           serverAddress: result.serverAddress || '',
           autoStart: result.autoStart ?? false,
           localIPs: result.localIPs
-        })
+        }
+        setConfig(next)
+        setLoadedConfig(next)
       }
       
       const statusResult = await (window as any).api?.server?.getStatus?.()
@@ -75,11 +78,37 @@ export function ServerPane({ notify }: ServerPaneProps) {
     loadConfig().finally(() => setLoading(false))
   }, [loadConfig])
 
+  function modeLabel(mode: ServerMode): string {
+    if (mode === 'local') return 'Lokal'
+    if (mode === 'server') return 'Server'
+    return 'Client'
+  }
+
+  const isDirty = (() => {
+    if (!loadedConfig) return false
+    return (
+      loadedConfig.mode !== config.mode ||
+      loadedConfig.port !== config.port ||
+      (loadedConfig.serverAddress || '') !== (config.serverAddress || '') ||
+      loadedConfig.autoStart !== config.autoStart
+    )
+  })()
+
+  const modeChanged = !!loadedConfig && loadedConfig.mode !== config.mode
+
+  const applyButtonLabel = saving
+    ? '…'
+    : !isDirty
+      ? 'Aktuell'
+      : modeChanged
+        ? `Betriebsmodus festlegen: ${modeLabel(config.mode)}`
+        : 'Änderungen übernehmen'
+
   const handleSave = async () => {
     try {
       setSaving(true)
       await (window as any).api?.server?.setConfig?.(config)
-      notify('success', 'Einstellungen gespeichert')
+      notify('success', modeChanged ? `Betriebsmodus festgelegt: ${modeLabel(config.mode)}` : 'Änderungen übernommen')
       // Let other parts of the app (AuthContext, status pills, etc.) react immediately.
       try { window.dispatchEvent(new Event('server-config-changed')) } catch {}
       try { window.dispatchEvent(new Event('auth-changed')) } catch {}
@@ -179,6 +208,9 @@ export function ServerPane({ notify }: ServerPaneProps) {
           {config.mode === 'local' && 'Nur dieser PC (Standard)'}
           {config.mode === 'server' && 'Andere PCs können sich verbinden'}
           {config.mode === 'client' && 'Mit anderem Server verbinden'}
+        </div>
+        <div className="helper" style={{ marginTop: 8 }}>
+          Aktiv: <strong>{modeLabel(status.mode)}</strong>{status.mode === 'server' ? (status.running ? ' (läuft)' : ' (gestoppt)') : ''}
         </div>
         <div className="btn-group" role="group" aria-label="Betriebsmodus">
           <button
@@ -331,11 +363,11 @@ export function ServerPane({ notify }: ServerPaneProps) {
       {/* Save Button */}
       <div className="settings-pane-actions" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button 
-          className="btn primary" 
+          className={`btn ${isDirty ? 'primary' : 'ghost'}`} 
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !isDirty}
         >
-          {saving ? 'Speichern...' : 'Speichern'}
+          {applyButtonLabel}
         </button>
       </div>
     </div>

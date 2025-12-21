@@ -183,6 +183,7 @@ contextBridge.exposeInMainWorld('api', {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),
         missingCategories: (payload: any) => ipcRenderer.invoke('imports.missingCategories', payload),
+        duplicates: (payload: any) => ipcRenderer.invoke('imports.duplicates', payload),
         template: () => ipcRenderer.invoke('imports.template'),
         testdata: () => ipcRenderer.invoke('imports.testdata')
     },

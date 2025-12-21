@@ -49,7 +49,21 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
         {visibleModules.map((mod) => (
           <div
             key={mod.key}
-            className="card"
+            className={`card module-toggle-card${canWrite ? '' : ' module-toggle-card--readonly'}`}
+            role={canWrite ? 'button' : undefined}
+            tabIndex={canWrite ? 0 : -1}
+            aria-label={canWrite ? `${mod.name} ${mod.enabled ? 'deaktivieren' : 'aktivieren'}` : undefined}
+            onClick={canWrite ? () => handleToggle(mod) : undefined}
+            onKeyDown={
+              canWrite
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleToggle(mod)
+                    }
+                  }
+                : undefined
+            }
             style={{
               padding: 16,
               display: 'flex',
@@ -90,6 +104,7 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
                 type="checkbox"
                 checked={mod.enabled}
                 disabled={!canWrite}
+                onClick={(e) => e.stopPropagation()}
                 onChange={() => handleToggle(mod)}
               />
               <span className="slider" />

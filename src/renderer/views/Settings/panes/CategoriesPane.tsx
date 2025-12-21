@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../../components/ModalHeader'
 import { useAuth } from '../../../context/AuthContext'
+import { ICONS } from '../../../utils/icons'
 
 interface CustomCategory {
   id: number
@@ -264,7 +265,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
                         {cat.isActive ? '👁️' : '👁️‍🗨️'}
                       </button>
                       <button 
-                        className="btn ghost" 
+                        className="btn btn-edit" 
                         onClick={() => setEditModal({
                           id: cat.id,
                           name: cat.name,
@@ -272,9 +273,8 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
                           description: cat.description || ''
                         })} 
                         title="Bearbeiten"
-                        style={{ padding: '6px 8px', fontSize: 12 }}
                       >
-                        ✏️
+                        ✎
                       </button>
                       <button 
                         className="btn ghost" 

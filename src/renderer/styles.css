@@ -15,6 +15,85 @@
 .settings-pane-card { padding: 12px; }
 .settings-pane-actions { margin-top: 8px; }
 
+/* Settings: About flyout (bottom-right) */
+.about-flyout {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10;
+    display: grid;
+    justify-items: end;
+    gap: 10px;
+    user-select: none;
+}
+
+.about-flyout__panel {
+    min-width: 220px;
+    padding: 12px;
+    transform-origin: 100% 100%;
+    transform: translateY(6px) scale(0.98);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+}
+
+.about-flyout__panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.about-flyout__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.about-flyout__title {
+    font-weight: 700;
+}
+
+.about-flyout__meta {
+    margin-top: 2px;
+    opacity: 0.65;
+    font-size: 10px;
+}
+
+.about-flyout__link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.about-flyout__link:hover {
+    text-decoration: underline;
+}
+
+.about-flyout__handle {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    color: var(--text);
+    font-weight: 800;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+}
+
+.about-flyout__handle:hover {
+    background: color-mix(in oklab, var(--accent) 30%, var(--surface));
+}
+
+.about-flyout__handle:focus { outline: none; }
+.about-flyout__handle:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
+}
+
 /* Settings Navigation - Aktenreiter (file tab) style */
 .settings-tabs-wrap {
     position: relative;
@@ -1722,10 +1801,47 @@ textarea:focus {
 }
 
 /* Import mapping: grouped layout */
+.import-dropzone {
+    border: 2px dashed color-mix(in oklab, var(--accent) 55%, var(--border));
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.import-dup-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
+    background: color-mix(in oklab, var(--danger) 16%, transparent);
+    color: var(--danger);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.module-toggle-card {
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+}
+
+.module-toggle-card:hover {
+    border-color: color-mix(in oklab, var(--accent) 35%, var(--border));
+    background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+
+.module-toggle-card:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.module-toggle-card--readonly {
+    cursor: not-allowed;
+}
+
 .group-grid {
     display: grid;
-    /* Larger min size to avoid horizontal overlap of dropdowns */
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: 1fr;
     gap: 12px;
 }
 

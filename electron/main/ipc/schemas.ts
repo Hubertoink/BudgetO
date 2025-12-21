@@ -668,7 +668,8 @@ export const ImportExecuteInput = z.object({
     mapping: z.record(z.string().nullable()),
     options: z
         .object({
-            createMissingCategories: z.boolean().optional()
+            createMissingCategories: z.boolean().optional(),
+            selectedRows: z.array(z.number()).optional()
         })
         .optional()
 })
@@ -678,6 +679,14 @@ export const ImportExecuteOutput = z.object({
     errors: z.array(z.object({ row: z.number(), message: z.string() })),
     rowStatuses: z.array(z.object({ row: z.number(), ok: z.boolean(), message: z.string().optional() })).optional(),
     errorFilePath: z.string().optional()
+})
+
+export const ImportDuplicatesInput = z.object({
+    pairs: z.array(z.object({ date: z.string(), grossAmount: z.number() }))
+})
+
+export const ImportDuplicatesOutput = z.object({
+    countsByKey: z.record(z.number())
 })
 
 // Imports: detect missing categories (from mapped category column)

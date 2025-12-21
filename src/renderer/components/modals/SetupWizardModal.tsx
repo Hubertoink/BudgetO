@@ -1,5 +1,6 @@
 ﻿ 
 import React, { useEffect, useMemo, useState } from 'react'
+import type { ModuleInfo, ModuleKey } from '../../context/ModuleContext'
 
 type NavLayout = 'left' | 'top'
 type NavIconColorMode = 'color' | 'mono'
@@ -89,30 +90,116 @@ export default function SetupWizardModal({
     }, [])
 
     const suggestedTags = useMemo(() => [
-        // Einnahmen
-        { name: 'Mitgliedsbeitrag', color: '#2E7D32' },
-        { name: 'Spende', color: '#1565C0' },
-        { name: 'Sponsor', color: '#6A1B9A' },
-        { name: 'Event', color: '#00838F' },
-        // Ausgaben
-        { name: 'Material', color: '#8D6E63' },
-        { name: 'Reise', color: '#AD1457' },
-        { name: 'Gebühren', color: '#455A64' },
-        { name: 'Miete', color: '#5D4037' }
+        // Kommunale Buchhaltung / Verwaltungspraxis (Stichwörter)
+        { name: 'Zuschuss / Fördermittel', color: '#2E7D32' },
+        { name: 'Eigenanteil', color: '#1565C0' },
+        { name: 'Kostenerstattung', color: '#6A1B9A' },
+        { name: 'Bewilligung / Bescheid', color: '#00838F' },
+        { name: 'Rechnung', color: '#8D6E63' },
+        { name: 'Beleg fehlt', color: '#AD1457' },
+        { name: 'Umbuchung', color: '#455A64' },
+        { name: 'Rückerstattung', color: '#5D4037' },
     ], [])
+
+    const CATEGORY_PRESET_COLORS = useMemo(() => ([
+        '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#F44336',
+        '#00BCD4', '#E91E63', '#795548', '#607D8B', '#3F51B5'
+    ]), [])
+
+    function colorForCategoryName(name: string): string {
+        // Deterministic (stable) color assignment from preset palette
+        let h = 0
+        for (let i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0
+        return CATEGORY_PRESET_COLORS[h % CATEGORY_PRESET_COLORS.length]!
+    }
+
+    const suggestedCategories = useMemo(() => [
+        // Vorschläge ohne Zahlencode (typische Sachkosten/Positionen)
+        { name: 'Büromaterial', color: '#607D8B' },
+        { name: 'Aus- und Fortbildung', color: '#3F51B5' },
+        { name: 'Sonstige Aufwendungen Lebensmittel', color: '#4CAF50' },
+        { name: 'Sonst. Geschäftsaufwendungen', color: '#795548' },
+        { name: 'Reisekosten', color: '#2196F3' },
+        { name: 'Öffentlichkeitsarbeit', color: '#E91E63' },
+        { name: 'Miete / Raumkosten', color: '#FF9800' },
+        { name: 'Porto / Versand', color: '#00BCD4' },
+        { name: 'Versicherung', color: '#9C27B0' },
+        { name: 'Honorare / Aufwandsentschädigung', color: '#F44336' },
+    ], [])
+
+    const [existingCategories, setExistingCategories] = useState<Array<{ id: number; name: string }>>([])
+    useEffect(() => {
+        let alive = true
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.customCategories?.list?.({ includeInactive: true })
+                const cats = (res?.categories || []) as any[]
+                if (!alive) return
+                setExistingCategories(
+                    (Array.isArray(cats) ? cats : []).map((c: any) => ({ id: Number(c.id), name: String(c.name || '') })).filter(c => c.id && c.name)
+                )
+            } catch {
+                if (alive) setExistingCategories([])
+            }
+        })()
+        return () => { alive = false }
+    }, [])
+
     const existingSet = useMemo(() => new Set((existingTags || []).map(t => t.name.trim().toLowerCase())), [existingTags])
+    const existingCategorySet = useMemo(() => new Set((existingCategories || []).map(c => c.name.trim().toLowerCase())), [existingCategories])
     const [selectedTags, setSelectedTags] = useState<Record<string, boolean>>(() => {
         const init: Record<string, boolean> = {}
         for (const t of suggestedTags) init[t.name] = !existingSet.has(t.name.toLowerCase()) // vorselektiert, wenn noch nicht vorhanden
         return init
     })
+    const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({})
+    useEffect(() => {
+        // Initialize defaults once we know existing categories
+        const init: Record<string, boolean> = {}
+        for (const c of suggestedCategories) init[c.name] = !existingCategorySet.has(c.name.toLowerCase())
+        setSelectedCategories(init)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedCategories, existingCategorySet.size])
+
     const [customTag, setCustomTag] = useState<string>('')
     const [customTags, setCustomTags] = useState<string[]>([])
+    const [customCategory, setCustomCategory] = useState<string>('')
+    const [customCategories, setCustomCategories] = useState<string[]>([])
     const [backupDir, setBackupDir] = useState<string>('')
     const [backupMsg, setBackupMsg] = useState<string>('')
     const [backupMode, setBackupMode] = useState<'SILENT' | 'PROMPT' | 'OFF'>('PROMPT')
     const [backupIntervalDays, setBackupIntervalDays] = useState<number>(7)
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
+
+    const suggestedModuleKeys = useMemo<ModuleKey[]>(() => (['budgets', 'instructors', 'cash-advance', 'excel-import', 'invoices'] as ModuleKey[]), [])
+    const [availableModules, setAvailableModules] = useState<ModuleInfo[]>([])
+    const [selectedModules, setSelectedModules] = useState<Record<string, boolean>>({})
+    const visibleModules = useMemo(() => (availableModules || []).filter(m => m.key !== 'custom-categories'), [availableModules])
+
+    useEffect(() => {
+        let alive = true
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.modules?.list?.()
+                const mods = (res?.modules || []) as ModuleInfo[]
+                if (!alive) return
+                setAvailableModules(Array.isArray(mods) ? mods : [])
+
+                const init: Record<string, boolean> = {}
+                for (const m of (Array.isArray(mods) ? mods : [])) {
+                    if (m.key === 'custom-categories') continue
+                    // Default: keep already enabled modules enabled, and additionally suggest a sensible starter set
+                    init[m.key] = Boolean(m.enabled) || suggestedModuleKeys.includes(m.key)
+                }
+                setSelectedModules(init)
+            } catch {
+                if (!alive) return
+                setAvailableModules([])
+                setSelectedModules({})
+            }
+        })()
+        return () => { alive = false }
+    }, [suggestedModuleKeys])
 
     function applyTablePreset(preset: TablePreset) {
         if (preset === 'custom') return // custom handled by direct edits
@@ -175,6 +262,22 @@ export default function SetupWizardModal({
             try { localStorage.setItem('journalCols', JSON.stringify(colsVisible)) } catch {}
             try { localStorage.setItem('journalColsOrder', JSON.stringify(colsOrder)) } catch {}
 
+            // Categories create
+            const catsToCreate: Array<{ name: string; color: string | null }> = []
+            for (const c of suggestedCategories) {
+                if (selectedCategories[c.name] && !existingCategorySet.has(c.name.toLowerCase())) catsToCreate.push({ name: c.name, color: c.color || null })
+            }
+            for (const n of customCategories) {
+                const nm = n.trim()
+                if (!nm) continue
+                if (existingCategorySet.has(nm.toLowerCase())) continue
+                if (catsToCreate.find(x => x.name.toLowerCase() === nm.toLowerCase())) continue
+                catsToCreate.push({ name: nm, color: colorForCategoryName(nm) })
+            }
+            for (const c of catsToCreate) {
+                try { await (window as any).api?.customCategories?.create?.({ name: c.name, color: c.color }) } catch {}
+            }
+
             // Tags upsert
             const toCreate: Array<{ name: string; color?: string }> = []
             for (const t of suggestedTags) {
@@ -190,6 +293,15 @@ export default function SetupWizardModal({
             for (const t of toCreate) {
                 try { await (window as any).api?.tags?.upsert?.({ name: t.name, color: t.color }) } catch {}
             }
+
+            // Modules enable/disable
+            for (const m of visibleModules) {
+                const want = Boolean(selectedModules[m.key])
+                if (m.key === 'custom-categories') continue
+                if (want === Boolean(m.enabled)) continue
+                try { await (window as any).api?.modules?.setEnabled?.({ moduleKey: m.key, enabled: want }) } catch {}
+            }
+            try { window.dispatchEvent(new Event('modules-changed')) } catch {}
 
             // Persist backup preferences (dir handled by choose/reset actions)
             try { await (window as any).api?.settings?.set?.({ key: 'backup.auto', value: backupMode }) } catch {}
@@ -353,7 +465,7 @@ export default function SetupWizardModal({
                         <li>Organisation: Name und Kassier/Nutzer</li>
                         <li>Darstellung: Menü, Zeilenlayout/-höhe, Farben (mit Vorschau)</li>
                         <li>Buchungsansicht: Spaltenanordnung und Sichtbarkeit</li>
-                        <li>Tags: häufige Stichwörter anlegen</li>
+                        <li>Module, Kategorien & Tags: Vorschläge übernehmen</li>
                         <li>Backups: Speicherort wählen und Hinweise</li>
                     </ul>
                 </div>
@@ -494,11 +606,11 @@ export default function SetupWizardModal({
             const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
             const lines = journalRowStyle === 'lines' || journalRowStyle === 'both'
             const demoRows = [
-                { actions: '✏️', date: '11 Sep', voucherNo: 'V001', type: 'IN', sphere: 'IDEELL', description: 'Mitgliedsbeitrag', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '+50,00 €', vat: '0,00 €', gross: '+50,00 €' },
-                { actions: '✏️', date: '12 Sep', voucherNo: 'V002', type: 'OUT', sphere: 'IDEELL', description: 'Material', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '−12,90 €', vat: '0,00 €', gross: '−12,90 €' }
+                { actions: '✏️', date: '11 Sep', voucherNo: 'V001', type: 'IN', sphere: 'Zuschuss / Fördermittel', description: 'Zuwendung', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '+50,00 €', vat: '0,00 €', gross: '+50,00 €' },
+                { actions: '✏️', date: '12 Sep', voucherNo: 'V002', type: 'OUT', sphere: 'Büromaterial', description: 'Material', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '−12,90 €', vat: '0,00 €', gross: '−12,90 €' }
             ]
             const headerLabels: Record<ColKey, string> = {
-                actions: 'Aktionen', date: 'Datum', voucherNo: 'Nr.', type: 'Art', sphere: 'Sphäre', description: 'Beschreibung', earmark: 'Zw.', budget: 'Budget', paymentMethod: 'Zahlweg', attachments: 'Anh.', net: 'Netto', vat: 'MwSt', gross: 'Brutto'
+                actions: 'Aktionen', date: 'Datum', voucherNo: 'Nr.', type: 'Art', sphere: 'Kategorie', description: 'Beschreibung', earmark: 'Zw.', budget: 'Budget', paymentMethod: 'Zahlweg', attachments: 'Anh.', net: 'Netto', vat: 'MwSt', gross: 'Brutto'
             }
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
@@ -567,7 +679,62 @@ export default function SetupWizardModal({
             const all = suggestedTags
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Wähle häufige Stichwörter. Du kannst später jederzeit weitere Tags anlegen.</div>
+                    <div>
+                        <strong>Module</strong>
+                        <div className="helper" style={{ marginTop: 4 }}>Vorschlag: Budgets, Übungsleiter, Barvorschüsse, Excel-Import, Verbindlichkeiten. Du kannst das später unter „Einstellungen → Module“ ändern.</div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                        {visibleModules.length === 0 ? (
+                            <div className="helper">Module konnten nicht geladen werden.</div>
+                        ) : (
+                            visibleModules.map((m) => (
+                                <label key={m.key} className="chip" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={!!selectedModules[m.key]}
+                                        onChange={(e) => setSelectedModules({ ...selectedModules, [m.key]: e.currentTarget.checked })}
+                                    />
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontWeight: 600 }}>{m.name}</div>
+                                        <div className="helper" style={{ marginTop: 2 }}>{m.description}</div>
+                                    </div>
+                                </label>
+                            ))
+                        )}
+                    </div>
+
+                    <div style={{ height: 8 }} />
+                    <div>
+                        <strong>Kategorien</strong>
+                        <div className="helper" style={{ marginTop: 4 }}>Vorschläge ohne Zahlencode – du kannst sie direkt anlegen lassen.</div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                        {suggestedCategories.map((c) => (
+                            <label key={c.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={!!selectedCategories[c.name]} onChange={(e) => setSelectedCategories({ ...selectedCategories, [c.name]: e.currentTarget.checked })} />
+                                <span>{c.name}</span>
+                                {existingCategorySet.has(c.name.toLowerCase()) && <span className="helper">(vorhanden)</span>}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="row">
+                        <div className="field" style={{ minWidth: 360 }}>
+                            <label>Eigene Kategorie</label>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <input className="input" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="z. B. Bürobedarf / Material" />
+                                <button className="btn hover-highlight" onClick={() => { const v = customCategory.trim(); if (v) { setCustomCategories([...customCategories, v]); setCustomCategory('') } }}>Hinzufügen</button>
+                            </div>
+                        </div>
+                    </div>
+                    {customCategories.length > 0 && (
+                        <div className="helper">Eigene Kategorien: {customCategories.join(', ')}</div>
+                    )}
+
+                    <div style={{ height: 8 }} />
+                    <div>
+                        <strong>Tags</strong>
+                        <div className="helper" style={{ marginTop: 4 }}>Wähle häufige Stichwörter. Du kannst später jederzeit weitere Tags anlegen.</div>
+                    </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                         {all.map(t => (
                             <label key={t.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

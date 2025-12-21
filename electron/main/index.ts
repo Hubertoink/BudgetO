@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename)
 const isDev = !app.isPackaged
 
 async function createWindow(): Promise<BrowserWindow> {
+    const devIconPath = path.join(process.cwd(), 'build', 'Icon.ico')
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -21,7 +22,8 @@ async function createWindow(): Promise<BrowserWindow> {
         show: false,
         autoHideMenuBar: true,
         frame: false,
-        title: 'VereinO',
+        title: 'BudgetO',
+        ...(isDev ? { icon: devIconPath } : {}),
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,

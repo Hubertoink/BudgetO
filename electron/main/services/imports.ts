@@ -14,6 +14,8 @@ export type ImportPreview = {
     headerRowIndex: number
 }
 
+type DuplicatePair = { date: string; grossAmount: number }
+
 export type ImportExecuteResult = {
     imported: number
     skipped: number
@@ -23,6 +25,7 @@ export type ImportExecuteResult = {
 
 export type ImportExecuteOptions = {
     createMissingCategories?: boolean
+    selectedRows?: number[]
 }
 
 const FIELD_KEYS = ['date', 'type', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'category', 'bankIn', 'bankOut', 'cashIn', 'cashOut'] as const
@@ -67,7 +70,7 @@ export async function previewXlsx(base64: string): Promise<ImportPreview> {
     if (!pick) throw new Error('Keine Tabelle gefunden')
     const { ws, headerRowIdx, headers, idxByHeader } = pick
     const sample: any[] = []
-    const maxR = Math.min(ws.actualRowCount, headerRowIdx + 20)
+    const maxR = Math.min(ws.actualRowCount, headerRowIdx + 50)
     for (let r = headerRowIdx + 1; r <= maxR; r++) {
         const rowObj: any = {}
         headers.forEach((h, i) => {
@@ -78,6 +81,48 @@ export async function previewXlsx(base64: string): Promise<ImportPreview> {
     }
     const suggestedMapping = suggestMapping(headers)
     return { headers, sample, suggestedMapping, headerRowIndex: headerRowIdx }
+}
+
+function duplicateKey(date: string, grossAmount: number): string {
+    const rounded = Math.round((grossAmount + Number.EPSILON) * 100) / 100
+    return `${date}|${rounded.toFixed(2)}`
+}
+
+export async function getDuplicateCountsByKey(pairs: DuplicatePair[]): Promise<{ countsByKey: Record<string, number> }> {
+    const countsByKey: Record<string, number> = {}
+    if (!pairs.length) return { countsByKey }
+
+    // Normalize + find min/max date to constrain DB query
+    const normalized: DuplicatePair[] = pairs
+        .map(p => ({ date: String(p.date).slice(0, 10), grossAmount: Number(p.grossAmount) }))
+        .filter(p => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && isFinite(p.grossAmount))
+    if (!normalized.length) return { countsByKey }
+
+    const dates = normalized.map(p => p.date).sort()
+    const minDate = dates[0]
+    const maxDate = dates[dates.length - 1]
+
+    const db = getDb()
+    const rows = db
+        .prepare(
+            `SELECT date as date, ROUND(gross_amount, 2) as amt, COUNT(*) as cnt
+             FROM vouchers
+             WHERE date >= ? AND date <= ? AND gross_amount IS NOT NULL
+             GROUP BY date, ROUND(gross_amount, 2)`
+        )
+        .all(minDate, maxDate) as Array<{ date: string; amt: number; cnt: number }>
+
+    const existing = new Map<string, number>()
+    for (const r of rows) {
+        const key = duplicateKey(String(r.date).slice(0, 10), Number(r.amt))
+        existing.set(key, Number(r.cnt) || 0)
+    }
+
+    for (const p of normalized) {
+        const key = duplicateKey(p.date, p.grossAmount)
+        countsByKey[key] = existing.get(key) || 0
+    }
+    return { countsByKey }
 }
 
 // --- CAMT.053 (ISO 20022) support ---
@@ -413,6 +458,8 @@ export async function executeXlsx(
     const earmarkIdByCode = new Map<string, number>()
     const categoryIdByKey = new Map<string, number>()
 
+    const selectedRowsSet = options?.selectedRows?.length ? new Set(options.selectedRows) : null
+
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
     const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
@@ -423,6 +470,12 @@ export async function executeXlsx(
 
     for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
         try {
+            if (selectedRowsSet && !selectedRowsSet.has(r)) {
+                skipped++
+                track(r, false, 'Vom Import abgewählt')
+                continue
+            }
+
             const get = (key: FieldKey): any => {
                 const h = mapping[key]
                 if (!h) return undefined

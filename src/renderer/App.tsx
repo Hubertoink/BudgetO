@@ -92,7 +92,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
     const text = [org || null, cashier || null].filter(Boolean).join(' | ')
     return (
         <div className="inline-flex items-center gap-8">
-            <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
+            <img src={appLogo} alt="BudgetO" width={24} height={24} style={{ borderRadius: 4, display: 'block' }} />
             <OrgSwitcher notify={notify} />
             {text ? (
                 <div className="helper text-ellipsis" title={text}>{text}</div>
@@ -614,7 +614,7 @@ function AppInner() {
             case 'date': return 'Datum'
             case 'voucherNo': return 'Nr.'
             case 'type': return 'Art'
-            case 'sphere': return 'Sphäre'
+            case 'sphere': return 'Kategorie'
             case 'description': return 'Beschreibung'
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'

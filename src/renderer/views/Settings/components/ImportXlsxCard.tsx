@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 interface ImportXlsxCardProps {
@@ -41,6 +41,153 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   const [showMissingCatsModal, setShowMissingCatsModal] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState<string>('')
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set())
+  const [duplicateCountsByRow, setDuplicateCountsByRow] = useState<Record<number, number>>({})
+
+  const effectiveHeaderRowIndex = headerRowIndex || 1
+  const rowNumberForSampleIndex = useMemo(() => {
+    return (i: number) => effectiveHeaderRowIndex + 1 + i
+  }, [effectiveHeaderRowIndex])
+
+  useEffect(() => {
+    if (!sample.length) {
+      setSelectedRows(new Set())
+      return
+    }
+    // Default: all preview rows selected
+    const next = new Set<number>()
+    for (let i = 0; i < sample.length; i++) next.add(rowNumberForSampleIndex(i))
+    setSelectedRows(next)
+  }, [sample, rowNumberForSampleIndex])
+
+  function parseNumber(v: any): number | null {
+    if (v == null || v === '') return null
+    if (typeof v === 'number' && isFinite(v)) return v
+    const s = String(v)
+      .replace(/\u00A0/g, ' ')
+      .replace(/[€\s]/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.')
+    const n = Number(s)
+    return isFinite(n) ? n : null
+  }
+
+  function toISODate(v: any): string | null {
+    if (v == null) return null
+    if (v instanceof Date) return v.toISOString().slice(0, 10)
+    if (typeof v === 'number' && isFinite(v)) {
+      const ms = (v - 25569) * 24 * 60 * 60 * 1000
+      return new Date(ms).toISOString().slice(0, 10)
+    }
+    const s = String(v).trim()
+    const dm = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s)
+    if (dm) {
+      const d = new Date(Date.UTC(Number(dm[3]), Number(dm[2]) - 1, Number(dm[1])))
+      return d.toISOString().slice(0, 10)
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    const n = Number(s)
+    if (isFinite(n) && n > 25569) {
+      const ms = (n - 25569) * 24 * 60 * 60 * 1000
+      return new Date(ms).toISOString().slice(0, 10)
+    }
+    return null
+  }
+
+  function duplicateKey(date: string, grossAmount: number): string {
+    const rounded = Math.round((grossAmount + Number.EPSILON) * 100) / 100
+    return `${date}|${rounded.toFixed(2)}`
+  }
+
+  function formatShortDate(v: any): string {
+    const iso = toISODate(v)
+    if (!iso) return String(v ?? '')
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+    if (!m) return iso
+    return `${m[3]}.${m[2]}.${m[1]}`
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!sample.length) {
+        setDuplicateCountsByRow({})
+        return
+      }
+
+      const dateHeader = (mapping as any)?.date as string | null
+      if (!dateHeader) {
+        setDuplicateCountsByRow({})
+        return
+      }
+
+      const amountHeaders: Array<string | null> = [
+        (mapping as any)?.grossAmount,
+        (mapping as any)?.inGross,
+        (mapping as any)?.outGross,
+        (mapping as any)?.bankIn,
+        (mapping as any)?.bankOut,
+        (mapping as any)?.cashIn,
+        (mapping as any)?.cashOut
+      ]
+
+      const activeAmountHeaders = amountHeaders.filter(Boolean) as string[]
+      if (!activeAmountHeaders.length) {
+        setDuplicateCountsByRow({})
+        return
+      }
+
+      const pairs: Array<{ date: string; grossAmount: number }> = []
+      const candidatesByRow: Record<number, string[]> = {}
+
+      for (let i = 0; i < sample.length; i++) {
+        const row = sample[i]
+        const rowNumber = rowNumberForSampleIndex(i)
+        const date = toISODate(row?.[dateHeader])
+        if (!date) continue
+
+        const keys: string[] = []
+        for (const h of activeAmountHeaders) {
+          const n = parseNumber(row?.[h])
+          if (n == null) continue
+          const amt = Math.abs(n)
+          if (!amt) continue
+          const key = duplicateKey(date, amt)
+          keys.push(key)
+          pairs.push({ date, grossAmount: amt })
+        }
+
+        if (keys.length) candidatesByRow[rowNumber] = keys
+      }
+
+      if (!pairs.length) {
+        setDuplicateCountsByRow({})
+        return
+      }
+
+      try {
+        const res = await window.api?.imports?.duplicates?.({ pairs })
+        const countsByKey = (res?.countsByKey || {}) as Record<string, number>
+        if (cancelled) return
+
+        const next: Record<number, number> = {}
+        for (const [rowNumberStr, keys] of Object.entries(candidatesByRow)) {
+          const rowNumber = Number(rowNumberStr)
+          let best = 0
+          for (const k of keys) best = Math.max(best, Number(countsByKey[k] || 0))
+          if (best > 0) next[rowNumber] = best
+        }
+        setDuplicateCountsByRow(next)
+      } catch {
+        if (!cancelled) setDuplicateCountsByRow({})
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [sample, mapping, rowNumberForSampleIndex])
 
   function bufferToBase64(buf: ArrayBuffer) {
     const bytes = new Uint8Array(buf)
@@ -129,7 +276,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
 
     setBusy(true)
     try {
-      const res = await window.api?.imports.execute?.({ fileBase64: base64, mapping })
+      const res = await window.api?.imports.execute?.({
+        fileBase64: base64,
+        mapping,
+        options: { selectedRows: Array.from(selectedRows).sort((a, b) => a - b) }
+      })
       if (res) {
         setResult(res)
         // let app know data changed
@@ -159,7 +310,10 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       const res = await window.api?.imports.execute?.({
         fileBase64: base64,
         mapping,
-        options: { createMissingCategories: true }
+        options: {
+          createMissingCategories: true,
+          selectedRows: Array.from(selectedRows).sort((a, b) => a - b)
+        }
       })
       if (res) {
         setResult(res)
@@ -181,6 +335,15 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       setMissingCats(null)
     }
   }
+
+  const allPreviewRows = useMemo(() => {
+    const rows: number[] = []
+    for (let i = 0; i < sample.length; i++) rows.push(rowNumberForSampleIndex(i))
+    return rows
+  }, [sample.length, rowNumberForSampleIndex])
+
+  const allSelected = allPreviewRows.length > 0 && allPreviewRows.every((r) => selectedRows.has(r))
+  const anySelected = allPreviewRows.some((r) => selectedRows.has(r))
 
   const fieldKeys: Array<{ key: string; label: string; required?: boolean; enumValues?: string[] }> = [
     { key: 'date', label: 'Datum', required: true },
@@ -245,7 +408,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     <div className="card" style={{ padding: 12 }}>
       <input ref={fileRef} type="file" accept=".xlsx,.xml" hidden onChange={onPickFile} />
       <div
-        className="input"
+        className="input import-dropzone"
         onDragOver={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -258,13 +421,12 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          borderRadius: 12,
-          border: '1px dashed var(--border)'
+          borderRadius: 12
         }}
         title="Datei hier ablegen oder auswählen"
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
+          <button type="button" className="btn primary" onClick={() => fileRef.current?.click()}>
             Datei auswählen
           </button>
           <span className="helper">{fileName || 'Keine ausgewählt'}</span>
@@ -408,11 +570,32 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       )}
       {sample.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <strong>Vorschau (erste 20 Zeilen)</strong>
+          <strong>Vorschau (erste 50 Zeilen)</strong>
           <div style={{ overflowX: 'auto', marginTop: 6 }}>
             <table cellPadding={6}>
               <thead>
                 <tr>
+                  <th align="left" style={{ width: 80 }}>
+                    <label className="inline-field">
+                      <input
+                        type="checkbox"
+                        aria-label="Alle Zeilen (Vorschau) auswählen"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (!el) return
+                          el.indeterminate = anySelected && !allSelected
+                        }}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setSelectedRows(() => {
+                            if (!checked) return new Set()
+                            return new Set(allPreviewRows)
+                          })
+                        }}
+                      />
+                      <span className="helper">Import</span>
+                    </label>
+                  </th>
                   {headers.map((h) => (
                     <th key={h} align="left">
                       {h || '(leer)'}
@@ -422,20 +605,56 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               </thead>
               <tbody>
                 {sample.map((row, i) => {
+                  const rowNumber = rowNumberForSampleIndex(i)
+                  const isSelected = selectedRows.has(rowNumber)
+                  const dupCount = duplicateCountsByRow[rowNumber] || 0
+                  const dateHeader = (mapping as any)?.date as string | null
+
                   // If we have a recent result, color-code by status: green for imported, dim/red for skipped/errors.
                   const st = result?.rowStatuses?.find(
-                    (rs) => rs.row === (headerRowIndex || 1) + 1 + i
+                    (rs) => rs.row === rowNumber
                   )
                   const bg = st
                     ? st.ok
                       ? 'color-mix(in oklab, var(--success) 12%, transparent)'
                       : 'color-mix(in oklab, var(--danger) 10%, transparent)'
-                    : undefined
+                    : isSelected
+                      ? 'color-mix(in oklab, var(--success) 8%, transparent)'
+                      : 'color-mix(in oklab, var(--danger) 8%, transparent)'
                   const title = st?.message
                   return (
                     <tr key={i} style={{ background: bg }} title={title}>
+                      <td>
+                        <label className="inline-field">
+                          <input
+                            type="checkbox"
+                            aria-label={`Zeile ${rowNumber} importieren`}
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedRows((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(rowNumber)) next.delete(rowNumber)
+                                else next.add(rowNumber)
+                                return next
+                              })
+                            }}
+                          />
+                          <span className="helper">{rowNumber}</span>
+                          {dupCount > 0 && (
+                            <span
+                              className="import-dup-hint"
+                              title={`Möglicherweise Duplikat: ${dupCount} bestehende Buchung(en) mit gleichem Datum + Bruttosumme`}
+                              aria-label={`Duplikat-Hinweis: ${dupCount} Treffer`}
+                            >
+                              ⧉
+                            </span>
+                          )}
+                        </label>
+                      </td>
                       {headers.map((h) => (
-                        <td key={h}>{String(row[h] ?? '')}</td>
+                        <td key={h}>
+                          {h && dateHeader && h === dateHeader ? formatShortDate(row[h]) : String(row[h] ?? '')}
+                        </td>
                       ))}
                     </tr>
                   )
