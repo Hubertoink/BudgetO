@@ -4,6 +4,7 @@ icon: assets/budget_logo.ico
 files:
   - dist/**
   - dist-electron/**
+  - assets/**
 asar: true
 asarUnpack:
   - '**/*.node'

@@ -88,6 +88,7 @@ interface JournalViewProps {
     from?: string
     to?: string
     filterSphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+    filterCategoryId?: number | null
     filterType?: 'IN' | 'OUT' | 'TRANSFER' | null
     filterPM?: 'BAR' | 'BANK' | null
     filterEarmark?: number | null
@@ -97,6 +98,7 @@ interface JournalViewProps {
     setFrom?: (v: string) => void
     setTo?: (v: string) => void
     setFilterSphere?: (v: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null) => void
+    setFilterCategoryId?: (v: number | null) => void
     setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
     setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
     setFilterEarmark?: (v: number | null) => void
@@ -137,6 +139,7 @@ export default function JournalView({
     from: fromProp,
     to: toProp,
     filterSphere: filterSphereProp,
+    filterCategoryId: filterCategoryIdProp,
     filterType: filterTypeProp,
     filterPM: filterPMProp,
     filterEarmark: filterEarmarkProp,
@@ -146,6 +149,7 @@ export default function JournalView({
     setFrom: setFromProp,
     setTo: setToProp,
     setFilterSphere: setFilterSphereProp,
+    setFilterCategoryId: setFilterCategoryIdProp,
     setFilterType: setFilterTypeProp,
     setFilterPM: setFilterPMProp,
     setFilterEarmark: setFilterEarmarkProp,
@@ -181,6 +185,7 @@ export default function JournalView({
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
+    const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
@@ -192,6 +197,7 @@ export default function JournalView({
     const activeFrom = fromProp !== undefined ? fromProp : from
     const activeTo = toProp !== undefined ? toProp : to
     const activeFilterSphere = filterSphereProp !== undefined ? filterSphereProp : filterSphere
+    const activeFilterCategoryId = filterCategoryIdProp !== undefined ? filterCategoryIdProp : filterCategoryId
     const activeFilterType = filterTypeProp !== undefined ? filterTypeProp : filterType
     const activeFilterPM = filterPMProp !== undefined ? filterPMProp : filterPM
     const activeFilterEarmark = filterEarmarkProp !== undefined ? filterEarmarkProp : filterEarmark
@@ -204,6 +210,7 @@ export default function JournalView({
     const activeSetFrom = setFromProp || setFrom
     const activeSetTo = setToProp || setTo
     const activeSetFilterSphere = setFilterSphereProp || setFilterSphere
+    const activeSetFilterCategoryId = setFilterCategoryIdProp || setFilterCategoryId
     const activeSetFilterType = setFilterTypeProp || setFilterType
     const activeSetFilterPM = setFilterPMProp || setFilterPM
     const activeSetFilterEarmark = setFilterEarmarkProp || setFilterEarmark
@@ -327,7 +334,12 @@ export default function JournalView({
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
         if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
-        if (activeFilterSphere) list.push({ key: 'sphere', label: `Kategorie: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
+        if (useCategoriesModule && activeFilterCategoryId != null) {
+            const name = categoryMap.get(activeFilterCategoryId)?.name
+            list.push({ key: 'category', label: `Kategorie: ${name || ('#' + activeFilterCategoryId)}`, clear: () => activeSetFilterCategoryId(null) })
+        } else if (activeFilterSphere) {
+            list.push({ key: 'sphere', label: `Kategorie: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
+        }
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
         if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
         if (activeFilterEarmark != null) {
@@ -341,7 +353,7 @@ export default function JournalView({
         if (activeFilterTag) list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null) })
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, activeQ])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, activeQ, activeSetFilterCategoryId])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -355,6 +367,7 @@ export default function JournalView({
                 sortBy,
                 paymentMethod: activeFilterPM || undefined,
                 sphere: activeFilterSphere || undefined,
+                categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
                 type: activeFilterType || undefined,
                 from: activeFrom || undefined,
                 to: activeTo || undefined,
@@ -371,7 +384,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -543,7 +556,7 @@ export default function JournalView({
                             <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
                         </span>
                     ))}
-                    {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
+                    {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterCategoryId != null || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
                         <button
                             className="btn ghost"
                             title="Alle Filter zurücksetzen"
@@ -552,6 +565,7 @@ export default function JournalView({
                                 activeSetFilterPM(null);
                                 activeSetFilterTag(null);
                                 activeSetFilterSphere(null);
+                                activeSetFilterCategoryId(null);
                                 activeSetFilterEarmark(null);
                                 activeSetFilterBudgetId(null);
                                 activeSetFrom('');
@@ -577,6 +591,7 @@ export default function JournalView({
                 to={activeTo || undefined} 
                 paymentMethod={activeFilterPM || undefined} 
                 sphere={activeFilterSphere || undefined} 
+                categoryId={useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined}
                 type={activeFilterType || undefined} 
                 earmarkId={activeFilterEarmark || undefined} 
                 budgetId={activeFilterBudgetId ?? undefined} 
@@ -629,6 +644,18 @@ export default function JournalView({
                         lockedUntil={periodLock?.closedUntil || null}
                         onTagClick={async (name) => {
                             activeSetFilterTag(name)
+                            setActivePage('Buchungen')
+                            activeSetPage(1)
+                            await loadRecent()
+                        }}
+                        onCategoryClick={async ({ categoryId, sphere }) => {
+                            if (typeof categoryId === 'number') {
+                                activeSetFilterCategoryId(categoryId)
+                                activeSetFilterSphere(null)
+                            } else if (sphere) {
+                                activeSetFilterSphere(sphere)
+                                activeSetFilterCategoryId(null)
+                            }
                             setActivePage('Buchungen')
                             activeSetPage(1)
                             await loadRecent()

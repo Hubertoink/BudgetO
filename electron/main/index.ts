@@ -12,8 +12,18 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
+function getWindowsIconPath(): string {
+    // Keep in sync with electron-builder.yml and ensure the file is packaged via `files: - assets/**`
+    const icoName = 'Budget_Logo.ico'
+    if (app.isPackaged) {
+        // In production the app is inside resources/app.asar
+        return path.join(process.resourcesPath, 'app.asar', 'assets', icoName)
+    }
+    return path.join(process.cwd(), 'assets', icoName)
+}
+
 async function createWindow(): Promise<BrowserWindow> {
-    const devIconPath = path.join(process.cwd(), 'assets', 'BudgetO_Logo.ico')
+    const winIconPath = getWindowsIconPath()
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -23,7 +33,8 @@ async function createWindow(): Promise<BrowserWindow> {
         autoHideMenuBar: true,
         frame: false,
         title: 'BudgetO',
-        ...(isDev ? { icon: devIconPath } : {}),
+        // Set explicitly so the distributed build shows an icon (titlebar/taskbar)
+        icon: winIconPath,
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,

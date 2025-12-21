@@ -390,6 +390,7 @@ export function listVouchersAdvancedPaged(filters: {
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -399,11 +400,12 @@ export function listVouchersAdvancedPaged(filters: {
     tag?: string
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
+    if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
@@ -643,6 +645,7 @@ export function batchAssignTags(params: {
 export function summarizeVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -651,12 +654,13 @@ export function summarizeVouchers(filters: {
     tag?: string
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, type, from, to, earmarkId, q, tag } = filters
+    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag } = filters
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
     if (paymentMethod) { wh.push('v.payment_method = ?'); paramsBase.push(paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
+    if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); paramsBase.push(categoryId) }
     if (type) { wh.push('v.type = ?'); paramsBase.push(type) }
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }

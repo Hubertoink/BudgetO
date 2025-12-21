@@ -88,6 +88,7 @@ interface JournalTableProps {
     sortDir: 'ASC' | 'DESC'
     sortBy: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere'
     onTagClick?: (name: string) => void
+    onCategoryClick?: (p: { categoryId?: number | null; categoryName?: string | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) => void
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
     highlightId?: number | null
@@ -113,6 +114,7 @@ export default function JournalTable({
     sortDir,
     sortBy,
     onTagClick,
+    onCategoryClick,
     onEarmarkClick,
     onBudgetClick,
     highlightId,
@@ -313,21 +315,34 @@ export default function JournalTable({
             <td key={k}>
                 {r.type === 'TRANSFER' ? '' : (
                     r.categoryId ? (
-                        <span
+                        <button
+                            type="button"
                             className="badge"
                             style={{
                                 background: r.categoryColor || 'var(--surface-alt)',
                                 color: contrastText(r.categoryColor || undefined),
-                                border: r.categoryColor ? `1px solid ${r.categoryColor}` : undefined
+                                border: r.categoryColor ? `1px solid ${r.categoryColor}` : undefined,
+                                cursor: onCategoryClick ? 'pointer' : undefined
                             }}
-                            title={r.categoryName || 'Kategorie'}
+                            title={r.categoryName ? `Nach Kategorie "${r.categoryName}" filtern` : 'Nach Kategorie filtern'}
+                            aria-label={r.categoryName ? `Nach Kategorie ${r.categoryName} filtern` : 'Nach Kategorie filtern'}
+                            onClick={(e) => { e.stopPropagation(); onCategoryClick?.({ categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null }) }}
                         >
                             {r.categoryName || 'Kategorie'}
-                        </span>
+                        </button>
                     ) : useCategoriesModule ? (
                         <span className="text-muted">—</span>
                     ) : (
-                        <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>
+                        <button
+                            type="button"
+                            className={`badge sphere-${r.sphere.toLowerCase()}`}
+                            style={{ cursor: onCategoryClick ? 'pointer' : undefined }}
+                            title={`Nach Kategorie "${r.sphere}" filtern`}
+                            aria-label={`Nach Kategorie ${r.sphere} filtern`}
+                            onClick={(e) => { e.stopPropagation(); onCategoryClick?.({ sphere: r.sphere }) }}
+                        >
+                            {r.sphere}
+                        </button>
                     )
                 )}
             </td>

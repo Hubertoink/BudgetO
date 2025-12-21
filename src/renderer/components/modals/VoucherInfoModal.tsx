@@ -8,6 +8,9 @@ type VoucherInfo = {
   date: string
   type: 'IN' | 'OUT' | 'TRANSFER'
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  categoryId?: number | null
+  categoryName?: string | null
+  categoryColor?: string | null
   description?: string | null
   paymentMethod?: 'BAR' | 'BANK' | null
   transferFrom?: 'BAR' | 'BANK' | null
@@ -48,6 +51,9 @@ function contrastText(bg?: string | null) {
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [] }: VoucherInfoModalProps) {
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
+
+  const categoryDisplay = voucher.categoryName || (typeof voucher.categoryId === 'number' ? `#${voucher.categoryId}` : sphereLabel)
+  const categoryColor = voucher.categoryColor || null
   
   // Find earmark with color
   const earmark = earmarks.find(e => e.id === voucher.earmarkId)
@@ -93,7 +99,7 @@ Belegnummer: ${voucher.voucherNo}
 Beschreibung: ${voucher.description || '-'}
 Brutto: ${eurFmt.format(voucher.grossAmount)}
 Art: ${typeLabel}
-Sphäre: ${sphereLabel}
+Kategorie: ${categoryDisplay}
 Budget: ${budgetDisplay}
 Zweckbindung: ${earmarkDisplay}
 Zahlweg: ${paymentLabel}
@@ -108,8 +114,8 @@ Tags: ${tagsDisplay}`
 
   const copyForExcel = () => {
     // Tab-separated format (headers + data)
-    const headers = 'Datum\tBelegnummer\tBeschreibung\tBrutto\tArt\tSphäre\tBudget\tZweckbindung\tZahlweg\tTags'
-    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${sphereLabel}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}`
+    const headers = 'Datum\tBelegnummer\tBeschreibung\tBrutto\tArt\tKategorie\tBudget\tZweckbindung\tZahlweg\tTags'
+    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${categoryDisplay}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}`
     const combined = `${headers}\n${data}`
     
     navigator.clipboard.writeText(combined).then(() => {
@@ -197,8 +203,27 @@ Tags: ${tagsDisplay}`
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Sphäre:</span>
-              <span>{sphereLabel}</span>
+              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Kategorie:</span>
+              <div>
+                {voucher.categoryName || typeof voucher.categoryId === 'number' ? (
+                  <span 
+                    className="badge"
+                    style={{
+                      background: categoryColor || 'var(--surface-alt)',
+                      color: contrastText(categoryColor || undefined),
+                      border: categoryColor ? `1px solid ${categoryColor}` : undefined,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      display: 'inline-block'
+                    }}
+                    title={categoryDisplay}
+                  >
+                    {categoryDisplay}
+                  </span>
+                ) : (
+                  <span>{sphereLabel}</span>
+                )}
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zahlweg:</span>

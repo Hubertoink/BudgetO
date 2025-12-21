@@ -109,6 +109,7 @@ export function registerIpcHandlers() {
             return ReportsSummaryOutput.parse(await remoteCall(cfg.serverAddress, 'reports.summary', {
                 paymentMethod: parsed.paymentMethod,
                 sphere: parsed.sphere,
+                categoryId: (parsed as any).categoryId,
                 type: parsed.type,
                 from: parsed.from,
                 to: parsed.to,
@@ -121,6 +122,7 @@ export function registerIpcHandlers() {
         const summary = summarizeVouchers({
             paymentMethod: parsed.paymentMethod as any,
             sphere: parsed.sphere as any,
+            categoryId: (parsed as any).categoryId,
             type: parsed.type as any,
             from: parsed.from,
             to: parsed.to,
@@ -746,6 +748,7 @@ export function registerIpcHandlers() {
             sortBy: (parsed as any).sortBy,
             paymentMethod: parsed.paymentMethod as any,
             sphere: parsed.sphere as any,
+            categoryId: (parsed as any).categoryId,
             type: parsed.type as any,
             from: parsed.from,
             to: parsed.to,

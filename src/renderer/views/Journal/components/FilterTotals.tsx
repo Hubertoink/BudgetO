@@ -6,6 +6,7 @@ interface FilterTotalsProps {
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     earmarkId?: number
     budgetId?: number | null
@@ -13,7 +14,7 @@ interface FilterTotalsProps {
     tag?: string
 }
 
-export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag }: FilterTotalsProps) {
+export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, categoryId, type, earmarkId, budgetId, q, tag }: FilterTotalsProps) {
     const [loading, setLoading] = useState(false)
     const [values, setValues] = useState<{ inGross: number; outGross: number; diff: number } | null>(null)
 
@@ -46,7 +47,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                     const diff = Math.round((inflow - spent) * 100) / 100
                     if (alive) setValues({ inGross: inflow, outGross: spent, diff })
                 } else {
-                    const res = await window.api?.reports.summary?.({ from, to, paymentMethod, sphere, type, earmarkId, q, tag })
+                    const res = await window.api?.reports.summary?.({ from, to, paymentMethod, sphere, categoryId, type, earmarkId, q, tag })
                     if (alive && res) {
                         const t = res.byType || []
                         const inGross = t.find((x: any) => x.key === 'IN')?.gross || 0
@@ -62,7 +63,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         }
         run()
         return () => { alive = false }
-    }, [from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag, refreshKey])
+    }, [from, to, paymentMethod, sphere, categoryId, type, earmarkId, budgetId, q, tag, refreshKey])
 
     useEffect(() => {
         let alive = true

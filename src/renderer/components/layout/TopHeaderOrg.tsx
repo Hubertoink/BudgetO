@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 
 // Resolve app icon for titlebar (works with Vite bundling)
-const appLogo: string = new URL('../../../../assets/BudgetO_Logo.ico', import.meta.url).href
+const appLogo: string = new URL('../../../../assets/Budget_Logo.ico', import.meta.url).href
 
 export default function TopHeaderOrg() {
     const [org, setOrg] = useState<string>('')

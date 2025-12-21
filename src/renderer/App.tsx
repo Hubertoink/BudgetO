@@ -41,7 +41,7 @@ import { UserIndicator } from './components/layout/UserIndicator'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
-const appLogo: string = new URL('../../assets/BudgetO_Logo.ico', import.meta.url).href
+const appLogo: string = new URL('../../assets/Budget_Logo.ico', import.meta.url).href
 
 // Safe ArrayBuffer -> base64 converter (chunked to avoid "Maximum call stack size exceeded")
 function bufferToBase64Safe(buf: ArrayBuffer) {
@@ -346,6 +346,21 @@ function AppInner() {
     // Setup Wizard modal state
     const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
 
+    // Auto-open Setup Wizard on first run (fresh install / fresh user profile)
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
+                const completed = Boolean(res?.value)
+                if (!cancelled && !completed) setShowSetupWizard(true)
+            } catch {
+                // If settings are temporarily unavailable, do nothing (avoid showing wizard repeatedly)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [])
+
     useEffect(() => {
         try { localStorage.setItem('activePage', activePage) } catch { }
     }, [activePage])
@@ -543,6 +558,7 @@ function AppInner() {
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
+    const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
@@ -570,7 +586,12 @@ function AppInner() {
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
         if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
-        if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        if (filterCategoryId != null && useCategoriesModule) {
+            const name = (customCategories || []).find(c => c.id === filterCategoryId)?.name
+            list.push({ key: 'category', label: `Kategorie: ${name || ('#' + filterCategoryId)}`, clear: () => setFilterCategoryId(null) })
+        } else if (filterSphere) {
+            list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
+        }
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
         if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
         if (filterEarmark != null) {
@@ -584,7 +605,7 @@ function AppInner() {
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
     if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '?' : ''), clear: () => setQ('') })
         return list
-    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
+    }, [from, to, filterSphere, filterCategoryId, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, useCategoriesModule, customCategories])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
     const activeChips = chips
 
@@ -934,6 +955,7 @@ function AppInner() {
                             from={from}
                             to={to}
                             filterSphere={filterSphere}
+                            filterCategoryId={filterCategoryId}
                             filterType={filterType}
                             filterPM={filterPM}
                             filterEarmark={filterEarmark}
@@ -943,6 +965,7 @@ function AppInner() {
                             setFrom={setFrom}
                             setTo={setTo}
                             setFilterSphere={setFilterSphere}
+                            setFilterCategoryId={setFilterCategoryId}
                             setFilterType={setFilterType}
                             setFilterPM={setFilterPM}
                             setFilterEarmark={setFilterEarmark}
