@@ -13,6 +13,7 @@ import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { useAuth } from '../../context/AuthContext'
+import { useModules } from '../../context/ModuleContext'
 
 /**
  * SettingsView - Main Settings Container
@@ -23,6 +24,8 @@ import { useAuth } from '../../context/AuthContext'
  */
 export function SettingsView(props: SettingsProps) {
   const { isReadonly } = useAuth()
+  const { isModuleEnabled, loading: modulesLoading } = useModules()
+  const importEnabled = isModuleEnabled('excel-import')
   const [activeTile, setActiveTile] = useState<TileKey>(() => {
     try {
       const saved = sessionStorage.getItem('settingsActiveTile')
@@ -48,17 +51,19 @@ export function SettingsView(props: SettingsProps) {
       { key: 'categories', icon: '📁', label: 'Kategorien' },
       { key: 'yearEnd', icon: '📊', label: 'Jahresabschluss' },
     ]
-    if (!isReadonly) return all
+    const withModuleGates = modulesLoading ? all : all.filter(t => t.key !== 'import' || importEnabled)
+    if (!isReadonly) return withModuleGates
     const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import'])
-    return all.filter(t => !hidden.has(t.key))
-  }, [isReadonly])
+    return withModuleGates.filter(t => !hidden.has(t.key))
+  }, [importEnabled, isReadonly, modulesLoading])
 
   useEffect(() => {
+    if (modulesLoading) return
     const allowed = new Set(visibleTiles.map(t => t.key))
     if (!allowed.has(activeTile)) {
       setActiveTile(visibleTiles[0]?.key ?? 'general')
     }
-  }, [activeTile, visibleTiles])
+  }, [activeTile, modulesLoading, visibleTiles])
 
   useEffect(() => {
     try {
@@ -130,7 +135,7 @@ export function SettingsView(props: SettingsProps) {
           />
         )}
         
-  {activeTile === 'import' && <ImportPane notify={props.notify} />}
+  {activeTile === 'import' && importEnabled && <ImportPane notify={props.notify} />}
 
   {activeTile === 'org' && <OrgPane notify={props.notify} />}
         

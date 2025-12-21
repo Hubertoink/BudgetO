@@ -1,22 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import BalanceAreaChart from './BalanceAreaChart'
-import IncomeExpenseBars from './IncomeExpenseBars'
-import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
-import ReportsCashBars from './charts/ReportsCashBars'
-// EarmarksUsageBars removed to avoid duplicate tile – combined in detail card
-// BudgetDeviationList (older Sphären‑Anteile donut) removed in favor of SphereShareCard
-// WorkQueueCard removed (Offene Aufgaben) per dashboard simplification request
-import EarmarkDetailCard from './EarmarkDetailCard'
-import BudgetDetailCard from './BudgetDetailCard'
-import SphereShareCard from './SphereShareCard'
-import AnnualBudgetCard from './AnnualBudgetCard'
-// LiquidityForecastArea removed per request
-import type { CommonFilters } from './types'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useIsModuleEnabled } from '../../context/ModuleContext'
+import BudgetOverviewWidget from './widgets/BudgetOverviewWidget'
+import HonorariaWidget from './widgets/HonorariaWidget'
+import CashAdvancesWidget from './widgets/CashAdvancesWidget'
+import CategorySpendingWidget from './widgets/CategorySpendingWidget'
 
 export default function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
+  void onGoToInvoices
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cashier, setCashier] = useState<string>('')
+  const instructorsEnabled = useIsModuleEnabled('instructors')
+  const cashAdvanceEnabled = useIsModuleEnabled('cash-advance')
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -42,8 +37,13 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
   }, [])
 
-  const [period, setPeriod] = useState<'MONAT' | 'JAHR' | 'GESAMT'>(() => {
-    try { return (localStorage.getItem('dashPeriod') as any) || 'JAHR' } catch { return 'JAHR' }
+  const [period, setPeriod] = useState<'MONAT' | 'JAHR'>(() => {
+    try {
+      const v = (localStorage.getItem('dashPeriod') as any) || 'JAHR'
+      return v === 'MONAT' ? 'MONAT' : 'JAHR'
+    } catch {
+      return 'JAHR'
+    }
   })
   useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
   const [yearSel, setYearSel] = useState<number | null>(null)
@@ -52,6 +52,21 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       setYearSel(yearsAvail[0])
     }
   }, [yearsAvail, period])
+
+  const { from, to, selectedYear, periodLabel } = useMemo(() => {
+    const now = new Date()
+    const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+
+    if (period === 'MONAT') {
+      const monthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+      const monthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+      return { from: monthFrom, to: monthTo, selectedYear: y, periodLabel: 'Monat' as const }
+    }
+
+    const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+    const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+    return { from: yearFrom, to: yearTo, selectedYear: y, periodLabel: 'Jahr' as const }
+  }, [period, yearSel])
 
   const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -62,25 +77,6 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
   }, [])
   useEffect(() => {
     let cancelled = false
-    const now = new Date()
-    const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
-    
-    let from: string, to: string
-    if (period === 'GESAMT') {
-      // Gesamtlaufzeit: vom ersten bis zum letzten verfügbaren Jahr
-      const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
-      const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
-      from = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
-    } else if (period === 'MONAT') {
-      from = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-    } else {
-      // JAHR
-      from = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-    }
-    
     window.api?.reports.summary?.({ from, to }).then(res => {
       if (cancelled || !res) return
       const inGross = res.byType.find(x => x.key === 'IN')?.gross || 0
@@ -90,143 +86,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       setSum({ inGross, outGross, diff })
     })
     return () => { cancelled = true }
-  }, [period, yearSel, refreshKey, yearsAvail])
-  const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-
-  const [invOpenCount, setInvOpenCount] = useState<number>(0)
-  const [invOpenRemaining, setInvOpenRemaining] = useState<number>(0)
-  const [invDueSoonCount, setInvDueSoonCount] = useState<number>(0)
-  const [invDueSoonRemaining, setInvDueSoonRemaining] = useState<number>(0)
-  const [invOverdueCount, setInvOverdueCount] = useState<number>(0)
-  const [invOverdueRemaining, setInvOverdueRemaining] = useState<number>(0)
-  const [invTopDue, setInvTopDue] = useState<Array<{ id: number; party: string; dueDate?: string | null; remaining: number }>>([])
-
-  // Member statistics
-  const [memberStats, setMemberStats] = useState<{ total: number; active: number; new: number; paused: number; left: number }>({ total: 0, active: 0, new: 0, paused: 0, left: 0 })
-  
-  useEffect(() => {
-    let cancelled = false
-    const loadStats = async () => {
-      try {
-        const [allRes, activeRes, newRes, pausedRes, leftRes] = await Promise.all([
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0 }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'ACTIVE' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'NEW' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'PAUSED' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'LEFT' })
-        ])
-        if (!cancelled) {
-          setMemberStats({
-            total: allRes?.total || 0,
-            active: activeRes?.total || 0,
-            new: newRes?.total || 0,
-            paused: pausedRes?.total || 0,
-            left: leftRes?.total || 0
-          })
-        }
-      } catch {}
-    }
-    loadStats()
-    const onChanged = () => loadStats()
-    window.addEventListener('data-changed', onChanged)
-    return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-  }, [])
-
-  const loadInvoiceTiles = useCallback(async () => {
-    try {
-      const now = new Date()
-      const isoToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10)
-      const plus5 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 5)).toISOString().slice(0, 10)
-      const yday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)).toISOString().slice(0, 10)
-      const sumTwo = (a: any, b: any) => ({ count: (a?.count || 0) + (b?.count || 0), remaining: (a?.remaining || 0) + (b?.remaining || 0) })
-      const sOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN' })
-      const sPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL' })
-      const openTot = sumTwo(sOpen, sPart)
-      setInvOpenCount(openTot.count)
-      setInvOpenRemaining(openTot.remaining)
-      const sSoonOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
-      const sSoonPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
-      const soonTot = sumTwo(sSoonOpen, sSoonPart)
-      setInvDueSoonCount(soonTot.count)
-      setInvDueSoonRemaining(soonTot.remaining)
-      const sOverOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueTo: yday })
-      const sOverPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueTo: yday })
-      const overTot = sumTwo(sOverOpen, sOverPart)
-      setInvOverdueCount(overTot.count)
-      setInvOverdueRemaining(overTot.remaining)
-      // Nächste Fälligkeiten: Alle offenen Verbindlichkeiten sortiert nach Fälligkeitsdatum (älteste zuerst)
-      const listOpen = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN' })
-      const listPart = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL' })
-      const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
-        .filter((r: any) => !!r && !!r.dueDate)
-        .sort((a: any, b: any) => String(a.dueDate).localeCompare(String(b.dueDate)))
-      const uniq: Map<number, any> = new Map()
-      for (const r of mergedRaw) { if (r && typeof r.id === 'number' && !uniq.has(r.id)) uniq.set(r.id, r) }
-      const merged = Array.from(uniq.values()).slice(0, 5)
-        .map((r: any) => ({ id: r.id, party: r.party, dueDate: r.dueDate, remaining: Math.max(0, Math.round(((Number(r.grossAmount || 0) - Number(r.paidSum || 0)) || 0) * 100) / 100) }))
-      setInvTopDue(merged)
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => { if (alive) await loadInvoiceTiles() })()
-    const onChanged = () => loadInvoiceTiles()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [loadInvoiceTiles])
-
-  // Active Zweckbindungen (earmarks) & Budgets for dashboard cards (max 2 each, exclude ended)
-  const [activeEarmarks, setActiveEarmarks] = useState<Array<{ id: number; code: string; name: string; endDate?: string | null; color?: string | null }>>([])
-  const [activeBudgets, setActiveBudgets] = useState<Array<{ id: number; name?: string | null; amountPlanned: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
-  useEffect(() => {
-    let alive = true
-  const todayIso = new Date().toISOString().slice(0,10)
-    const load = async () => {
-      try {
-        const earmarkRes = await (window as any).api?.bindings?.list?.({ activeOnly: true })
-        const rawEarmarks = (earmarkRes?.rows || []) as Array<any>
-        const filteredEarmarks = rawEarmarks
-          .filter(e => {
-            const sd = e.startDate ? String(e.startDate) : null
-            const ed = e.endDate ? String(e.endDate) : null
-            const startedOk = !sd || sd <= todayIso
-            const notEnded = !ed || ed >= todayIso
-            return startedOk && notEnded
-          })
-          .sort((a,b)=>{
-            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
-            const be = b.endDate ? String(b.endDate) : '9999-12-31'
-            return ae.localeCompare(be)
-          })
-          .slice(0,2)
-        if (alive) setActiveEarmarks(filteredEarmarks.map(e => ({ id: e.id, code: e.code, name: e.name, endDate: e.endDate || null, color: e.color || null })))
-      } catch { if (alive) setActiveEarmarks([]) }
-      try {
-        const budgetRes = await (window as any).api?.budgets?.list?.({})
-        const rawBudgets = (budgetRes?.rows || []) as Array<any>
-        const filteredBudgets = rawBudgets
-          .filter(b => {
-            const sd = b.startDate ? String(b.startDate) : null
-            const ed = b.endDate ? String(b.endDate) : null
-            const startedOk = !sd || sd <= todayIso
-            const notEnded = !ed || ed >= todayIso
-            return startedOk && notEnded
-          })
-          .sort((a,b)=>{
-            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
-            const be = b.endDate ? String(b.endDate) : '9999-12-31'
-            return ae.localeCompare(be)
-          })
-          .slice(0,2)
-        if (alive) setActiveBudgets(filteredBudgets.map(b => ({ id: b.id, name: b.name || null, amountPlanned: b.amountPlanned || 0, sphere: b.sphere, startDate: b.startDate || null, endDate: b.endDate || null, color: b.color || null })))
-      } catch { if (alive) setActiveBudgets([]) }
-    }
-    load()
-    const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [])
+  }, [from, to, refreshKey])
 
   return (
     <div className="card dashboard-card">
@@ -241,12 +101,11 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           <div className="helper">{quote?.author || quote?.source || ''}</div>
         </div>
       </div>
-        <div className="dashboard-grid-auto">
-          <div className="dashboard-period-row">
+      <div className="dashboard-grid-auto">
+        <div className="dashboard-period-row">
           <div className="btn-group" role="group" aria-label="Zeitraum">
-              <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
-              <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
-              <button className={`btn ghost ${period === 'GESAMT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('GESAMT')}>Gesamt</button>
+            <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
+            <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
           </div>
           {period === 'JAHR' && yearsAvail.length > 1 && (
             <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label="Jahr auswählen">
@@ -256,150 +115,20 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
             </select>
           )}
         </div>
-          <div className="card card--success summary-card">
-          <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
-            <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
-        </div>
-          <div className="card card--danger summary-card">
-          <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
-            <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
-        </div>
-          <div className="card card--accent summary-card">
-          <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
-            <div className="summary-value" style={{ color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
-        </div>
-      </div>
-        <div className="card card--accent chart-card-overflow">
-          <div className="chart-header-baseline">
-            <div className="legend-container">
-            <strong>Offene Verbindlichkeiten</strong>
-          </div>
-        </div>
-          <div className="dashboard-grid-wide">
-            <div className="card invoice-card-warning">
-            <div className="helper">Offen gesamt</div>
-              <div className="summary-value-overflow">{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
-          </div>
-            <div className="card invoice-card-warning">
-            <div className="helper">Fällig in ≤ 5 Tagen</div>
-              <div className="summary-value-overflow" style={{ color: '#f9a825' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
-          </div>
-            <div className="card invoice-card-danger">
-            <div className="helper">Überfällig</div>
-              <div className="summary-value-overflow" style={{ color: 'var(--danger)' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
-          </div>
-        </div>
-          <div className="overflow-container-mt">
-          <div className="helper">Nächste Fälligkeiten</div>
-          {invTopDue.length > 0 ? (
-              <div className="invoice-list-container">
-              {invTopDue.map((r) => {
-                const onOpen = () => {
-                  try { onGoToInvoices() } catch {}
-                  window.setTimeout(() => { window.dispatchEvent(new CustomEvent('open-invoice-details', { detail: { id: r.id } })) }, 0)
-                }
-                return (
-                    <div key={r.id} onClick={onOpen} title="Details öffnen" className="invoice-item-row">
-                    <div style={{ color: 'var(--text-dim)' }}>{r.dueDate || '—'}</div>
-                <div className="text-overflow-ellipsis">{r.party || '—'}</div>
-                <div className="text-right-bold">{eur.format(r.remaining || 0)}</div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="helper" style={{ marginTop: 6 }}>—</div>
-          )}
-        </div>
       </div>
 
-      {/* Mitgliederübersicht */}
-      <div className="card card--accent chart-card-overflow">
-        <div className="chart-header-baseline">
-          <div className="legend-container">
-            <strong>Mitglieder</strong>
-          </div>
-        </div>
-        <div className="dashboard-grid-wide">
-          <div className="card summary-card">
-            <div className="helper">Gesamt</div>
-            <div className="summary-value-overflow">{memberStats.total}</div>
-          </div>
-          <div className="card summary-card card--success">
-            <div className="helper">Aktiv</div>
-            <div className="summary-value-overflow">{memberStats.active}</div>
-          </div>
-          <div className="card summary-card">
-            <div className="helper">Neu</div>
-            <div className="summary-value-overflow">{memberStats.new}</div>
-          </div>
-          <div className="card summary-card">
-            <div className="helper">Pause</div>
-            <div className="summary-value-overflow">{memberStats.paused}</div>
-          </div>
-          <div className="card summary-card">
-            <div className="helper">Ausgetreten</div>
-            <div className="summary-value-overflow">{memberStats.left}</div>
-          </div>
-        </div>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <BudgetOverviewWidget
+          year={selectedYear}
+          periodLabel={periodLabel}
+          income={sum?.inGross || 0}
+          expenses={sum?.outGross || 0}
+          saldo={sum?.diff || 0}
+        />
+        <CategorySpendingWidget from={from} to={to} />
+        {instructorsEnabled ? <HonorariaWidget year={selectedYear} /> : null}
+        {cashAdvanceEnabled ? <CashAdvancesWidget /> : null}
       </div>
-
-      {(() => {
-        const now = new Date()
-        const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
-        
-        // Jahresbereich für Jahres-Charts
-        const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-        const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-        const yearFilters: CommonFilters = { from: yearFrom, to: yearTo }
-
-        // Monatsbereich (für Tagesverlauf im Kassenstand, wenn "Monat" gewählt ist)
-        const curMonthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-        const curMonthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-        
-        // Gesamtbereich über alle Jahre
-        const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
-        const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
-        const gesamtFrom = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
-        const gesamtTo = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
-        
-        const balanceFilters: CommonFilters = period === 'GESAMT'
-          ? { from: gesamtFrom, to: gesamtTo }
-          : period === 'MONAT'
-            ? { from: curMonthFrom, to: curMonthTo }
-            : yearFilters
-
-        return (
-          <>
-            {/* Alle Komponenten untereinander in einer Spalte */}
-            <div style={{ display: 'grid', gap: 12 }}>
-              {/* Jahresbudget Widget - nur anzeigen wenn Budget definiert */}
-              <AnnualBudgetCard year={y} />
-              <BalanceAreaChart {...balanceFilters} />
-              {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
-              {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {activeBudgets.map(b => (
-                    <BudgetDetailCard key={b.id} budgetId={b.id} from={yearFilters.from} to={yearFilters.to} />
-                  ))}
-                  {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
-                </div>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {activeEarmarks.map(em => (
-                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...yearFilters} />
-                  ))}
-                  {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
-                </div>
-              </div>
-              <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} />
-              <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
-              <SphereShareCard from={yearFilters.from} to={yearFilters.to} />
-              <IncomeExpenseBars {...balanceFilters} />
-            </div>
-          </>
-        )
-      })()}
 
       <DashboardRecentActivity />
     </div>
@@ -493,7 +222,7 @@ function DashboardRecentActivity() {
           if (same) return
           const f = fmt ? fmt(from) : (from == null ? '—' : String(from))
           const t = fmt ? fmt(to) : (to == null ? '—' : String(to))
-          const nameMap: Record<string,string> = { grossAmount: 'Brutto', netAmount: 'Netto', vatRate: 'USt%', paymentMethod: 'Zahlweg', description: 'Beschreibung', date: 'Datum', sphere: 'Sphäre', type: 'Art', earmarkId: 'Zweckbindung', budgetId: 'Budget', tags: 'Tags' }
+          const nameMap: Record<string,string> = { grossAmount: 'Brutto', netAmount: 'Netto', vatRate: 'USt%', paymentMethod: 'Zahlweg', description: 'Beschreibung', date: 'Datum', type: 'Art', earmarkId: 'Zweckbindung', budgetId: 'Budget', tags: 'Tags' }
           const nm = nameMap[k] || k
           changes.push(`${nm}: ${f} → ${t}`)
         }
@@ -503,7 +232,6 @@ function DashboardRecentActivity() {
         add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod)
         add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
-        add('sphere', d.before?.sphere, d.after?.sphere)
         // Zweckbindung: Code anzeigen statt ID
         add('earmarkId', d.before?.earmarkId, d.after?.earmarkId, (id: any) => {
           if (!id) return '—'

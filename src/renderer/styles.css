@@ -16,22 +16,67 @@
 .settings-pane-actions { margin-top: 8px; }
 
 /* Settings Navigation - Aktenreiter (file tab) style */
+.settings-tabs-wrap {
+    position: relative;
+}
+
+.settings-tabs-fade {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.settings-tabs-fade-left {
+    left: 0;
+    background: linear-gradient(
+        to right,
+        color-mix(in oklab, var(--surface) 85%, transparent),
+        transparent
+    );
+}
+
+.settings-tabs-fade-right {
+    right: 0;
+    background: linear-gradient(
+        to left,
+        color-mix(in oklab, var(--surface) 85%, transparent),
+        transparent
+    );
+}
+
+.settings-tabs-wrap.can-scroll-left .settings-tabs-fade-left { opacity: 1; }
+.settings-tabs-wrap.can-scroll-right .settings-tabs-fade-right { opacity: 1; }
+
 .settings-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
     margin-bottom: 0;
     padding-bottom: 0;
     position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+.settings-tabs::-webkit-scrollbar {
+    display: none; /* Chromium/WebKit */
 }
 
 /* Horizontal line that extends from the last tab to the right edge */
 .settings-tabs::after {
     content: '';
-    flex: 1;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     border-bottom: 1px solid var(--border);
-    align-self: flex-end;
-    margin-bottom: 0;
+    pointer-events: none;
 }
 
 .settings-tab {
@@ -49,6 +94,8 @@
     color: var(--text-dim);
     transition: background 0.15s, color 0.15s;
     margin-bottom: -1px;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .settings-tab:hover {

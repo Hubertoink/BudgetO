@@ -11,6 +11,7 @@ import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../reposit
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
+import { ensureExportsBaseDir } from './exportsDir'
 
 export interface FiscalReportOptions {
   fiscalYear: number
@@ -44,8 +45,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   // Create export directory
   const when = new Date()
   const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+  const baseDir = ensureExportsBaseDir()
   const filePath = path.join(baseDir, `Finanzamt_${fiscalYear}_${stamp}.pdf`)
 
   // 1. Get opening balance (previous year end)

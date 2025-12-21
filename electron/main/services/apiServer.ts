@@ -324,6 +324,26 @@ function registerHandlers() {
     return { buckets: monthlyVouchers(body) }
   })
 
+  apiHandlers.set('reports.byCategory', async (body) => {
+    const { summarizeVouchersByCategory } = await import('../repositories/vouchers')
+    return { rows: summarizeVouchersByCategory(body) }
+  })
+
+  apiHandlers.set('reports.balanceAt', async (body) => {
+    const { balanceAt } = await import('../repositories/vouchers')
+    return balanceAt(body)
+  })
+
+  apiHandlers.set('reports.byCategory', async (body) => {
+    const { summarizeVouchersByCategory } = await import('../repositories/vouchers')
+    return { rows: summarizeVouchersByCategory(body) }
+  })
+
+  apiHandlers.set('reports.balanceAt', async (body) => {
+    const { balanceAt } = await import('../repositories/vouchers')
+    return balanceAt(body)
+  })
+
   apiHandlers.set('reports.daily', async (body) => {
     const { dailyVouchers } = await import('../repositories/vouchers')
     return { buckets: dailyVouchers(body) }
@@ -632,6 +652,11 @@ function registerHandlers() {
   apiHandlers.set('cashAdvances.create', async (body) => {
     const { createCashAdvance } = await import('../repositories/cashAdvances')
     return createCashAdvance(body)
+  })
+
+  apiHandlers.set('cashAdvances.resolve', async (body) => {
+    const { resolveCashAdvance } = await import('../repositories/cashAdvances')
+    return resolveCashAdvance(body)
   })
 
   apiHandlers.set('cashAdvances.update', async (body) => {

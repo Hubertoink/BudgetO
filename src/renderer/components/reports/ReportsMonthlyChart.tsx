@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sphere, VoucherType, PaymentMethod } from './types'
+import { VoucherType, PaymentMethod } from './types'
 
 function monthKeys(from?: string, to?: string): string[] {
   // Build inclusive YYYY-MM keys; fallback to current year if props missing
@@ -21,10 +21,11 @@ function monthKeys(from?: string, to?: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod }) {
+export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod }) {
   const [loading, setLoading] = useState(false)
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
+  const [openingBalance, setOpeningBalance] = useState<number>(0)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -71,15 +72,42 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     let cancelled = false
     setLoading(true)
     Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod })
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'IN', paymentMethod: props.paymentMethod }),
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'OUT', paymentMethod: props.paymentMethod })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
       setInBuckets((inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
       setOutBuckets((outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
+  }, [props.from, props.to, props.paymentMethod, props.refreshKey])
+
+  // Budgetstart: annual budget amount for the selected year (if set).
+  useEffect(() => {
+    let cancelled = false
+    const from = props.from
+    if (!from) {
+      setOpeningBalance(0)
+      return
+    }
+    const year = Number(String(from).slice(0, 4))
+    if (!Number.isFinite(year) || year < 1900) {
+      setOpeningBalance(0)
+      return
+    }
+    const p = (window as any).api?.annualBudgets?.get?.({ year, costCenterId: null })
+    if (!p || typeof p.then !== 'function') {
+      setOpeningBalance(0)
+      return
+    }
+    p.then((budget: any) => {
+      if (cancelled) return
+      setOpeningBalance(Number(budget?.amount) || 0)
+    }).catch(() => {
+      if (!cancelled) setOpeningBalance(0)
+    })
+    return () => { cancelled = true }
+  }, [props.from, props.refreshKey])
 
   // Build the X-axis months based on filters
   // - With explicit from/to: show full continuous range (all months)
@@ -111,12 +139,13 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     outGross: -(outMap.get(m) || 0),
   }))
   const saldo = (() => {
-    let cum = 0
+    let cum = openingBalance
     return series.map((s) => { cum += (s.inGross + s.outGross); return cum })
   })()
   const scaleVals = (() => {
     const vals: number[] = []
     for (const s of series) { vals.push(Math.abs(s.inGross)); vals.push(Math.abs(s.outGross)); }
+    vals.push(Math.abs(openingBalance))
     for (const v of saldo) vals.push(Math.abs(v))
     return vals
   })()
@@ -209,11 +238,14 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   return (
     <div className="card" style={{ marginTop: 12, padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
-        <div className="legend">
+        <strong>Monatsverlauf (Balken: IN/OUT · Linie: Restbudget)</strong>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="helper" style={{ margin: 0 }}>Budgetstart: <strong style={{ color: 'var(--text)' }}>{eurFmt.format(openingBalance || 0)}</strong></div>
+          <div className="legend">
           <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
           <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
-          <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--accent)' }}></span>Saldo</span>
+          <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--accent)' }}></span>Restbudget</span>
+          </div>
         </div>
       </div>
       {loading && <div>Lade …</div>}
@@ -230,10 +262,11 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             return (
               <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)} {s.month.slice(0, 4)}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--text-dim)' }}>Budgetstart</span> <strong style={{ color: 'var(--text-dim)' }}>{eurFmt.format(openingBalance || 0)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>
-                <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--accent)' }}>Saldo kumuliert</span> <strong style={{ color: 'var(--accent)' }}>{eurFmt.format(saldo[idx] || 0)}</strong></div>
+                <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--accent)' }}>Restbudget</span> <strong style={{ color: 'var(--accent)' }}>{eurFmt.format(saldo[idx] || 0)}</strong></div>
               </div>
             )
           })()}

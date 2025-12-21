@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsByCategoryInput, ReportsByCategoryOutput, ReportsBalanceAtInput, ReportsBalanceAtOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
@@ -15,7 +15,8 @@ import { getSetting, setSetting } from '../services/settings'
 import { getTaxExemptionCertificate, saveTaxExemptionCertificate, deleteTaxExemptionCertificate, updateTaxExemptionValidity } from '../services/taxExemption'
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
-import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
+import { previewFile, executeFile, generateImportTemplate, generateImportTestData, findMissingCategories } from '../services/imports'
+import { ensureExportsBaseDir } from '../services/exportsDir'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
@@ -157,6 +158,47 @@ export function registerIpcHandlers() {
         return ReportsMonthlyOutput.parse({ buckets })
     })
 
+    ipcMain.handle('reports.byCategory', async (_e, payload) => {
+        const parsed = ReportsByCategoryInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsByCategoryOutput.parse(await remoteCall(cfg.serverAddress, 'reports.byCategory', {
+                from: parsed.from,
+                to: parsed.to,
+                paymentMethod: parsed.paymentMethod,
+                type: parsed.type
+            }))
+        }
+
+        const { summarizeVouchersByCategory } = await import('../repositories/vouchers')
+        return ReportsByCategoryOutput.parse({ rows: summarizeVouchersByCategory({
+            from: parsed.from,
+            to: parsed.to,
+            paymentMethod: parsed.paymentMethod as any,
+            type: parsed.type as any
+        }) })
+    })
+
+    ipcMain.handle('reports.balanceAt', async (_e, payload) => {
+        const parsed = ReportsBalanceAtInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return ReportsBalanceAtOutput.parse(await remoteCall(cfg.serverAddress, 'reports.balanceAt', {
+                to: parsed.to,
+                sphere: parsed.sphere
+            }))
+        }
+
+        const { balanceAt } = await import('../repositories/vouchers')
+        return ReportsBalanceAtOutput.parse(balanceAt({ to: parsed.to, sphere: parsed.sphere as any }))
+    })
+
     ipcMain.handle('reports.daily', async (_e, payload) => {
         const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
 
@@ -234,8 +276,7 @@ export function registerIpcHandlers() {
 
         const when = new Date()
         const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+        const baseDir = ensureExportsBaseDir()
 
         const defaultCols = ['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'] as const
         const colsSel = (parsed.fields && parsed.fields.length ? parsed.fields : defaultCols) as string[]
@@ -249,8 +290,7 @@ export function registerIpcHandlers() {
             // Phase 1 PDF: simple summary page rendered in an offscreen BrowserWindow and printed to PDF
             const when = new Date()
             const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-            const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-            try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+            const baseDir = ensureExportsBaseDir()
             const filePath = path.join(baseDir, `Controlling_${stamp}.pdf`)
 
             // Gather summary data for the report
@@ -1013,8 +1053,15 @@ export function registerIpcHandlers() {
         const parsed = ImportExecuteInput.parse(payload)
         // Safety: backup before potentially large data modification
         try { await backup.makeBackup('preImportRows') } catch { /* ignore */ }
-        const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
+        const res = await executeFile(parsed.fileBase64, parsed.mapping as any, (parsed as any).options)
         return ImportExecuteOutput.parse(res as any)
+    })
+
+    ipcMain.handle('imports.missingCategories', async (_e, payload) => {
+        const { ImportMissingCategoriesInput, ImportMissingCategoriesOutput } = await import('./schemas')
+        const parsed = ImportMissingCategoriesInput.parse(payload)
+        const res = await findMissingCategories(parsed.fileBase64, parsed.mapping as any)
+        return ImportMissingCategoriesOutput.parse(res as any)
     })
     ipcMain.handle('imports.template', async (_e, payload) => {
         ImportTemplateInput.parse(payload)
@@ -2583,6 +2630,22 @@ export function registerIpcHandlers() {
         const { createCashAdvance } = await import('../repositories/cashAdvances')
         const res = createCashAdvance(parsed)
         return CashAdvanceCreateOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.resolve', async (_e, payload) => {
+        const { CashAdvanceResolveInput, CashAdvanceResolveOutput } = await import('./schemas')
+        const parsed = CashAdvanceResolveInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvanceResolveOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.resolve', parsed))
+        }
+
+        const { resolveCashAdvance } = await import('../repositories/cashAdvances')
+        const res = resolveCashAdvance(parsed)
+        return CashAdvanceResolveOutput.parse(res)
     })
 
     ipcMain.handle('cashAdvances.update', async (_e, payload) => {

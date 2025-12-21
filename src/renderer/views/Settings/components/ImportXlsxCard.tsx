@@ -14,7 +14,6 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   const [mapping, setMapping] = useState<Record<string, string | null>>({
     date: null,
     type: null,
-    sphere: null,
     description: null,
     paymentMethod: null,
     netAmount: null,
@@ -23,11 +22,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     inGross: null,
     outGross: null,
     earmarkCode: null,
+    category: null,
     bankIn: null,
     bankOut: null,
     cashIn: null,
-    cashOut: null,
-    defaultSphere: 'IDEELL'
+    cashOut: null
   })
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<null | {
@@ -38,6 +37,8 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     errorFilePath?: string
   }>(null)
   const [showErrorsModal, setShowErrorsModal] = useState(false)
+  const [missingCats, setMissingCats] = useState<null | { names: Array<{ name: string; count: number }> }>(null)
+  const [showMissingCatsModal, setShowMissingCatsModal] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState<string>('')
 
@@ -95,6 +96,37 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       setError('Bitte zuerst eine XLSX-Datei auswählen.')
       return
     }
+
+    // Optional: detect missing categories from mapped "Kategorie" column before importing.
+    try {
+      if ((mapping as any)?.category) {
+        const check = await window.api?.imports?.missingCategories?.({ fileBase64: base64, mapping })
+        const missingNames = (check?.missingNames || []) as string[]
+        const missingIds = (check?.missingIds || []) as number[]
+        const nameCounts = (check?.missingNameCounts || {}) as Record<string, number>
+
+        if (missingIds.length > 0) {
+          setError(
+            `Kategorie-ID(s) nicht gefunden: ${missingIds.join(
+              ', '
+            )}. Bitte Datei/Zuordnung korrigieren oder Kategorie-ID entfernen.`
+          )
+          return
+        }
+
+        if (missingNames.length > 0) {
+          setMissingCats({
+            names: missingNames.map((n) => ({ name: n, count: Number(nameCounts[n] || 0) || 0 }))
+          })
+          setShowMissingCatsModal(true)
+          return
+        }
+      }
+    } catch (e: any) {
+      // If detection fails for any reason, do not block the import.
+      console.warn('missingCategories check failed', e)
+    }
+
     setBusy(true)
     try {
       const res = await window.api?.imports.execute?.({ fileBase64: base64, mapping })
@@ -119,10 +151,40 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     }
   }
 
+  async function runImportWithAutoCreateCategories() {
+    setShowMissingCatsModal(false)
+    setError('')
+    setBusy(true)
+    try {
+      const res = await window.api?.imports.execute?.({
+        fileBase64: base64,
+        mapping,
+        options: { createMissingCategories: true }
+      })
+      if (res) {
+        setResult(res)
+        window.dispatchEvent(new Event('data-changed'))
+        if ((res.errors?.length || 0) > 0) {
+          setShowErrorsModal(true)
+          if (res.errorFilePath) {
+            notify?.('info', `Fehler-Excel gespeichert: ${res.errorFilePath}`)
+          }
+        } else {
+          notify?.('success', `Import abgeschlossen: ${res.imported} importiert, ${res.skipped} übersprungen`)
+        }
+      }
+    } catch (e: any) {
+      setResult(null)
+      setError('Import fehlgeschlagen: ' + (e?.message || String(e)))
+    } finally {
+      setBusy(false)
+      setMissingCats(null)
+    }
+  }
+
   const fieldKeys: Array<{ key: string; label: string; required?: boolean; enumValues?: string[] }> = [
     { key: 'date', label: 'Datum', required: true },
     { key: 'type', label: 'Art (IN/OUT/TRANSFER)' },
-    { key: 'sphere', label: 'Sphäre (IDEELL/ZWECK/VERMOEGEN/WGB)', required: true },
     { key: 'description', label: 'Beschreibung' },
     { key: 'paymentMethod', label: 'Zahlweg (BAR/BANK)' },
     { key: 'netAmount', label: 'Netto' },
@@ -131,15 +193,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     { key: 'inGross', label: 'Einnahmen (Brutto)' },
     { key: 'outGross', label: 'Ausgaben (Brutto)' },
     { key: 'earmarkCode', label: 'Zweckbindung-Code' },
+    { key: 'category', label: 'Kategorie (Name oder ID)' },
     { key: 'bankIn', label: 'Bankkonto + (Einnahmen)' },
     { key: 'bankOut', label: 'Bankkonto - (Ausgaben)' },
     { key: 'cashIn', label: 'Barkonto + (Einnahmen)' },
-    { key: 'cashOut', label: 'Barkonto - (Ausgaben)' },
-    {
-      key: 'defaultSphere',
-      label: 'Standard-Sphäre (Fallback)',
-      enumValues: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']
-    }
+    { key: 'cashOut', label: 'Barkonto - (Ausgaben)' }
   ]
 
   // Helper to render a single mapping field with label and select
@@ -277,7 +335,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <li>Beste Lesbarkeit: Kopfzeile in Zeile 1, Daten ab Zeile 2 (erkannte Kopfzeile: Zeile {headerRowIndex || 1}).</li>
               <li>Keine zusammengeführten Zellen oder Leerzeilen im Kopfbereich.</li>
               <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden automatisch ignoriert.</li>
-              <li>Mindestens Datum und ein Betrag (Brutto oder Netto+USt). Optional: Art (IN/OUT/TRANSFER), Sphäre, Zweckbindung, Zahlweg.</li>
+              <li>Mindestens Datum und ein Betrag (Brutto oder Netto+USt). Optional: Art (IN/OUT/TRANSFER), Kategorie, Zweckbindung, Zahlweg.</li>
               <li>Tipp: Nutze "Vorlage herunterladen" bzw. "Testdatei erzeugen" als Referenz.</li>
             </ul>
           </div>
@@ -291,11 +349,8 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 keyName="type"
                 tooltip="Art der Buchung: Einnahme (IN), Ausgabe (OUT), Umbuchung (TRANSFER)"
               />
-              <Field
-                keyName="sphere"
-                tooltip="Sphäre aus der Datei. Wenn leer, wird die Standard-Sphäre genutzt."
-              />
               <Field keyName="earmarkCode" tooltip="Zweckbindung als Code/Abkürzung" />
+              <Field keyName="category" tooltip="Kategorie (Name oder ID)" />
             </div>
             <div className="field-group fg-amounts">
               <div className="group-title">💶 Beträge</div>
@@ -315,21 +370,6 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <Field keyName="bankOut" tooltip="Bankkonto Ausgaben (-)" />
               <Field keyName="cashIn" tooltip="Barkonto Einnahmen (+)" />
               <Field keyName="cashOut" tooltip="Barkonto Ausgaben (-)" />
-            </div>
-            <div className="field-group fg-defaults">
-              <div className="group-title">⚙️ Standardwerte</div>
-              <div className="field-row" style={{ alignItems: 'center' }}>
-                <Field
-                  keyName="defaultSphere"
-                  tooltip="Fallback Sphäre, wenn keine Sphäre-Spalte zugeordnet ist"
-                />
-                <span
-                  className="badge badge-default"
-                  title="Wird verwendet, wenn keine Sphäre-Spalte gewählt ist"
-                >
-                  Fallback
-                </span>
-              </div>
             </div>
           </div>
           <details className="mapping-summary" style={{ marginTop: 8 }}>
@@ -351,7 +391,6 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 Bankkonto+/-, Barkonto+/-. Bei letzteren werden automatisch mehrere Buchungen je Zeile
                 erzeugt.
               </li>
-              <li>"Standard-Sphäre" wird verwendet, wenn keine Sphäre-Spalte vorhanden ist.</li>
               <li>
                 Summenzeilen wie "Ergebnis/Summe/Saldo" werden automatisch übersprungen.
               </li>
@@ -444,6 +483,75 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
           ) : null}
         </div>
       )}
+
+      {showMissingCatsModal &&
+        missingCats &&
+        createPortal(
+          <div
+            className="modal-overlay"
+            onClick={() => setShowMissingCatsModal(false)}
+            role="dialog"
+            aria-modal="true"
+            style={{ zIndex: 10000 }}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+              <header
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8
+                }}
+              >
+                <h2 style={{ margin: 0 }}>Fehlende Kategorien</h2>
+                <button className="btn danger" onClick={() => setShowMissingCatsModal(false)}>
+                  Schließen
+                </button>
+              </header>
+              <div className="helper">
+                In der Importdatei sind Kategorien enthalten, die in BudgetO noch nicht existieren.
+                Soll BudgetO diese Kategorien automatisch anlegen und dann importieren?
+              </div>
+              <div
+                style={{
+                  marginTop: 10,
+                  maxHeight: 260,
+                  overflowY: 'auto',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: 8
+                }}
+              >
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {missingCats.names.map((n) => (
+                    <li key={n.name}>
+                      {n.name}
+                      {n.count > 1 ? ` (x${n.count})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="helper" style={{ marginTop: 10 }}>
+                Hinweis: Wenn du nicht automatisch anlegen möchtest, entferne die Kategorie-Zuordnung oder
+                lege die Kategorien vorher unter Einstellungen → Kategorien an.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                <button className="btn" onClick={() => setShowMissingCatsModal(false)} disabled={busy}>
+                  Abbrechen
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={runImportWithAutoCreateCategories}
+                  disabled={busy}
+                >
+                  Kategorien anlegen & Import starten
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
       {showErrorsModal &&
         result &&
         createPortal(

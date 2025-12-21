@@ -94,7 +94,10 @@ export function deleteAnnualBudget(id: number): { id: number } {
 }
 
 /**
- * Get budget usage for a specific year (sum of all OUT vouchers)
+ * Get budget usage for a specific year.
+ *
+ * BudgetO semantics: budget is reduced by net spending (OUT − IN).
+ * This means income increases remaining budget.
  */
 export function getAnnualBudgetUsage(params: { year: number; costCenterId?: number | null }): {
   budgeted: number
@@ -121,10 +124,15 @@ export function getAnnualBudgetUsage(params: { year: number; costCenterId?: numb
     WHERE date >= ? AND date <= ?
   `).get(yearStart, yearEnd) as { spent: number; income: number }
   
-  const spent = row.spent
-  const income = row.income
-  const remaining = budgeted - spent
-  const percentage = budgeted > 0 ? Math.min(100, (spent / budgeted) * 100) : 0
+  const spent = Number(row.spent || 0)
+  const income = Number(row.income || 0)
+
+  // Net spending reduces remaining; income increases it.
+  const netSpent = spent - income
+  const remaining = budgeted - netSpent
+
+  // Show usage based on net spending; never go below 0%.
+  const percentage = budgeted > 0 ? Math.min(100, Math.max(0, (netSpent / budgeted) * 100)) : 0
   
   return { budgeted, spent, income, remaining, percentage }
 }

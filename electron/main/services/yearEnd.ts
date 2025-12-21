@@ -6,6 +6,7 @@ import { getDb } from '../db/database'
 import { getSetting, setSetting } from './settings'
 import { summarizeVouchers, monthlyVouchers, listVouchersAdvanced, cashBalance as getCashBalance } from '../repositories/vouchers'
 import { writeAudit } from './audit'
+import { ensureExportsBaseDir } from './exportsDir'
 
 export async function preview(year: number) {
     const from = `${year}-01-01`
@@ -30,8 +31,7 @@ export async function preview(year: number) {
 export async function exportPackage(year: number): Promise<{ filePath: string }> {
     const from = `${year}-01-01`
     const to = `${year}-12-31`
-    const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-    try { fs.mkdirSync(baseDir, { recursive: true }) } catch {}
+    const baseDir = ensureExportsBaseDir()
     const stamp = `${year}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`
     const filePath = path.join(baseDir, `Jahresabschluss_${stamp}.xlsx`)
 

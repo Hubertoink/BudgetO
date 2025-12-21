@@ -8,6 +8,10 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
   const { canWrite } = useAuth()
   const { modules, loading, setModuleEnabled } = useModules()
 
+  // BudgetO arbeitet ausschließlich mit eigenen Kategorien.
+  // Daher wird dieses Modul nicht als optionales Toggle angeboten.
+  const visibleModules = modules.filter((m) => m.key !== 'custom-categories')
+
   const handleToggle = async (mod: ModuleInfo) => {
     if (!canWrite) return
     try {
@@ -42,7 +46,7 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
       )}
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {modules.map((mod) => (
+        {visibleModules.map((mod) => (
           <div
             key={mod.key}
             className="card"

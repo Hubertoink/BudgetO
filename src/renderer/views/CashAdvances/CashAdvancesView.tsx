@@ -90,6 +90,11 @@ export default function CashAdvancesView() {
     settledAt: string
   }>(null)
 
+  const [resolveModal, setResolveModal] = useState<null | {
+    createCounterVoucher: boolean
+    confirmIrreversible: boolean
+  }>(null)
+
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<null | {
     partialId: number
     recipientName: string
@@ -298,16 +303,31 @@ export default function CashAdvancesView() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Update Status
+  // Resolve (irreversible close)
   // ─────────────────────────────────────────────────────────────────────────
-  const updateStatus = async (newStatus: CashAdvanceStatus) => {
+  const openResolve = () => {
     if (!detail) return
+    const allPartialsSettled = detail.partials.every((p) => p.isSettled)
+    if (!allPartialsSettled) {
+      notify('error', 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind')
+      return
+    }
+    setResolveModal({ createCounterVoucher: false, confirmIrreversible: false })
+  }
+
+  const confirmResolve = async () => {
+    if (!detail || !resolveModal) return
+    if (!resolveModal.confirmIrreversible) {
+      notify('error', 'Bitte bestätige, dass der Abschluss irreversibel ist')
+      return
+    }
     try {
-      await (window as any).api?.cashAdvances?.update?.({
+      const res = await (window as any).api?.cashAdvances?.resolve?.({
         id: detail.id,
-        status: newStatus
+        createCounterVoucher: resolveModal.createCounterVoucher
       })
-      notify('success', newStatus === 'RESOLVED' ? 'Barvorschuss abgeschlossen' : 'Status geändert')
+      notify('success', res?.counterVoucherId ? 'Barvorschuss abgeschlossen und Differenz gebucht' : 'Barvorschuss abgeschlossen')
+      setResolveModal(null)
       await load()
       await loadDetail(detail.id)
     } catch (e: any) {
@@ -512,18 +532,26 @@ export default function CashAdvancesView() {
                 </div>
                 <div style={{ marginTop: 8 }}>
                   {detail.status === 'OPEN' && (
-                    <button className="btn primary" style={{ fontSize: 13 }} onClick={() => updateStatus('RESOLVED')}>
+                    (() => {
+                      const canResolve = detail.partials.every((p) => p.isSettled)
+                      return (
+                    <button
+                      className="btn primary"
+                      onClick={openResolve}
+                      aria-disabled={!canResolve}
+                      title={!canResolve
+                        ? 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind'
+                        : undefined}
+                      style={{
+                        fontSize: 13,
+                        opacity: canResolve ? 1 : 0.6,
+                        cursor: canResolve ? 'pointer' : 'not-allowed'
+                      }}
+                    >
                       ✓ Abschließen
                     </button>
-                  )}
-                  {detail.status === 'RESOLVED' && (
-                    <button 
-                      className="btn" 
-                      style={{ fontSize: 13, background: 'var(--surface-alt)', border: '1px solid var(--border)' }} 
-                      onClick={() => updateStatus('OPEN')}
-                    >
-                      ↩ Wieder öffnen
-                    </button>
+                      )
+                    })()
                   )}
                 </div>
               </div>
@@ -549,22 +577,6 @@ export default function CashAdvancesView() {
                 subLabel={`Faktisch verfügbar: ${eurFmt.format(detail.actualRemaining)}`}
               />
               
-              {/* Coverage indicator */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                marginTop: 8,
-                padding: '8px 12px',
-                borderRadius: 8,
-                background: detail.coverage > 0 ? '#F4433615' : detail.coverage < 0 ? '#4CAF5015' : 'transparent'
-              }}>
-                <span className="helper">Deckung:</span>
-                <span style={{ fontWeight: 700, color: detail.coverage > 0 ? '#F44336' : detail.coverage < 0 ? '#4CAF50' : 'var(--text)' }}>
-                  {detail.coverage > 0 ? '+' : ''}{eurFmt.format(detail.coverage)}
-                  {detail.coverage > 0 ? ' ⚠️' : detail.coverage < 0 ? ' ✓' : ''}
-                </span>
-              </div>
             </div>
 
             {/* Buttons */}
@@ -876,6 +888,77 @@ export default function CashAdvancesView() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button className="btn ghost" onClick={() => setSettleModal(null)}>Abbrechen</button>
               <button className="btn primary" onClick={settlePartial}>Abrechnen</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Resolve Modal (irreversibel abschließen) */}
+      {resolveModal && detail && createPortal(
+        <div className="modal-overlay" onClick={() => setResolveModal(null)} role="dialog" aria-modal="true">
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <ModalHeader title="Barvorschuss abschließen" onClose={() => setResolveModal(null)} />
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="card" style={{ padding: 12, background: 'var(--surface-alt)' }}>
+                <div style={{ fontWeight: 700 }}>⚠️ Irreversibel</div>
+                <div className="helper" style={{ marginTop: 4 }}>
+                  Nach dem Abschluss kann der Barvorschuss nicht wieder geöffnet werden.
+                </div>
+              </div>
+
+              {(() => {
+                const diff = (detail.totalAmount || 0) - (detail.totalSettled || 0)
+                const abs = Math.abs(diff)
+                const label = diff > 0 ? 'Rückgeld (unter Ausgaben)' : diff < 0 ? 'Nachschuss (über Ausgaben)' : 'Keine Differenz'
+                const color = diff > 0 ? '#4CAF50' : diff < 0 ? '#F44336' : 'var(--text)'
+                return (
+                  <div className="card" style={{ padding: 12 }}>
+                    <div className="helper">Differenz (Vorschuss − Ausgegeben)</div>
+                    <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4, color }}>
+                      {diff > 0 ? '+' : diff < 0 ? '-' : ''}{eurFmt.format(abs)}
+                    </div>
+                    <div className="helper" style={{ marginTop: 4 }}>{label}</div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: abs > 0 ? 'pointer' : 'not-allowed' }}>
+                        <input
+                          type="checkbox"
+                          checked={resolveModal.createCounterVoucher}
+                          disabled={abs === 0}
+                          onChange={(e) => setResolveModal({ ...resolveModal, createCounterVoucher: e.target.checked })}
+                          style={{ width: 18, height: 18 }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 600 }}>🧾 Differenz gegenbuchen</div>
+                          <div className="helper" style={{ marginTop: 2 }}>
+                            Erstellt eine {diff > 0 ? 'Einnahme' : diff < 0 ? 'Ausgabe' : ''}-Buchung (Zahlweg: BAR)
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={resolveModal.confirmIrreversible}
+                  onChange={(e) => setResolveModal({ ...resolveModal, confirmIrreversible: e.target.checked })}
+                  style={{ width: 18, height: 18 }}
+                />
+                <div>
+                  <div style={{ fontWeight: 600 }}>Ich bestätige: Abschluss ist irreversibel</div>
+                </div>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button className="btn ghost" onClick={() => setResolveModal(null)}>Abbrechen</button>
+              <button className="btn primary" onClick={confirmResolve}>
+                Abschließen
+              </button>
             </div>
           </div>
         </div>,

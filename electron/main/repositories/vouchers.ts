@@ -13,7 +13,7 @@ function round2(n: number) {
     return Math.round(n * 100) / 100
 }
 
-export function createVoucher(input: {
+export type CreateVoucherInput = {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -33,47 +33,48 @@ export function createVoucher(input: {
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
-}) {
-    return withTransaction((d: DB) => {
-        const warnings: string[] = []
-        ensurePeriodOpen(input.date, d)
-        const date = new Date(input.date)
-        const year = date.getFullYear()
-        // sequence and voucherNo will be (re)generated inside retry loop
+}
 
-        // compute based on provided net or gross
-        let netAmount: number
-        let grossAmount: number
-        let vatAmount: number
-        if (typeof input.netAmount === 'number') {
-            netAmount = input.netAmount
-            vatAmount = round2((netAmount * input.vatRate) / 100)
-            grossAmount = round2(netAmount + vatAmount)
-        } else if (typeof input.grossAmount === 'number') {
-            // User provided gross; do not infer VAT/net automatically
-            grossAmount = input.grossAmount
-            netAmount = 0
-            vatAmount = 0
-        } else {
-            throw new Error('Either netAmount or grossAmount must be provided')
+export function createVoucherTx(d: DB, input: CreateVoucherInput) {
+    const warnings: string[] = []
+    ensurePeriodOpen(input.date, d)
+    const date = new Date(input.date)
+    const year = date.getFullYear()
+    // sequence and voucherNo will be (re)generated inside retry loop
+
+    // compute based on provided net or gross
+    let netAmount: number
+    let grossAmount: number
+    let vatAmount: number
+    if (typeof input.netAmount === 'number') {
+        netAmount = input.netAmount
+        vatAmount = round2((netAmount * input.vatRate) / 100)
+        grossAmount = round2(netAmount + vatAmount)
+    } else if (typeof input.grossAmount === 'number') {
+        // User provided gross; do not infer VAT/net automatically
+        grossAmount = input.grossAmount
+        netAmount = 0
+        vatAmount = 0
+    } else {
+        throw new Error('Either netAmount or grossAmount must be provided')
+    }
+
+    // Earmark validations (if provided)
+    if (input.earmarkId != null) {
+        const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(input.earmarkId) as any
+        if (!em) throw new Error('Zweckbindung nicht gefunden')
+        if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
+        
+        // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+        if (em.enforceTimeRange) {
+            if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+            if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
         }
 
-        // Earmark validations (if provided)
-        if (input.earmarkId != null) {
-            const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(input.earmarkId) as any
-            if (!em) throw new Error('Zweckbindung nicht gefunden')
-            if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-            
-            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
-            if (em.enforceTimeRange) {
-                if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-                if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
-            }
-
-            // Negative-balance protection (using junction table)
-            const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
-            if (!cfg.allowNegative && input.type === 'OUT') {
-                const balRow = d.prepare(`
+        // Negative-balance protection (using junction table)
+        const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
+        if (!cfg.allowNegative && input.type === 'OUT') {
+            const balRow = d.prepare(`
                     SELECT
                       IFNULL(SUM(CASE WHEN v.type='IN' THEN ve.amount ELSE 0 END),0) as allocated,
                       IFNULL(SUM(CASE WHEN v.type='OUT' THEN ve.amount ELSE 0 END),0) as released
@@ -81,117 +82,120 @@ export function createVoucher(input: {
                     JOIN vouchers v ON v.id = ve.voucher_id
                     WHERE ve.earmark_id = ? AND v.date <= ?
                 `).get(input.earmarkId, input.date) as any
-                const em2 = d.prepare('SELECT budget FROM earmarks WHERE id=?').get(input.earmarkId) as any
-                const budget = Number(em2?.budget ?? 0) || 0
-                const currentBalance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
-                const remaining = Math.round(((budget + currentBalance) * 100)) / 100
-                const wouldBe = Math.round(((remaining - (grossAmount ?? 0)) * 100)) / 100
-                if (wouldBe < 0) {
+            const em2 = d.prepare('SELECT budget FROM earmarks WHERE id=?').get(input.earmarkId) as any
+            const budget = Number(em2?.budget ?? 0) || 0
+            const currentBalance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
+            const remaining = Math.round(((budget + currentBalance) * 100)) / 100
+            const wouldBe = Math.round(((remaining - (grossAmount ?? 0)) * 100)) / 100
+            if (wouldBe < 0) {
                     warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
-                }
             }
         }
+    }
 
-        // Budget validations (if provided)
-        if (input.budgetId != null) {
-            const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(input.budgetId) as any
-            if (!budget) throw new Error('Budget nicht gefunden')
-            
-            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
-            if (budget.enforceTimeRange) {
-                if (budget.startDate && input.date < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
-                if (budget.endDate && input.date > budget.endDate) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${budget.endDate})`)
-            }
+    // Budget validations (if provided)
+    if (input.budgetId != null) {
+        const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(input.budgetId) as any
+        if (!budget) throw new Error('Budget nicht gefunden')
+        
+        // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+        if (budget.enforceTimeRange) {
+            if (budget.startDate && input.date < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
+            if (budget.endDate && input.date > budget.endDate) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${budget.endDate})`)
         }
+    }
 
-        const stmt = d.prepare(`
+    const stmt = d.prepare(`
       INSERT INTO vouchers (
     year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
         net_amount, vat_rate, vat_amount, gross_amount, payment_method, transfer_from, transfer_to, counterparty, created_by
         ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
-        let id: number | null = null
-        let lastVoucherNo: string = ''
-        // BudgetO: Sequenz pro Tag (nicht pro Sphäre) - bis zu 9999 Buchungen/Tag
-        const maxSeqRow = d.prepare(
-            'SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM vouchers WHERE date = ?'
-        ).get(input.date) as { maxSeq: number }
-        let seq = maxSeqRow.maxSeq + 1
-        
-        // Retry a few times in case of rare UNIQUE collisions
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const voucherNo = makeVoucherNo(year, input.date, '', seq)
-            lastVoucherNo = voucherNo
-            try {
-                const info = stmt.run(
-                    year,
-                    seq,
-                    voucherNo,
-                    input.date,
-                    input.type,
-                    input.sphere,
-                    input.categoryId ?? null,
-                    input.projectId ?? null,
-                    input.earmarkId ?? null,
-                    input.earmarkAmount ?? null,
-                    input.budgetId ?? null,
-                    input.budgetAmount ?? null,
-                    input.description ?? null,
-                    netAmount,
-                    input.vatRate,
-                    vatAmount,
-                    grossAmount,
-                    input.paymentMethod ?? null,
-                    input.transferFrom ?? null,
-                    input.transferTo ?? null,
-                    input.createdBy ?? null
-                )
-                id = Number(info.lastInsertRowid)
-                
-                // Update sequence table to stay in sync
-                d.prepare(
-                    'INSERT INTO voucher_sequences(year, sphere, last_seq_no) VALUES(?,?,?) ON CONFLICT(year, sphere) DO UPDATE SET last_seq_no = MAX(excluded.last_seq_no, voucher_sequences.last_seq_no)'
-                ).run(year, input.sphere, seq)
-                
-                break
-            } catch (e: any) {
-                const msg = String(e?.message || '')
-                const code = String((e as any)?.code || '')
-                const isUnique = code.includes('SQLITE_CONSTRAINT') || /UNIQUE constraint failed/i.test(msg)
-                if (!isUnique) throw e
-                // Increment seq and retry
-                seq++
-                if (attempt === 4) throw new Error('Konnte Belegnummer nicht vergeben (UNIQUE). Bitte erneut versuchen.')
-            }
+    let id: number | null = null
+    let lastVoucherNo: string = ''
+    // BudgetO: Sequenz pro Tag (nicht pro Sphäre) - bis zu 9999 Buchungen/Tag
+    const maxSeqRow = d.prepare(
+        'SELECT COALESCE(MAX(seq_no), 0) as maxSeq FROM vouchers WHERE date = ?'
+    ).get(input.date) as { maxSeq: number }
+    let seq = maxSeqRow.maxSeq + 1
+    
+    // Retry a few times in case of rare UNIQUE collisions
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const voucherNo = makeVoucherNo(year, input.date, '', seq)
+        lastVoucherNo = voucherNo
+        try {
+            const info = stmt.run(
+                year,
+                seq,
+                voucherNo,
+                input.date,
+                input.type,
+                input.sphere,
+                input.categoryId ?? null,
+                input.projectId ?? null,
+                input.earmarkId ?? null,
+                input.earmarkAmount ?? null,
+                input.budgetId ?? null,
+                input.budgetAmount ?? null,
+                input.description ?? null,
+                netAmount,
+                input.vatRate,
+                vatAmount,
+                grossAmount,
+                input.paymentMethod ?? null,
+                input.transferFrom ?? null,
+                input.transferTo ?? null,
+                input.createdBy ?? null
+            )
+            id = Number(info.lastInsertRowid)
+            
+            // Update sequence table to stay in sync
+            d.prepare(
+                'INSERT INTO voucher_sequences(year, sphere, last_seq_no) VALUES(?,?,?) ON CONFLICT(year, sphere) DO UPDATE SET last_seq_no = MAX(excluded.last_seq_no, voucher_sequences.last_seq_no)'
+            ).run(year, input.sphere, seq)
+            
+            break
+        } catch (e: any) {
+            const msg = String(e?.message || '')
+            const code = String((e as any)?.code || '')
+            const isUnique = code.includes('SQLITE_CONSTRAINT') || /UNIQUE constraint failed/i.test(msg)
+            if (!isUnique) throw e
+            // Increment seq and retry
+            seq++
+            if (attempt === 4) throw new Error('Konnte Belegnummer nicht vergeben (UNIQUE). Bitte erneut versuchen.')
         }
-        if (!id) throw new Error('Belegerstellung fehlgeschlagen')
+    }
+    if (!id) throw new Error('Belegerstellung fehlgeschlagen')
 
-        if (input.files?.length) {
-            const { filesDir } = getAppDataDir()
-            for (const f of input.files) {
-                const buff = Buffer.from(f.dataBase64, 'base64')
-                const safeName = `${id}-${Date.now()}-${f.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
-                const abs = path.join(filesDir, safeName)
-                fs.writeFileSync(abs, buff)
-                d.prepare(
-                    ' INSERT INTO voucher_files(voucher_id, file_name, file_path, mime_type, size) VALUES (?,?,?,?,?) '
-                ).run(id, f.name, abs, f.mime ?? null, buff.length)
-            }
+    if (input.files?.length) {
+        const { filesDir } = getAppDataDir()
+        for (const f of input.files) {
+            const buff = Buffer.from(f.dataBase64, 'base64')
+            const safeName = `${id}-${Date.now()}-${f.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
+            const abs = path.join(filesDir, safeName)
+            fs.writeFileSync(abs, buff)
+            d.prepare(
+                ' INSERT INTO voucher_files(voucher_id, file_name, file_path, mime_type, size) VALUES (?,?,?,?,?) '
+            ).run(id, f.name, abs, f.mime ?? null, buff.length)
         }
+    }
 
-        // assign tags if provided
-        if (input.tags && input.tags.length) {
-            setVoucherTags(id, input.tags)
-        }
+    // assign tags if provided
+    if (input.tags && input.tags.length) {
+        setVoucherTags(id, input.tags)
+    }
 
-        writeAudit(d, input.createdBy ?? null, 'vouchers', id, 'CREATE', {
-            id,
-            data: input
-        })
-
-        return { id, voucherNo: lastVoucherNo, grossAmount, warnings }
+    writeAudit(d, input.createdBy ?? null, 'vouchers', id, 'CREATE', {
+        id,
+        data: input
     })
+
+    return { id, voucherNo: lastVoucherNo, grossAmount, warnings }
+}
+
+export function createVoucher(input: CreateVoucherInput) {
+    return withTransaction((d: DB) => createVoucherTx(d, input))
 }
 
 export function reverseVoucher(originalId: number, userId: number | null) {
@@ -708,6 +712,81 @@ export function summarizeVouchers(filters: {
     `).all(...paramsBase) as any[]
 
     return { totals, bySphere, byPaymentMethod, byType }
+}
+
+export function summarizeVouchersByCategory(filters: {
+    paymentMethod?: 'BAR' | 'BANK'
+    type?: 'IN' | 'OUT' | 'TRANSFER'
+    from?: string
+    to?: string
+}) {
+    const d = getDb()
+    const { paymentMethod, type, from, to } = filters
+    const params: any[] = []
+    const wh: string[] = []
+    if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
+    if (type) { wh.push('v.type = ?'); params.push(type) }
+    if (from) { wh.push('v.date >= ?'); params.push(from) }
+    if (to) { wh.push('v.date <= ?'); params.push(to) }
+    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+
+    let rows: any[] = []
+    try {
+        rows = d.prepare(`
+            SELECT
+                v.category_id as categoryId,
+                cc.name as categoryName,
+                cc.color as categoryColor,
+                IFNULL(SUM(v.gross_amount), 0) as gross
+            FROM vouchers v
+            LEFT JOIN custom_categories cc ON cc.id = v.category_id
+            ${whereSql}
+            GROUP BY v.category_id, cc.name, cc.color
+            ORDER BY ABS(gross) DESC
+        `).all(...params) as any[]
+    } catch {
+        // Legacy fallback for older DBs that still use a plain `categories` table
+        rows = d.prepare(`
+            SELECT
+                v.category_id as categoryId,
+                c.name as categoryName,
+                NULL as categoryColor,
+                IFNULL(SUM(v.gross_amount), 0) as gross
+            FROM vouchers v
+            LEFT JOIN categories c ON c.id = v.category_id
+            ${whereSql}
+            GROUP BY v.category_id, c.name
+            ORDER BY ABS(gross) DESC
+        `).all(...params) as any[]
+    }
+
+    return rows.map((r) => ({
+        categoryId: r.categoryId ?? null,
+        categoryName: r.categoryName ?? 'Ohne Kategorie',
+        categoryColor: r.categoryColor ?? null,
+        gross: Number(r.gross) || 0
+    }))
+}
+
+export function balanceAt(params: { to: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
+    const d = getDb()
+    const to = params.to
+    const wh: string[] = ['date <= ?']
+    const vals: any[] = [to]
+    if (params.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
+    const whereSql = ' WHERE ' + wh.join(' AND ')
+    const rows = d.prepare(`
+        SELECT payment_method as pm, type, IFNULL(SUM(gross_amount), 0) as gross
+        FROM vouchers${whereSql}
+        GROUP BY payment_method, type
+    `).all(...vals) as any[]
+    let bar = 0, bank = 0
+    for (const r of rows) {
+        const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0
+        if (r.pm === 'BAR') bar += sign * (r.gross || 0)
+        if (r.pm === 'BANK') bank += sign * (r.gross || 0)
+    }
+    return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100 }
 }
 
 export function monthlyVouchers(filters: {

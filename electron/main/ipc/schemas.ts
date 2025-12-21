@@ -185,6 +185,40 @@ export const ReportsMonthlyOutput = z.object({
     )
 })
 
+// Category breakdown for reports
+export const ReportsByCategoryInput = z.object({
+    from: z.string().optional(),
+    to: z.string().optional(),
+    paymentMethod: PaymentMethod.optional(),
+    type: VoucherType.optional()
+})
+
+export const ReportsByCategoryOutput = z.object({
+    rows: z.array(z.object({
+        categoryId: z.number().nullable(),
+        categoryName: z.string(),
+        categoryColor: z.string().nullable(),
+        gross: z.number()
+    }))
+})
+
+export type TReportsByCategoryInput = z.infer<typeof ReportsByCategoryInput>
+export type TReportsByCategoryOutput = z.infer<typeof ReportsByCategoryOutput>
+
+// Balance at a specific date (opening balance)
+export const ReportsBalanceAtInput = z.object({
+    to: z.string(),
+    sphere: Sphere.optional()
+})
+
+export const ReportsBalanceAtOutput = z.object({
+    BAR: z.number(),
+    BANK: z.number()
+})
+
+export type TReportsBalanceAtInput = z.infer<typeof ReportsBalanceAtInput>
+export type TReportsBalanceAtOutput = z.infer<typeof ReportsBalanceAtOutput>
+
 export type TReportsMonthlyInput = z.infer<typeof ReportsMonthlyInput>
 export type TReportsMonthlyOutput = z.infer<typeof ReportsMonthlyOutput>
 
@@ -631,7 +665,12 @@ export const ImportPreviewOutput = z.object({
 })
 export const ImportExecuteInput = z.object({
     fileBase64: z.string(),
-    mapping: z.record(z.string().nullable())
+    mapping: z.record(z.string().nullable()),
+    options: z
+        .object({
+            createMissingCategories: z.boolean().optional()
+        })
+        .optional()
 })
 export const ImportExecuteOutput = z.object({
     imported: z.number(),
@@ -640,6 +679,22 @@ export const ImportExecuteOutput = z.object({
     rowStatuses: z.array(z.object({ row: z.number(), ok: z.boolean(), message: z.string().optional() })).optional(),
     errorFilePath: z.string().optional()
 })
+
+// Imports: detect missing categories (from mapped category column)
+export const ImportMissingCategoriesInput = z.object({
+    fileBase64: z.string(),
+    mapping: z.record(z.string().nullable())
+})
+
+export const ImportMissingCategoriesOutput = z.object({
+    missingNames: z.array(z.string()),
+    missingIds: z.array(z.number()),
+    missingNameCounts: z.record(z.number()),
+    missingIdCounts: z.record(z.number())
+})
+
+export type TImportMissingCategoriesInput = z.infer<typeof ImportMissingCategoriesInput>
+export type TImportMissingCategoriesOutput = z.infer<typeof ImportMissingCategoriesOutput>
 
 // Imports template (download)
 export const ImportTemplateInput = z.object({}).optional()
@@ -1227,6 +1282,16 @@ export const CashAdvanceUpdateInput = z.object({
 })
 export const CashAdvanceUpdateOutput = z.object({ id: z.number() })
 
+// Resolve (irreversible close)
+export const CashAdvanceResolveInput = z.object({
+    id: z.number(),
+    createCounterVoucher: z.boolean().optional()
+})
+export const CashAdvanceResolveOutput = z.object({
+    id: z.number(),
+    counterVoucherId: z.number().optional()
+})
+
 // Delete
 export const CashAdvanceDeleteInput = z.object({ id: z.number() })
 export const CashAdvanceDeleteOutput = z.object({ id: z.number() })
@@ -1282,3 +1347,5 @@ export type TCashAdvance = z.infer<typeof CashAdvanceSchema>
 export type TPartialCashAdvance = z.infer<typeof PartialCashAdvanceSchema>
 export type TCashAdvanceSettlement = z.infer<typeof CashAdvanceSettlementSchema>
 export type TCashAdvanceWithDetails = z.infer<typeof CashAdvanceWithDetailsSchema>
+export type TCashAdvanceResolveInput = z.infer<typeof CashAdvanceResolveInput>
+export type TCashAdvanceResolveOutput = z.infer<typeof CashAdvanceResolveOutput>

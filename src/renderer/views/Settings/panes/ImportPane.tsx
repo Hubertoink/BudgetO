@@ -35,7 +35,7 @@ export function ImportPane({ notify }: ImportPaneProps) {
             <ul style={{ margin: '4px 0 0 16px' }}>
               <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
               <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden ignoriert.</li>
-              <li>Mindestens: Datum und Betrag (Brutto oder Netto+USt). Optional: Art, Sphäre, Zweckbindung, Zahlweg.</li>
+              <li>Mindestens: Datum und Betrag (Brutto oder Netto+USt). Optional: Art, Kategorie, Zweckbindung, Zahlweg.</li>
               <li>Bank-/Bar-Split: Alternativ die vier Spalten Bank+/-, Bar+/- verwenden (erzeugt ggf. mehrere Buchungen pro Zeile).</li>
             </ul>
           </div>

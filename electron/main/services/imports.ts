@@ -1,9 +1,11 @@
 import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { createVoucher } from '../repositories/vouchers'
+import { createCustomCategory } from '../repositories/customCategories'
 import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
+import { ensureExportsBaseDir } from './exportsDir'
 
 export type ImportPreview = {
     headers: string[]
@@ -19,7 +21,11 @@ export type ImportExecuteResult = {
     rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
 }
 
-const FIELD_KEYS = ['date', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'bankIn', 'bankOut', 'cashIn', 'cashOut', 'defaultSphere'] as const
+export type ImportExecuteOptions = {
+    createMissingCategories?: boolean
+}
+
+const FIELD_KEYS = ['date', 'type', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'category', 'bankIn', 'bankOut', 'cashIn', 'cashOut'] as const
 export type FieldKey = typeof FIELD_KEYS[number]
 
 function normalizeHeader(h: string) {
@@ -29,14 +35,13 @@ function normalizeHeader(h: string) {
 
 function suggestMapping(headers: string[]): Record<string, string | null> {
     const map: Record<string, string | null> = {
-        date: null, type: null, sphere: null, description: null, paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null,
-        bankIn: null, bankOut: null, cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
+        date: null, type: null, description: null, paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null, category: null,
+        bankIn: null, bankOut: null, cashIn: null, cashOut: null
     }
     for (const h of headers) {
         const n = normalizeHeader(h)
         if (!map.date && /(datum|date)/.test(n)) map.date = h
         else if (!map.type && /(art|type|in|out|transfer)/.test(n)) map.type = h
-        else if (!map.sphere && /(sph|sphäre|sphere)/.test(n)) map.sphere = h
         else if (!map.description && /(beschreibung|text|zweck|desc|bezeichnung)/.test(n)) map.description = h
         else if (!map.paymentMethod && /(zahlweg|payment|bar|bank|konto)/.test(n)) map.paymentMethod = h
         else if (!map.netAmount && /(netto|net)/.test(n)) map.netAmount = h
@@ -45,6 +50,7 @@ function suggestMapping(headers: string[]): Record<string, string | null> {
         else if (!map.outGross && /(ausgab|ausgang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.outGross = h
         else if (!map.grossAmount && /(brutto|gross|betrag|amount)/.test(n)) map.grossAmount = h
         else if (!map.earmarkCode && /(zweckbindung|earmark|code)/.test(n)) map.earmarkCode = h
+        else if (!map.category && /(kategorie|category)/.test(n)) map.category = h
         else if (!map.bankIn && /bank|konto/.test(n) && (/\+/.test(n) || /(ein|eingang|einnahm)/.test(n))) map.bankIn = h
         else if (!map.bankOut && /bank|konto/.test(n) && (/-/.test(n) || /(ausgab|ausgang)/.test(n))) map.bankOut = h
         else if (!map.cashIn && /(bar|kasse|barkonto)/.test(n) && (/\+/.test(n) || /(ein|einnahm)/.test(n))) map.cashIn = h
@@ -189,8 +195,8 @@ export async function previewCamt(base64: string): Promise<ImportPreview> {
         'Ref': e.entryRef || ''
     }))
     const suggestedMapping: Record<string, string | null> = {
-        date: 'Datum', type: null, sphere: null, description: 'Text', paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null,
-        bankIn: 'Bank +', bankOut: 'Bank -', cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
+        date: 'Datum', type: null, description: 'Text', paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null, category: null,
+        bankIn: 'Bank +', bankOut: 'Bank -', cashIn: null, cashOut: null
     }
     return { headers, sample, suggestedMapping, headerRowIndex: 1 }
 }
@@ -203,7 +209,8 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
     const errors: Array<{ row: number; message: string }> = []
     const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
     const track = (row: number, ok: boolean, message?: string) => { if (rowStatuses.length < 1000) rowStatuses.push({ row, ok, message }) }
-    const defaultSphere = (mapping?.defaultSphere as any) as ('IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB') || 'IDEELL'
+    void mapping
+    const sphere: 'IDEELL' = 'IDEELL'
 
     let row = 2 // pretend header at 1
     for (const e of entries) {
@@ -216,7 +223,7 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
             const descKey = description.slice(0, 120)
             const dup = d.prepare("SELECT id FROM vouchers WHERE date = ? AND payment_method = 'BANK' AND ROUND(gross_amount, 2) = ROUND(?, 2) AND COALESCE(description,'') LIKE ? LIMIT 1").get(e.date, amount, descKey + '%') as any
             if (dup?.id) { skipped++; track(row, false, 'Duplikat erkannt'); row++; continue }
-            await Promise.resolve(createVoucher({ date: e.date, type: type as any, sphere: defaultSphere, description, paymentMethod: 'BANK', vatRate: 0, grossAmount: amount }))
+            await Promise.resolve(createVoucher({ date: e.date, type: type as any, sphere, description, paymentMethod: 'BANK', vatRate: 0, grossAmount: amount }))
             imported++
             track(row, true)
         } catch (err: any) {
@@ -237,12 +244,27 @@ export async function previewFile(base64: string): Promise<ImportPreview> {
     return previewXlsx(base64)
 }
 
-export async function executeFile(base64: string, mapping: Record<FieldKey, string | null>): Promise<ImportExecuteResult & { errorFilePath?: string }> {
+export async function executeFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>
+): Promise<ImportExecuteResult & { errorFilePath?: string }>
+
+export async function executeFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    options?: ImportExecuteOptions
+): Promise<ImportExecuteResult & { errorFilePath?: string }>
+
+export async function executeFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    options?: ImportExecuteOptions
+): Promise<ImportExecuteResult & { errorFilePath?: string }> {
     const t = detectFileType(base64)
     const db = getDb()
     let res: ImportExecuteResult & { errorFilePath?: string }
     if (t === 'CAMT') res = await executeCamt(base64, mapping)
-    else res = await executeXlsx(base64, mapping)
+    else res = await executeXlsx(base64, mapping, options)
     try {
         // Persist a compact audit entry for the Import Log modal
         writeAudit(db as any, null, 'imports', 0, 'EXECUTE', {
@@ -255,6 +277,79 @@ export async function executeFile(base64: string, mapping: Record<FieldKey, stri
         })
     } catch { /* ignore audit failures */ }
     return res
+}
+
+export async function findMissingCategories(
+    base64: string,
+    mapping: Record<FieldKey, string | null>
+): Promise<{ missingNames: string[]; missingIds: number[]; missingNameCounts: Record<string, number>; missingIdCounts: Record<string, number> }> {
+    const t = detectFileType(base64)
+    if (t !== 'XLSX') return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
+
+    const categoryHeader = mapping?.category
+    if (!categoryHeader) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
+
+    const wb = new ExcelJS.Workbook()
+    const buf = NodeBuffer.from(base64, 'base64')
+    await (wb as any).xlsx.load(buf as any)
+    const pick = pickWorksheet(wb)
+    if (!pick) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
+    const { ws, headerRowIdx, idxByHeader } = pick
+
+    const d = getDb()
+    const missingNames = new Set<string>()
+    const missingIds = new Set<number>()
+    const missingNameCounts: Record<string, number> = {}
+    const missingIdCounts: Record<string, number> = {}
+    const seenNameKey = new Set<string>()
+
+    const col = idxByHeader[categoryHeader]
+    if (!col) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
+
+    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+        const dateVal = normalizeCellValue(ws.getRow(r).getCell(idxByHeader[mapping.date || ''] || 1).value)
+        const date = parseDate(dateVal)
+        if (!date) {
+            const descVal = normalizeCellValue(ws.getRow(r).getCell(idxByHeader[mapping.description || ''] || 1).value)
+            const txt = [dateVal, descVal].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
+            if (/ergebnis|summe|saldo/.test(txt)) continue
+            continue
+        }
+        const raw = normalizeCellValue(ws.getRow(r).getCell(col).value)
+        if (raw == null) continue
+        const s = String(raw).trim()
+        if (!s) continue
+
+        const numeric = Number(s)
+        if (Number.isFinite(numeric) && String(numeric) === s) {
+            const exists = d.prepare('SELECT id FROM custom_categories WHERE id = ?').get(numeric) as any
+            if (!exists?.id) {
+                const idNum = Number(numeric)
+                missingIds.add(idNum)
+                const k = String(idNum)
+                missingIdCounts[k] = (missingIdCounts[k] || 0) + 1
+            }
+            continue
+        }
+
+        const key = s.toLowerCase()
+        if (seenNameKey.has(key)) continue
+        seenNameKey.add(key)
+        const exists = d.prepare('SELECT id FROM custom_categories WHERE LOWER(name) = LOWER(?) LIMIT 1').get(s) as any
+        if (!exists?.id) {
+            missingNames.add(s)
+            missingNameCounts[s] = (missingNameCounts[s] || 0) + 1
+        }
+    }
+
+    const sortedNames = Array.from(missingNames).sort((a, b) => a.localeCompare(b, 'de'))
+    const sortedIds = Array.from(missingIds).sort((a, b) => a - b)
+    return {
+        missingNames: sortedNames,
+        missingIds: sortedIds,
+        missingNameCounts,
+        missingIdCounts
+    }
 }
 
 function parseEnum<T extends string>(v: any, set: readonly T[], fallback?: T): T | undefined {
@@ -301,7 +396,11 @@ function parseDate(v: any): string | undefined {
     return undefined
 }
 
-export async function executeXlsx(base64: string, mapping: Record<FieldKey, string | null>): Promise<ImportExecuteResult & { errorFilePath?: string }> {
+export async function executeXlsx(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    options?: ImportExecuteOptions
+): Promise<ImportExecuteResult & { errorFilePath?: string }> {
     const wb = new ExcelJS.Workbook()
     const buf = NodeBuffer.from(base64, 'base64')
     await (wb as any).xlsx.load(buf as any)
@@ -309,9 +408,10 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
     if (!pick) throw new Error('Keine Tabelle gefunden')
     const { ws, headerRowIdx, headers, idxByHeader } = pick
 
-    // Earmark lookup cache
+    // Lookup caches
     const d = getDb()
     const earmarkIdByCode = new Map<string, number>()
+    const categoryIdByKey = new Map<string, number>()
 
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
@@ -338,7 +438,9 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 throw new Error('Datum fehlt/ungültig')
             }
             const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
-            const sphere = parseEnum(get('sphere'), ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || parseEnum(mapping['defaultSphere'] || 'IDEELL', ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
+            // BudgetO: Sphäre is no longer a user-facing concept.
+            // Keep a stable internal default to satisfy the vouchers schema.
+            const sphere: 'IDEELL' = 'IDEELL'
             const description = get('description') != null ? String(get('description')) : undefined
             const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
             let netAmount = parseNumber(get('netAmount'))
@@ -389,11 +491,43 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 }
             }
 
+            // Optional category: accept ID or name (custom_categories)
+            let categoryId: number | undefined
+            const categoryVal = get('category')
+            if (categoryVal != null && String(categoryVal).trim()) {
+                const raw = String(categoryVal).trim()
+                const numeric = Number(raw)
+                if (Number.isFinite(numeric) && String(numeric) === raw) {
+                    const existing = d.prepare('SELECT id FROM custom_categories WHERE id = ?').get(numeric) as any
+                    if (!existing?.id) throw new Error(`Kategorie nicht gefunden (ID): ${raw}`)
+                    categoryId = Number(existing.id)
+                } else {
+                    const key = raw.toLowerCase()
+                    if (categoryIdByKey.has(key)) categoryId = categoryIdByKey.get(key)
+                    else {
+                        const row = d.prepare('SELECT id FROM custom_categories WHERE LOWER(name) = LOWER(?) LIMIT 1').get(raw) as any
+                        if (row?.id) {
+                            categoryIdByKey.set(key, Number(row.id))
+                            categoryId = Number(row.id)
+                        } else {
+                            if (options?.createMissingCategories) {
+                                const created = createCustomCategory({ name: raw })
+                                categoryIdByKey.set(key, Number(created.id))
+                                categoryId = Number(created.id)
+                            } else {
+                                throw new Error(`Kategorie nicht gefunden (Name): ${raw}`)
+                            }
+                        }
+                    }
+                }
+            }
+
             if (ops.length > 0) {
                 // From bank/cash columns; create one voucher per non-zero op
                 for (const op of ops) {
                     const payload: any = { date, type: op.t, sphere, description, paymentMethod: op.pm, vatRate: 0, grossAmount: op.amount }
                     if (earmarkId != null) payload.earmarkId = earmarkId
+                    if (categoryId != null) payload.categoryId = categoryId
                     await Promise.resolve(createVoucher(payload))
                     imported++
                 }
@@ -405,6 +539,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 else if (netAmount != null) payload.netAmount = netAmount
                 else { skipped++; track(r, false, 'Kein Betrag (Netto/Brutto)'); continue }
                 if (earmarkId != null) payload.earmarkId = earmarkId
+                if (categoryId != null) payload.categoryId = categoryId
                 await Promise.resolve(createVoucher(payload))
                 imported++
                 track(r, true)
@@ -435,11 +570,8 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             errWs.addRow(rowVals)
         }
         try {
-            const fs = await import('node:fs')
             const path = await import('node:path')
-            const os = await import('node:os')
-            const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-            try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+            const baseDir = ensureExportsBaseDir()
             const when = new Date()
             const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}${String(when.getSeconds()).padStart(2, '0')}`
             errorFilePath = path.join(baseDir, `Import_Fehler_${stamp}.xlsx`)
@@ -544,15 +676,15 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Import')
     // Intro text
-    ws.addRow(['Verein Finanzplaner – Importvorlage'])
+    ws.addRow(['BudgetO – Importvorlage'])
     ws.addRow(['Hinweise:'])
-    ws.addRow(['1) Trage die Buchungen in die Tabelle ab Zeile 4 ein. 2) Summen-/Saldozeilen überspringt der Import automatisch. 3) Sphäre bitte aus der Liste wählen.'])
+    ws.addRow(['1) Trage die Buchungen in die Tabelle ab Zeile 4 ein. 2) Summen-/Saldozeilen überspringt der Import automatisch. 3) Optional kannst du eine Kategorie (Name oder ID) zuordnen.'])
     ws.getRow(1).font = { bold: true, size: 14 }
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
     // Define table aligned with app logic
     // Removed 'Anmerkungen' column – not used by the app
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Kategorie (Name oder ID)', 'Zweckbindung-Code']
     ws.columns = [
         { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
     ]
@@ -563,15 +695,14 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         totalsRow: false,
         columns: columns.map((c) => ({ name: c })),
         rows: [
-            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '']
+            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, '', '']
         ]
     })
     // Freeze header + intro
     ws.views = [{ state: 'frozen', ySplit: 4 }]
-        // Data validations: C=Art, D=Zahlweg, H=Sphäre
+        // Data validations: C=Art, D=Zahlweg
         ; (ws as any).dataValidations?.add('C5:C10000', { type: 'list', allowBlank: true, formulae: ['"IN,OUT,TRANSFER"'] })
         ; (ws as any).dataValidations?.add('D5:D10000', { type: 'list', allowBlank: true, formulae: ['"BAR,BANK"'] })
-        ; (ws as any).dataValidations?.add('H5:H10000', { type: 'list', allowBlank: true, formulae: ['"IDEELL,ZWECK,VERMOEGEN,WGB"'] })
 
     // Power Query guidance
     const tips = wb.addWorksheet('PowerQuery_Hinweis')
@@ -597,7 +728,7 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         '    {"Einnahmen","Einnahmen (Brutto)"},',
         '    {"Ausgaben","Ausgaben (Brutto)"},',
         '    {"USt%","USt %"},',
-        '    {"Sphaere","Sphäre"}',
+        '    {"Kategorie","Kategorie (Name oder ID)"}',
         '  }),',
         '  Typen = Table.TransformColumnTypes(Umbenannt, {{"Datum", type date}, {"Einnahmen (Brutto)", type number}, {"Ausgaben (Brutto)", type number}, {"USt %", type number}})',
         'in',
@@ -608,13 +739,10 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     tips.getRow(10).alignment = { vertical: 'top', wrapText: true }
 
     // Save file
-    const fs = await import('node:fs')
     const path = await import('node:path')
-    const os = await import('node:os')
     let filePath = destPath
     if (!filePath) {
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+        const baseDir = ensureExportsBaseDir()
         const when = new Date()
         const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
         filePath = path.join(baseDir, `Import_Vorlage_${stamp}.xlsx`)
@@ -628,14 +756,14 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Import')
     // Intro rows similar to template
-    ws.addRow(['Verein Finanzplaner – Testdaten'])
+    ws.addRow(['BudgetO – Testdaten'])
     ws.addRow(['Diese Datei enthält Beispielbuchungen für den Import.'])
     ws.addRow(['Die Kopfzeile steht in Zeile 4, darunter die Daten.'])
     ws.getRow(1).font = { bold: true, size: 14 }
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
 
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Kategorie (Name oder ID)', 'Zweckbindung-Code']
     ws.columns = [
         { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
     ]
@@ -645,28 +773,25 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     const m = String(today.getMonth() + 1).padStart(2, '0')
 
     const rows: any[] = [
-        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', ''],
-        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', ''],
-        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', ''],
-        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', ''],
-        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', ''],
-        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', ''],
-        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', ''],
-        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', ''],
-        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', ''],
+        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, '', ''],
+        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, '', ''],
+        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, '', ''],
+        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, '', ''],
+        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, '', ''],
+        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, '', ''],
+        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, '', ''],
+        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, '', ''],
+        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, '', ''],
         [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '']
     ]
 
     ws.addTable({ name: 'Buchungen', ref: 'A4', headerRow: true, totalsRow: false, columns: columns.map(n => ({ name: n })), rows })
     ws.views = [{ state: 'frozen', ySplit: 4 }]
 
-    const fs = await import('node:fs')
     const path = await import('node:path')
-    const os = await import('node:os')
     let filePath = destPath
     if (!filePath) {
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
+        const baseDir = ensureExportsBaseDir()
         const when = new Date()
         const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
         filePath = path.join(baseDir, `Import_Testdaten_${stamp}.xlsx`)

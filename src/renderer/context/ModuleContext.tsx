@@ -80,13 +80,21 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map(m => m.key)
 
+  // BudgetO requires custom categories.
+  if (!enabledModules.includes('custom-categories')) enabledModules.push('custom-categories')
+
   const isModuleEnabled = useCallback((key: ModuleKey): boolean => {
+    if (key === 'custom-categories') return true
     const mod = modules.find(m => m.key === key)
     return mod?.enabled ?? false
   }, [modules])
 
   const setModuleEnabled = useCallback(async (key: ModuleKey, enabled: boolean) => {
     try {
+      if (key === 'custom-categories') {
+        // BudgetO requires custom categories; do not allow disabling.
+        return
+      }
       await (window as any).api?.modules?.setEnabled?.({ moduleKey: key, enabled })
       // Optimistic update
       setModules(prev => prev.map(m => 

@@ -123,6 +123,8 @@ contextBridge.exposeInMainWorld('api', {
         // Expose daily buckets endpoint for Dashboard day-level charts
         daily: (payload: any) => ipcRenderer.invoke('reports.daily', payload),
         cashBalance: (payload: any) => ipcRenderer.invoke('reports.cashBalance', payload),
+        byCategory: (payload: any) => ipcRenderer.invoke('reports.byCategory', payload),
+        balanceAt: (payload: any) => ipcRenderer.invoke('reports.balanceAt', payload),
         years: () => ipcRenderer.invoke('reports.years'),
     },
     db: {
@@ -180,6 +182,7 @@ contextBridge.exposeInMainWorld('api', {
     imports: {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),
+        missingCategories: (payload: any) => ipcRenderer.invoke('imports.missingCategories', payload),
         template: () => ipcRenderer.invoke('imports.template'),
         testdata: () => ipcRenderer.invoke('imports.testdata')
     },
@@ -262,6 +265,8 @@ contextBridge.exposeInMainWorld('api', {
         getById: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.getById', payload),
         create: (payload: { orderNumber: string; employeeName: string; purpose?: string | null; totalAmount: number; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
             ipcRenderer.invoke('cashAdvances.create', payload),
+        resolve: (payload: { id: number; createCounterVoucher?: boolean }) =>
+            ipcRenderer.invoke('cashAdvances.resolve', payload),
         update: (payload: { id: number; orderNumber?: string; employeeName?: string; purpose?: string | null; totalAmount?: number; status?: string; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
             ipcRenderer.invoke('cashAdvances.update', payload),
         delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.delete', payload),

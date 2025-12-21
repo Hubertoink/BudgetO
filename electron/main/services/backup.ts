@@ -97,11 +97,19 @@ function timestamp(now = new Date()) {
     return `${y}-${m}-${d}_${hh}${mm}${ss}`
 }
 
+function safePart(v: string) {
+    return String(v || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .slice(0, 40)
+}
+
 export async function makeBackup(reason?: string): Promise<{ filePath: string }> {
     const dir = getBackupDir()
     const stamp = timestamp()
     const tag = reason ? `_${reason.replace(/[^a-zA-Z0-9_-]+/g, '_')}` : ''
-    const out = path.join(dir, `database_${stamp}${tag}.sqlite`)
+    const orgKey = safePart(path.basename(getCurrentDbInfo().root) || 'default')
+    const out = path.join(dir, `database_${orgKey}_${stamp}${tag}.sqlite`)
     // Use better-sqlite3 online backup for a consistent copy while DB is open
     const d: any = getDb()
     try {

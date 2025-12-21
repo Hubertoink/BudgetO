@@ -11,7 +11,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { getAppDataDir, getDb } from '../db/database'
+import { getAppDataDir, getDb, withTransaction } from '../db/database'
+import { createVoucherTx } from './vouchers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -219,8 +220,19 @@ export function updateCashAdvance(input: {
   const db = getDb()
   const { id, ...fields } = input
 
-  const existing = db.prepare('SELECT id FROM cash_advances WHERE id = ?').get(id)
+  const existing = db.prepare('SELECT id, status, resolved_at as resolvedAt FROM cash_advances WHERE id = ?').get(id) as { id: number; status: CashAdvanceStatus; resolvedAt: string | null } | undefined
   if (!existing) throw new Error('Barvorschuss nicht gefunden')
+
+  if (fields.status !== undefined) {
+    // Never allow reopening once resolved
+    if (existing.status === 'RESOLVED' && fields.status !== 'RESOLVED') {
+      throw new Error('Barvorschuss ist abgeschlossen und kann nicht wieder geöffnet werden')
+    }
+    // Closing must go through the dedicated resolve flow (modal + optional counter-booking)
+    if (fields.status === 'RESOLVED') {
+      throw new Error('Barvorschuss kann nur über "Abschließen" abgeschlossen werden')
+    }
+  }
 
   const sets: string[] = []
   const params: any[] = []
@@ -246,11 +258,8 @@ export function updateCashAdvance(input: {
   if (fields.status !== undefined) {
     sets.push('status = ?')
     params.push(fields.status)
-    if (fields.status === 'RESOLVED') {
-      sets.push("resolved_at = datetime('now')")
-    } else {
-      sets.push('resolved_at = NULL')
-    }
+    // resolved_at is managed by resolveCashAdvance(); keep it NULL for non-resolved states.
+    sets.push('resolved_at = NULL')
   }
   if (fields.dueDate !== undefined) {
     sets.push('due_date = ?')
@@ -271,6 +280,70 @@ export function updateCashAdvance(input: {
   }
 
   return { id }
+}
+
+export function resolveCashAdvance(input: {
+  id: number
+  createCounterVoucher?: boolean
+}): { id: number; counterVoucherId?: number } {
+  const { id, createCounterVoucher = false } = input
+
+  return withTransaction((db) => {
+    const row = db.prepare(`
+      SELECT id, order_number as orderNumber, employee_name as employeeName,
+             purpose, total_amount as totalAmount, status, resolved_at as resolvedAt
+      FROM cash_advances WHERE id = ?
+    `).get(id) as { id: number; orderNumber: string; employeeName: string; purpose: string | null; totalAmount: number; status: CashAdvanceStatus; resolvedAt: string | null } | undefined
+
+    if (!row) throw new Error('Barvorschuss nicht gefunden')
+
+    if (row.status === 'RESOLVED') {
+      // Irreversible and idempotent: already resolved -> do nothing.
+      return { id: row.id }
+    }
+
+    const openPartialsRow = db.prepare(`
+      SELECT COUNT(*) as cnt
+      FROM partial_cash_advances
+      WHERE cash_advance_id = ? AND is_settled = 0
+    `).get(id) as { cnt: number }
+
+    if ((openPartialsRow?.cnt || 0) > 0) {
+      throw new Error('Alle Teil-Vorschüsse müssen abgerechnet sein, bevor abgeschlossen werden kann')
+    }
+
+    const totalSettledRow = db.prepare(`
+      SELECT COALESCE(SUM(settled_amount), 0) as totalSettled
+      FROM partial_cash_advances
+      WHERE cash_advance_id = ? AND is_settled = 1
+    `).get(id) as { totalSettled: number }
+
+    const totalSettled = Number(totalSettledRow?.totalSettled ?? 0) || 0
+    const diff = (Number(row.totalAmount) || 0) - totalSettled
+
+    let counterVoucherId: number | undefined
+    if (createCounterVoucher && Math.round(diff * 100) !== 0) {
+      const today = new Date().toISOString().slice(0, 10)
+      const voucherRes = createVoucherTx(db as any, {
+        date: today,
+        type: diff > 0 ? 'IN' : 'OUT',
+        sphere: 'IDEELL',
+        description: `Barvorschuss ${row.orderNumber} - Differenz ${diff > 0 ? '(Rückgeld)' : '(Nachschuss)'}${row.purpose ? ` - ${row.purpose}` : ''}`,
+        grossAmount: Math.abs(diff),
+        vatRate: 0,
+        paymentMethod: 'BAR'
+      })
+      counterVoucherId = voucherRes.id
+    }
+
+    db.prepare(`
+      UPDATE cash_advances
+      SET status = 'RESOLVED', resolved_at = datetime('now')
+      WHERE id = ?
+    `).run(id)
+
+    return counterVoucherId != null ? { id, counterVoucherId } : { id }
+  })
 }
 
 export function deleteCashAdvance(id: number): { id: number } {
