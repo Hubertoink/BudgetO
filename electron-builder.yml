@@ -1,6 +1,6 @@
 appId: org.jugendfoerderung.budgeto
 productName: BudgetO
-icon: build/Icon.ico
+icon: assets/budget_logo.ico
 files:
   - dist/**
   - dist-electron/**
@@ -13,7 +13,10 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: build/Icon.ico
+  icon: assets/budget_logo.ico
+nsis:
+  installerIcon: assets/budget_logo.ico
+  uninstallerIcon: assets/budget_logo.ico
 artifactName: '${productName} Setup ${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance

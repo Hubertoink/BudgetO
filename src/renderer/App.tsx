@@ -41,7 +41,7 @@ import { UserIndicator } from './components/layout/UserIndicator'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
-const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
+const appLogo: string = new URL('../../assets/BudgetO_Logo.ico', import.meta.url).href
 
 // Safe ArrayBuffer -> base64 converter (chunked to avoid "Maximum call stack size exceeded")
 function bufferToBase64Safe(buf: ArrayBuffer) {

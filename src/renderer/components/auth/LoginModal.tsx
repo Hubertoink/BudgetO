@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import './LoginModal.css'
 
 // Resolve app icon and background image for the login screen
-const appLogo: string = new URL('../../../../build/Icon.ico', import.meta.url).href
+const appLogo: string = new URL('../../../../assets/BudgetO_Logo.ico', import.meta.url).href
 const loginBg: string = new URL('../../assets/a_snow_covered_houses_and_a_street_light.png', import.meta.url).href
 
 interface LoginModalProps {
