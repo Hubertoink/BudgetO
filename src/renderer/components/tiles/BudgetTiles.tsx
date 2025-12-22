@@ -41,7 +41,7 @@ export interface BudgetTileBudget {
   enforceTimeRange?: number
 }
 
-export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
+export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit?: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   
@@ -183,13 +183,15 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                   >
                     📄 Buchungen
                   </button>
-                  <button 
-                    className="btn btn-edit" 
-                    onClick={() => onEdit(b)} 
-                    title="Bearbeiten"
-                  >
-                    ✎
-                  </button>
+                  {onEdit && (
+                    <button 
+                      className="btn btn-edit" 
+                      onClick={() => onEdit(b)} 
+                      title="Bearbeiten"
+                    >
+                      ✎
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

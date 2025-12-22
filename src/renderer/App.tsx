@@ -38,6 +38,7 @@ import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import { NetworkStatus } from './components/layout/NetworkStatus'
 import { UserIndicator } from './components/layout/UserIndicator'
+import { StatusFlyout } from './components/layout/StatusFlyout'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
@@ -102,7 +103,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
 }
 
 function AppInner() {
-    const { authRequired, isAuthenticated, isLoading: authLoading, logout, canAccessSettings, canWrite } = useAuth()
+    const { authEnforced, isAuthenticated, isLoading: authLoading, logout, canAccessSettings, canWrite } = useAuth()
     // Use toast context
     const { notify } = useToast()
 
@@ -859,10 +860,11 @@ function AppInner() {
     return (
         <>
             <LoginModal
-                isOpen={!!authRequired && !authLoading && !isAuthenticated}
+                isOpen={!!authEnforced && !authLoading && !isAuthenticated}
                 allowClose={serverMode === 'client'}
                 onClose={serverMode === 'client' ? onCancelLogin : undefined}
             />
+            <StatusFlyout />
         <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header
@@ -890,8 +892,6 @@ function AppInner() {
                 {isTopNav && <div />}
                 {/* User indicator and Network status */}
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
-                    <UserIndicator />
-                    <NetworkStatus />
                     {/* Window controls */}
                     <div style={{ display: 'inline-flex', gap: 4 }}>
                         <button className="btn ghost icon-btn" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()}>

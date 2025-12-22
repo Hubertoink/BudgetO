@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import BudgetModal from '../../components/modals/BudgetModal'
+import { useAuth } from '../../context/AuthContext'
 
 type Budget = {
   id: number
@@ -43,6 +44,7 @@ export default function BudgetsView({
   onGoToBookings: (budgetId: number) => void
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
+  const { canWrite } = useAuth()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [editBudget, setEditBudget] = useState<BudgetEdit | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -71,22 +73,24 @@ export default function BudgetsView({
       <div className="card" style={{ padding: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
-          <button
-            className="btn primary"
-            onClick={() =>
-              setEditBudget({
-                year: new Date().getFullYear(),
-                sphere: 'IDEELL',
-                amountPlanned: 0,
-                categoryId: null,
-                projectId: null,
-                earmarkId: null,
-                enforceTimeRange: 0
-              })
-            }
-          >
-            + Neu
-          </button>
+          {canWrite && (
+            <button
+              className="btn primary"
+              onClick={() =>
+                setEditBudget({
+                  year: new Date().getFullYear(),
+                  sphere: 'IDEELL',
+                  amountPlanned: 0,
+                  categoryId: null,
+                  projectId: null,
+                  earmarkId: null,
+                  enforceTimeRange: 0
+                })
+              }
+            >
+              + Neu
+            </button>
+          )}
         </div>
 
         {/* Simple table */}
@@ -131,29 +135,31 @@ export default function BudgetsView({
                 </td>
                 <td align="right">{eurFmt.format(b.amountPlanned)}</td>
                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                  <button
-                    className="btn btn-edit"
-                    onClick={() =>
-                      setEditBudget({
-                        id: b.id,
-                        year: b.year,
-                        sphere: b.sphere,
-                        categoryId: b.categoryId ?? null,
-                        projectId: b.projectId ?? null,
-                        earmarkId: b.earmarkId ?? null,
-                        amountPlanned: b.amountPlanned,
-                        name: b.name ?? null,
-                        categoryName: b.categoryName ?? null,
-                        projectName: b.projectName ?? null,
-                        startDate: b.startDate ?? null,
-                        endDate: b.endDate ?? null,
-                        color: b.color ?? null,
-                        enforceTimeRange: b.enforceTimeRange ?? 0
-                      })
-                    }
-                  >
-                    ✎
-                  </button>
+                  {canWrite && (
+                    <button
+                      className="btn btn-edit"
+                      onClick={() =>
+                        setEditBudget({
+                          id: b.id,
+                          year: b.year,
+                          sphere: b.sphere,
+                          categoryId: b.categoryId ?? null,
+                          projectId: b.projectId ?? null,
+                          earmarkId: b.earmarkId ?? null,
+                          amountPlanned: b.amountPlanned,
+                          name: b.name ?? null,
+                          categoryName: b.categoryName ?? null,
+                          projectName: b.projectName ?? null,
+                          startDate: b.startDate ?? null,
+                          endDate: b.endDate ?? null,
+                          color: b.color ?? null,
+                          enforceTimeRange: b.enforceTimeRange ?? 0
+                        })
+                      }
+                    >
+                      ✎
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -172,7 +178,7 @@ export default function BudgetsView({
       <BudgetTiles
         budgets={budgets}
         eurFmt={eurFmt}
-        onEdit={(b) =>
+        onEdit={canWrite ? (b) =>
           setEditBudget({
             id: b.id,
             year: b.year,
@@ -189,12 +195,12 @@ export default function BudgetsView({
             color: b.color ?? null,
             enforceTimeRange: b.enforceTimeRange ?? 0
           })
-        }
+        : undefined}
         onGoToBookings={onGoToBookings}
       />
 
       {/* Edit Modal */}
-      {editBudget && (
+      {canWrite && editBudget && (
         <BudgetModal value={editBudget as any} onClose={() => setEditBudget(null)} onSaved={handleSaved} />
       )}
     </div>

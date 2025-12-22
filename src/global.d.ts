@@ -206,6 +206,7 @@ declare global {
             auth: {
                 login: (payload: { username: string; password: string }) => Promise<{ success: boolean; user?: any; error?: string; token?: string }>
                 isRequired: () => Promise<{ required: boolean }>
+                isEnforced: () => Promise<{ enforced: boolean }>
                 logout: () => Promise<any>
                 setToken: (payload: { token: string | null }) => Promise<{ ok: boolean }>
                 setInitialPassword: (payload: { userId: number; password: string }) => Promise<{ success: boolean }>

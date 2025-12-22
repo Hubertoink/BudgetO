@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
+import { useAuth } from '../../context/AuthContext'
 
 type Binding = {
   id: number
@@ -43,6 +44,7 @@ export default function EarmarksView({
   onLoadEarmarks: () => Promise<void>
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
+  const { canWrite } = useAuth()
   const [bindings, setBindings] = useState<Binding[]>([])
   const [editBinding, setEditBinding] = useState<BindingEdit | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -72,23 +74,25 @@ export default function EarmarksView({
       <div className="card" style={{ padding: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="helper">Zweckbindungen verwalten</div>
-          <button
-            className="btn primary"
-            onClick={() =>
-              setEditBinding({
-                code: '',
-                name: '',
-                description: null,
-                startDate: null,
-                endDate: null,
-                isActive: true,
-                color: null,
-                budget: null
-              })
-            }
-          >
-            + Neu
-          </button>
+          {canWrite && (
+            <button
+              className="btn primary"
+              onClick={() =>
+                setEditBinding({
+                  code: '',
+                  name: '',
+                  description: null,
+                  startDate: null,
+                  endDate: null,
+                  isActive: true,
+                  color: null,
+                  budget: null
+                })
+              }
+            >
+              + Neu
+            </button>
+          )}
         </div>
 
         <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
@@ -131,25 +135,27 @@ export default function EarmarksView({
                   )}
                 </td>
                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                  <button
-                    className="btn btn-edit"
-                    onClick={() =>
-                      setEditBinding({
-                        id: b.id,
-                        code: b.code,
-                        name: b.name,
-                        description: b.description ?? null,
-                        startDate: b.startDate ?? null,
-                        endDate: b.endDate ?? null,
-                        isActive: !!b.isActive,
-                        color: b.color ?? null,
-                        budget: b.budget ?? null,
-                        enforceTimeRange: b.enforceTimeRange ?? 0
-                      })
-                    }
-                  >
-                    ✎
-                  </button>
+                  {canWrite && (
+                    <button
+                      className="btn btn-edit"
+                      onClick={() =>
+                        setEditBinding({
+                          id: b.id,
+                          code: b.code,
+                          name: b.name,
+                          description: b.description ?? null,
+                          startDate: b.startDate ?? null,
+                          endDate: b.endDate ?? null,
+                          isActive: !!b.isActive,
+                          color: b.color ?? null,
+                          budget: b.budget ?? null,
+                          enforceTimeRange: b.enforceTimeRange ?? 0
+                        })
+                      }
+                    >
+                      ✎
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -163,7 +169,7 @@ export default function EarmarksView({
           </tbody>
         </table>
 
-        {editBinding && (
+        {canWrite && editBinding && (
           <BindingModal value={editBinding} onClose={() => setEditBinding(null)} onSaved={handleSaved} />
         )}
       </div>
@@ -174,7 +180,7 @@ export default function EarmarksView({
         from={from}
         to={to}
         sphere={filterSphere}
-        onEdit={(b: any) =>
+        onEdit={canWrite ? (b: any) =>
           setEditBinding({
             id: b.id,
             code: b.code,
@@ -187,7 +193,7 @@ export default function EarmarksView({
             budget: b.budget ?? null,
             enforceTimeRange: b.enforceTimeRange ?? 0
           })
-        }
+        : undefined}
         onGoToBookings={onGoToBookings}
       />
     </>

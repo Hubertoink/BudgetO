@@ -37,6 +37,10 @@ export function UsersPane({ notify }: UsersPaneProps) {
   const [loading, setLoading] = useState(true)
   const [authRequired, setAuthRequired] = useState(false)
 
+  // Delete confirmation modal state
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null)
+  const [deleteSaving, setDeleteSaving] = useState(false)
+
   const PROJECT_SCOPE_ACK_KEY = 'budgeto_project_scope_ack_v1'
   const [showProjectScope, setShowProjectScope] = useState(false)
   const [pendingAddAfterScope, setPendingAddAfterScope] = useState(false)
@@ -341,17 +345,23 @@ export function UsersPane({ notify }: UsersPaneProps) {
       notify('error', 'Sie können sich nicht selbst löschen')
       return
     }
-    
-    if (!confirm(`Benutzer "${user.name}" wirklich löschen?`)) {
-      return
-    }
-    
+
+    setDeleteConfirmUser(user)
+  }
+
+  const performDelete = async () => {
+    if (!deleteConfirmUser) return
+
+    setDeleteSaving(true)
     try {
-      await (window as any).api?.users?.delete?.({ id: user.id })
+      await (window as any).api?.users?.delete?.({ id: deleteConfirmUser.id })
       notify('success', 'Benutzer gelöscht')
+      setDeleteConfirmUser(null)
       await loadUsers()
     } catch (e: any) {
       notify('error', e?.message || 'Fehler beim Löschen')
+    } finally {
+      setDeleteSaving(false)
     }
   }
 
@@ -507,6 +517,53 @@ export function UsersPane({ notify }: UsersPaneProps) {
         )
       : null
 
+  const deleteUserConfirmPortal =
+    deleteConfirmUser
+      ? createPortal(
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Benutzer löschen bestätigen"
+            style={{ zIndex: 6500 }}
+            onClick={() => (deleteSaving ? null : setDeleteConfirmUser(null))}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0 }}>Benutzer löschen</h2>
+                <button
+                  className="btn ghost"
+                  onClick={() => setDeleteConfirmUser(null)}
+                  aria-label="Schließen"
+                  disabled={deleteSaving}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-grid" style={{ gap: 10 }}>
+                <div>
+                  Benutzer <strong>„{deleteConfirmUser.name}“</strong> wirklich löschen?
+                  <div className="helper" style={{ margin: '6px 0 0 0' }}>
+                    {deleteConfirmUser.username ? `Benutzername: ${deleteConfirmUser.username}` : null}
+                    {deleteConfirmUser.username && deleteConfirmUser.email ? ' · ' : null}
+                    {deleteConfirmUser.email ? `E-Mail: ${deleteConfirmUser.email}` : null}
+                  </div>
+                </div>
+                <div className="modal-actions-end" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => setDeleteConfirmUser(null)} disabled={deleteSaving}>
+                    Abbrechen
+                  </button>
+                  <button className="btn danger" onClick={performDelete} disabled={deleteSaving}>
+                    {deleteSaving ? 'Löschen…' : 'Ja, löschen'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null
+
   // Show edit/add form
   if (editUser || isAddMode) {
     const isEditingSelf = !!editUser && editUser.id === currentUser?.id
@@ -514,6 +571,8 @@ export function UsersPane({ notify }: UsersPaneProps) {
       <>
         {passwordModalPortal}
         {removePasswordConfirmPortal}
+        {deleteUserConfirmPortal}
+        {deleteUserConfirmPortal}
 
         <div className="stack gap-20">
           <div>

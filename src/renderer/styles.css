@@ -94,6 +94,128 @@
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
 }
 
+/* Global status flyout (bottom-left) – compact design */
+.status-flyout {
+    position: fixed;
+    left: calc(env(safe-area-inset-left, 0px) + 6px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    z-index: 10;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
+    user-select: none;
+}
+
+.status-flyout__panel {
+    min-width: 180px;
+    padding: 8px 10px;
+    background: color-mix(in oklab, var(--surface) 94%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    backdrop-filter: blur(12px);
+    transform-origin: 0% 100%;
+    transform: translateY(6px) scale(0.97);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s ease-out, transform .12s ease-out;
+}
+
+.status-flyout__panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.status-flyout__handle {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+    background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    transition: background .1s, transform .1s, box-shadow .1s, border-color .15s;
+}
+
+.status-flyout__handle:hover,
+.status-flyout__handle.is-active {
+    background: color-mix(in oklab, var(--accent) 28%, var(--surface));
+    transform: scale(1.06);
+}
+
+/* Green ring when server is running */
+.status-flyout__handle[data-server-running="true"] {
+    border-color: var(--success);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 35%, transparent);
+}
+
+.status-flyout__handle:focus { outline: none; }
+.status-flyout__handle:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
+}
+
+/* Rows inside the flyout */
+.status-flyout__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.status-flyout__row--mode {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+}
+
+.status-flyout__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.status-flyout__name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-flyout__role {
+    opacity: 0.6;
+    font-size: 11px;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.status-flyout__logout {
+    width: 100%;
+    margin-top: 6px;
+    padding: 4px 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--danger);
+    cursor: pointer;
+    transition: background .1s;
+}
+
+.status-flyout__logout:hover {
+    background: color-mix(in oklab, var(--danger) 12%, transparent);
+}
+
 /* Settings Navigation - Aktenreiter (file tab) style */
 .settings-tabs-wrap {
     position: relative;
@@ -518,14 +640,20 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
 .swatch { width: 18px; height: 12px; border-radius: 3px; border: 1px solid color-mix(in oklab, var(--text)/15%, transparent); box-shadow: 0 1px 0 color-mix(in oklab, var(--text)/10%, transparent) inset; }
 
 :root[data-theme="dark"] {
-    --bg: #0F1115;
-    --surface: #151821;
-    --muted: #1C2028;
-    --border: #2B3240;
-    --text: #E7EAF0;
-    --text-dim: #AAB3C2;
-    --accent: #6AA6FF;
-    --accent-hover: #8BB9FF;
+    /* Standard (winter palette)
+       #37353E
+       #44444E
+       #715A5A
+       #D3DAD9
+    */
+    --bg: #37353E;
+    --surface: #44444E;
+    --muted: color-mix(in oklab, var(--surface) 86%, var(--bg) 14%);
+    --border: color-mix(in oklab, var(--surface) 70%, var(--text) 30%);
+    --text: #D3DAD9;
+    --text-dim: color-mix(in oklab, var(--text) 75%, var(--accent) 25%);
+    --accent: #715A5A;
+    --accent-hover: color-mix(in oklab, var(--accent) 78%, var(--text) 22%);
     --success: #4CC38A;
     --warning: #F5C451;
     --danger: #F06A6A;
@@ -588,8 +716,7 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
 
 /* Color theme palettes (override accent colors). Applied via data-color-theme on <html>. */
 :root[data-color-theme="default"] {
-    --accent: #6AA6FF;
-    --accent-hover: #8BB9FF;
+    /* Use base Standard palette from :root[data-theme] */
 }
 
 /* Fiery Ocean */
@@ -664,25 +791,31 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
 
 /* Ocean Breeze */
 :root[data-color-theme="ocean-breeze"] {
-    --bg: #090B16;
-    --surface: #0E1120;
-    --muted: #131833;
-    --border: #1C2445;
-    --text: #E6F2FF;
-    --text-dim: #B6D0EA;
-    --accent: #00B4D8; /* pacific-cyan */
-    --accent-hover: #90E0EF; /* non-photo-blue */
-    --success: #55d1a0;
-    --warning: #e9c15f;
+    /* Earthy replacement palette:
+       #3E3F29 (dark olive)
+       #7D8D86 (sage gray)
+       #BCA88D (sand)
+       #F1F0E4 (eggshell)
+    */
+    --bg: #3E3F29;
+    --text: #F1F0E4;
+    --text-dim: #BCA88D;
+    --surface: color-mix(in oklab, var(--bg) 88%, var(--text) 12%);
+    --muted: color-mix(in oklab, var(--bg) 80%, var(--text) 20%);
+    --border: color-mix(in oklab, var(--bg) 60%, #7D8D86 40%);
+    --accent: #7D8D86;
+    --accent-hover: #BCA88D;
+    --success: #7D8D86;
+    --warning: #BCA88D;
     --danger: #FF6B6B;
-    --badge-in: #55d1a0;
+    --badge-in: #7D8D86;
     --badge-out: #FF6B6B;
-    --sphere-ideell: #0077B6; /* honolulu-blue */
-    --sphere-zweck: #00B4D8; /* pacific-cyan */
-    --sphere-vermoegen: #90E0EF; /* non-photo-blue */
-    --sphere-wgb: #CAF0F8; /* light-cyan */
-    --pm-bar: #90E0EF;
-    --pm-bank: #00B4D8;
+    --sphere-ideell: #7D8D86;
+    --sphere-zweck: #BCA88D;
+    --sphere-vermoegen: #F1F0E4;
+    --sphere-wgb: #3E3F29;
+    --pm-bar: #BCA88D;
+    --pm-bank: #7D8D86;
 }
 
 /* Earthy Tones */
@@ -3830,7 +3963,7 @@ html[data-glass-modals="true"] .flyout-arrow {
 .theme-swatch[data-theme="fiery-ocean"] { background: linear-gradient(135deg, #FF5722 50%, #2196F3 50%); }
 .theme-swatch[data-theme="peachy-delight"] { background: linear-gradient(135deg, #FF8A65 50%, #FFCCBC 50%); }
 .theme-swatch[data-theme="pastel-dreamland"] { background: linear-gradient(135deg, #CE93D8 50%, #90CAF9 50%); }
-.theme-swatch[data-theme="ocean-breeze"] { background: linear-gradient(135deg, #26A69A 50%, #4DD0E1 50%); }
+.theme-swatch[data-theme="ocean-breeze"] { background: linear-gradient(135deg, #3E3F29 50%, #BCA88D 50%); }
 .theme-swatch[data-theme="earthy-tones"] { background: linear-gradient(135deg, #8D6E63 50%, #A5D6A7 50%); }
 .theme-swatch[data-theme="monochrome-harmony"] { background: linear-gradient(135deg, #78909C 50%, #CFD8DC 50%); }
 .theme-swatch[data-theme="vintage-charm"] { background: linear-gradient(135deg, #8E7CC3 50%, #F9CB9C 50%); }

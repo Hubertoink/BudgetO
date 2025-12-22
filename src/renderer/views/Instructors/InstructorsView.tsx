@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 
 type InstructorStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'
 
@@ -56,6 +57,7 @@ const STATUS_COLORS: Record<InstructorStatus, string> = {
 
 export default function InstructorsView() {
   const { notify } = useToast()
+  const { canWrite } = useAuth()
   
   const [rows, setRows] = useState<Instructor[]>([])
   const [total, setTotal] = useState(0)
@@ -106,6 +108,14 @@ export default function InstructorsView() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (canWrite) return
+    setForm(null)
+    setDeleteConfirm(null)
+    setInvoiceForm(null)
+    setContractForm(null)
+  }, [canWrite])
+
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true)
     try {
@@ -119,6 +129,7 @@ export default function InstructorsView() {
   }, [notify])
 
   const saveForm = async () => {
+    if (!canWrite) return
     if (!form) return
     try {
       if (form.mode === 'create') {
@@ -177,6 +188,7 @@ export default function InstructorsView() {
   }
 
   const doDelete = async () => {
+    if (!canWrite) return
     if (!deleteConfirm) return
     try {
       await (window as any).api?.instructors?.delete?.({ id: deleteConfirm.id })
@@ -190,6 +202,7 @@ export default function InstructorsView() {
   }
 
   const addInvoice = async () => {
+    if (!canWrite) return
     if (!invoiceForm) return
     const amount = parseFloat(invoiceForm.amount.replace(',', '.'))
     if (isNaN(amount) || amount <= 0) {
@@ -246,6 +259,7 @@ export default function InstructorsView() {
   }
 
   const deleteInvoice = async (invoiceId: number) => {
+    if (!canWrite) return
     try {
       await (window as any).api?.instructors?.invoices?.delete?.({ invoiceId })
       notify('success', 'Rechnung gelöscht')
@@ -256,6 +270,7 @@ export default function InstructorsView() {
   }
 
   const addContract = async () => {
+    if (!canWrite) return
     if (!contractForm || !contractForm.file) {
       notify('error', 'Bitte eine Datei auswählen')
       return
@@ -299,6 +314,7 @@ export default function InstructorsView() {
   }
 
   const deleteContract = async (contractId: number) => {
+    if (!canWrite) return
     try {
       await (window as any).api?.instructors?.contracts?.delete?.({ contractId })
       notify('success', 'Vertrag gelöscht')
@@ -310,6 +326,7 @@ export default function InstructorsView() {
 
   // Create a voucher from an invoice (triggers global Quick-Add)
   const createVoucherFromInvoice = async (invoice: InstructorInvoice) => {
+    if (!canWrite) return
     if (!detail) return
     // Trigger the global Quick-Add with pre-filled data
     const event = new CustomEvent('quick-add-prefill', {
@@ -356,9 +373,11 @@ export default function InstructorsView() {
             <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Übungsleiter</h1>
             <div className="helper" style={{ marginTop: 4 }}>Verwalte Übungsleiter, Verträge und Honorare</div>
           </div>
-          <button className="btn primary" onClick={() => setForm({ mode: 'create', draft: { status: 'ACTIVE', yearlyCap: 3000 } })}>
-            + Neuer Übungsleiter
-          </button>
+          {canWrite && (
+            <button className="btn primary" onClick={() => setForm({ mode: 'create', draft: { status: 'ACTIVE', yearlyCap: 3000 } })}>
+              + Neuer Übungsleiter
+            </button>
+          )}
         </div>
 
         {/* Filter Row */}
@@ -486,12 +505,16 @@ export default function InstructorsView() {
                       {STATUS_LABELS[r.status]}
                     </span>
                     <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
-                      <button className="btn ghost icon-btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { ...r } })}>
-                        ✎
-                      </button>
-                      <button className="btn ghost icon-btn danger" title="Löschen" onClick={() => setDeleteConfirm({ id: r.id, name: r.name })}>
-                        🗑
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button className="btn ghost icon-btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { ...r } })}>
+                            ✎
+                          </button>
+                          <button className="btn ghost icon-btn danger" title="Löschen" onClick={() => setDeleteConfirm({ id: r.id, name: r.name })}>
+                            🗑
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -594,20 +617,22 @@ export default function InstructorsView() {
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>📄 Verträge</h3>
-                    <button 
-                      className="btn ghost icon-btn" 
-                      title="Vertrag hochladen"
-                      aria-label="Vertrag hochladen"
-                      onClick={() => setContractForm({ 
-                        instructorId: detail.id, 
-                        title: '', 
-                        startDate: '', 
-                        endDate: '', 
-                        file: null 
-                      })}
-                    >
-                      📤
-                    </button>
+                    {canWrite && (
+                      <button 
+                        className="btn ghost icon-btn" 
+                        title="Vertrag hochladen"
+                        aria-label="Vertrag hochladen"
+                        onClick={() => setContractForm({ 
+                          instructorId: detail.id, 
+                          title: '', 
+                          startDate: '', 
+                          endDate: '', 
+                          file: null 
+                        })}
+                      >
+                        📤
+                      </button>
+                    )}
                   </div>
                   
                   {detail.contracts.length === 0 ? (
@@ -636,9 +661,11 @@ export default function InstructorsView() {
                             <button className="btn ghost" style={{ fontSize: 12 }} onClick={() => openContract(c.id)}>
                               Öffnen
                             </button>
-                            <button className="btn ghost danger" style={{ fontSize: 12 }} onClick={() => deleteContract(c.id)}>
-                              🗑
-                            </button>
+                            {canWrite && (
+                              <button className="btn ghost danger" style={{ fontSize: 12 }} onClick={() => deleteContract(c.id)}>
+                                🗑
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -650,21 +677,23 @@ export default function InstructorsView() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>💰 Rechnungen</h3>
-                    <button 
-                      className="btn ghost icon-btn" 
-                      title="Rechnung hinzufügen"
-                      aria-label="Rechnung hinzufügen"
-                      onClick={() => setInvoiceForm({ 
-                        instructorId: detail.id, 
-                        instructorName: detail.name,
-                        date: new Date().toISOString().slice(0, 10), 
-                        description: '', 
-                        amount: '',
-                        file: null
-                      })}
-                    >
-                      ➕
-                    </button>
+                    {canWrite && (
+                      <button 
+                        className="btn ghost icon-btn" 
+                        title="Rechnung hinzufügen"
+                        aria-label="Rechnung hinzufügen"
+                        onClick={() => setInvoiceForm({ 
+                          instructorId: detail.id, 
+                          instructorName: detail.name,
+                          date: new Date().toISOString().slice(0, 10), 
+                          description: '', 
+                          amount: '',
+                          file: null
+                        })}
+                      >
+                        ➕
+                      </button>
+                    )}
                   </div>
                   
                   {detail.invoices.length === 0 ? (
@@ -707,7 +736,7 @@ export default function InstructorsView() {
                             {eurFmt.format(inv.amount)}
                           </div>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            {!inv.voucherId && (
+                            {canWrite && !inv.voucherId && (
                               <button 
                                 className="btn ghost icon-btn" 
                                 style={{ fontSize: 14, color: 'var(--primary)' }} 
@@ -721,9 +750,11 @@ export default function InstructorsView() {
                             {inv.voucherId && (
                               <span className="helper" style={{ fontSize: 11, color: 'var(--success)', padding: '4px 8px' }}>✓ Gebucht</span>
                             )}
-                            <button className="btn ghost danger icon-btn" style={{ fontSize: 12 }} onClick={() => deleteInvoice(inv.id)} title="Löschen" aria-label="Löschen">
-                              🗑
-                            </button>
+                            {canWrite && (
+                              <button className="btn ghost danger icon-btn" style={{ fontSize: 12 }} onClick={() => deleteInvoice(inv.id)} title="Löschen" aria-label="Löschen">
+                                🗑
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -751,7 +782,7 @@ export default function InstructorsView() {
       </div>
 
       {/* Create/Edit Modal */}
-      {form && createPortal(
+      {canWrite && form && createPortal(
         <div className="modal-overlay" onClick={() => setForm(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader 
@@ -982,7 +1013,7 @@ export default function InstructorsView() {
       )}
 
       {/* Delete Confirm Modal */}
-      {deleteConfirm && createPortal(
+      {canWrite && deleteConfirm && createPortal(
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
             <ModalHeader title="Übungsleiter löschen" onClose={() => setDeleteConfirm(null)} />
@@ -1002,7 +1033,7 @@ export default function InstructorsView() {
       )}
 
       {/* Invoice Add Modal */}
-      {invoiceForm && createPortal(
+      {canWrite && invoiceForm && createPortal(
         <div className="modal-overlay" onClick={() => setInvoiceForm(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader title="Rechnung hinzufügen" onClose={() => setInvoiceForm(null)} />
@@ -1106,7 +1137,7 @@ export default function InstructorsView() {
       )}
 
       {/* Contract Upload Modal */}
-      {contractForm && createPortal(
+      {canWrite && contractForm && createPortal(
         <div className="modal-overlay" onClick={() => setContractForm(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 450 }}>
             <ModalHeader title="Vertrag hochladen" onClose={() => setContractForm(null)} />

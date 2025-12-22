@@ -494,7 +494,7 @@ export default function SetupWizardModal({
                 { value: 'fiery-ocean', label: 'Fiery Ocean' },
                 { value: 'peachy-delight', label: 'Peachy Delight' },
                 { value: 'pastel-dreamland', label: 'Pastel Dreamland' },
-                { value: 'ocean-breeze', label: 'Ocean Breeze' },
+                { value: 'ocean-breeze', label: 'Earthy Palette' },
                 { value: 'earthy-tones', label: 'Earthy Tones' },
                 { value: 'monochrome-harmony', label: 'Monochrome' },
                 { value: 'vintage-charm', label: 'Vintage Charm' },
@@ -722,7 +722,19 @@ export default function SetupWizardModal({
                             <label>Eigene Kategorie</label>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <input className="input" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="z. B. Bürobedarf / Material" />
-                                <button className="btn hover-highlight" onClick={() => { const v = customCategory.trim(); if (v) { setCustomCategories([...customCategories, v]); setCustomCategory('') } }}>Hinzufügen</button>
+                                <button
+                                    className="btn hover-highlight"
+                                    onClick={() => {
+                                        const v = customCategory.trim()
+                                        if (v) {
+                                            setCustomCategories([...customCategories, v])
+                                            setCustomCategory('')
+                                            notify('success', 'Kategorie hinzugefügt')
+                                        }
+                                    }}
+                                >
+                                    Hinzufügen
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -750,7 +762,19 @@ export default function SetupWizardModal({
                             <label>Eigener Tag</label>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <input className="input" value={customTag} onChange={(e) => setCustomTag(e.target.value)} placeholder="z. B. Projekt ABC" />
-                                <button className="btn hover-highlight" onClick={() => { const v = customTag.trim(); if (v) { setCustomTags([...customTags, v]); setCustomTag('') } }}>Hinzufügen</button>
+                                <button
+                                    className="btn hover-highlight"
+                                    onClick={() => {
+                                        const v = customTag.trim()
+                                        if (v) {
+                                            setCustomTags([...customTags, v])
+                                            setCustomTag('')
+                                            notify('success', 'Tag hinzugefügt')
+                                        }
+                                    }}
+                                >
+                                    Hinzufügen
+                                </button>
                             </div>
                         </div>
                     </div>

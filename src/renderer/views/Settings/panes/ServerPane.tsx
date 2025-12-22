@@ -45,6 +45,10 @@ export function ServerPane({ notify }: ServerPaneProps) {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [authRequired, setAuthRequired] = useState<boolean>(false)
 
+  // Local-mode auth behavior: when passwords exist, user can opt out of login prompts in local mode.
+  const [requireAuthInLocalMode, setRequireAuthInLocalMode] = useState<boolean>(false)
+  const [showLocalAuthPrompt, setShowLocalAuthPrompt] = useState<boolean>(false)
+
   // Load current config and status
   const loadConfig = useCallback(async () => {
     try {
@@ -68,6 +72,13 @@ export function ServerPane({ notify }: ServerPaneProps) {
 
       const authResult = await (window as any).api?.auth?.isRequired?.()
       setAuthRequired(!!authResult?.required)
+
+      try {
+        const s = await (window as any).api?.settings?.get?.({ key: 'auth.requireInLocalMode' })
+        setRequireAuthInLocalMode(!!s?.value)
+      } catch {
+        setRequireAuthInLocalMode(false)
+      }
     } catch (e) {
       console.error('Failed to load server config:', e)
     }
@@ -118,6 +129,16 @@ export function ServerPane({ notify }: ServerPaneProps) {
       notify('error', e?.message || 'Fehler beim Speichern')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const persistRequireAuthInLocalMode = async (next: boolean) => {
+    setRequireAuthInLocalMode(next)
+    try {
+      await (window as any).api?.settings?.set?.({ key: 'auth.requireInLocalMode', value: next })
+      try { window.dispatchEvent(new Event('auth-changed')) } catch {}
+    } catch (e: any) {
+      notify('error', e?.message || 'Konnte Einstellung nicht speichern')
     }
   }
 
@@ -193,6 +214,40 @@ export function ServerPane({ notify }: ServerPaneProps) {
 
   return (
     <div className="settings-pane">
+      {showLocalAuthPrompt && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Passwortabfrage im Lokalmodus"
+          style={{ zIndex: 6500 }}
+          onClick={() => setShowLocalAuthPrompt(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0 }}>Lokalmodus: Passwortabfrage</h2>
+              <button className="btn ghost" onClick={() => setShowLocalAuthPrompt(false)} aria-label="Schließen">✕</button>
+            </div>
+            <div className="modal-grid" style={{ gap: 10 }}>
+              <div>
+                Es sind Benutzer mit Passwort vorhanden. Im <strong>Lokalmodus</strong> kannst du wählen, ob beim Start eine Anmeldung erforderlich ist.
+              </div>
+              <div className="helper" style={{ margin: 0 }}>
+                Empfehlung: <strong>Ohne Passwort</strong> für Einzel-PC. Für geteilte PCs: <strong>Mit Passwort</strong>.
+              </div>
+              <div className="modal-actions-end" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => { void persistRequireAuthInLocalMode(false); setShowLocalAuthPrompt(false) }}>
+                  Ohne Passwort
+                </button>
+                <button className="btn primary" onClick={() => { void persistRequireAuthInLocalMode(true); setShowLocalAuthPrompt(false) }}>
+                  Mit Passwort
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h2 style={{ margin: 0, marginBottom: 4 }}>Netzwerk</h2>
@@ -216,7 +271,13 @@ export function ServerPane({ notify }: ServerPaneProps) {
           <button
             type="button"
             className={`btn-option ${config.mode === 'local' ? 'active' : ''}`}
-            onClick={() => setConfig({ ...config, mode: 'local' })}
+            onClick={() => {
+              // If switching to local mode and there are passwords, ask whether login prompts should stay enabled.
+              if (config.mode !== 'local' && authRequired) {
+                setShowLocalAuthPrompt(true)
+              }
+              setConfig({ ...config, mode: 'local' })
+            }}
           >
             Lokal
           </button>
@@ -236,6 +297,28 @@ export function ServerPane({ notify }: ServerPaneProps) {
           </button>
         </div>
       </div>
+
+      {config.mode === 'local' && (
+        <div className="settings-card settings-pane-card">
+          <div className="settings-title">Sicherheit im Lokalmodus</div>
+          <div className="settings-sub">Steuert, ob beim Start eine Anmeldung nötig ist.</div>
+          <div className="settings-inline-toggle" style={{ marginTop: 10 }}>
+            <label htmlFor="toggle-local-auth-required">Passwortabfrage aktivieren</label>
+            <input
+              id="toggle-local-auth-required"
+              role="switch"
+              aria-checked={requireAuthInLocalMode}
+              className="toggle"
+              type="checkbox"
+              checked={requireAuthInLocalMode}
+              onChange={(e) => { void persistRequireAuthInLocalMode(e.target.checked) }}
+            />
+          </div>
+          <div className="helper" style={{ marginTop: 8 }}>
+            Wenn deaktiviert, wird im Lokalmodus keine Passwortabfrage angezeigt (auch wenn Passwörter gesetzt sind).
+          </div>
+        </div>
+      )}
 
       {/* Server Mode Settings */}
       {config.mode === 'server' && (

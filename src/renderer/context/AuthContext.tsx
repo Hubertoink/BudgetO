@@ -23,6 +23,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isLoading: boolean
   authRequired: boolean
+  authEnforced: boolean
   
   // Actions
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [serverMode, setServerMode] = useState<'local' | 'server' | 'client'>('local')
   const [isLoading, setIsLoading] = useState(true)
   const [authRequired, setAuthRequired] = useState(false)
+  const [authEnforced, setAuthEnforced] = useState(false)
 
   const tokenRequired = serverMode === 'client'
 
@@ -77,6 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return authRequired
     }
   }, [authRequired])
+
+  const refreshAuthEnforced = useCallback(async () => {
+    try {
+      const fn = (window as any).api?.auth?.isEnforced
+      if (typeof fn !== 'function') {
+        // Backwards compatible + safe default: if we can't determine enforcement,
+        // treat "passwords exist" as "login is enforced".
+        setAuthEnforced(authRequired)
+        return authRequired
+      }
+      const res = await fn()
+      const enforced = res?.enforced ?? false
+      setAuthEnforced(enforced)
+      return enforced
+    } catch {
+      return authEnforced
+    }
+  }, [authEnforced, authRequired])
 
   // Check if auth is required and restore session on mount
   useEffect(() => {
@@ -107,12 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Check if authentication is required
         const required = await refreshAuthRequired()
+        const enforced = await refreshAuthEnforced()
         
         // Try to restore session from storage
         const storedUser = sessionStorage.getItem(USER_STORAGE_KEY)
         if (storedUser) {
           // If auth is required, a user without a token is not an authenticated session.
-          if (required && needsToken && !storedToken) {
+          if (enforced && needsToken && !storedToken) {
             sessionStorage.removeItem(USER_STORAGE_KEY)
           } else {
           try {
@@ -131,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         // If no auth required and no user, auto-login as admin
-        if (!required && !storedUser) {
+        if (!enforced && !storedUser) {
           const usersResult = await (window as any).api?.users?.list?.()
           const adminUser = usersResult?.users?.find((u: any) => u.role === 'ADMIN' && u.isActive)
           if (adminUser) {
@@ -150,12 +171,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     init()
-  }, [refreshAuthRequired, refreshServerMode])
+  }, [refreshAuthRequired, refreshAuthEnforced, refreshServerMode])
 
   useEffect(() => {
-    const onAuthChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
-    const onDataChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
-    const onServerConfigChanged = () => { void refreshAuthRequired(); void refreshServerMode() }
+    const onAuthChanged = () => { void refreshAuthRequired(); void refreshAuthEnforced(); void refreshServerMode() }
+    const onDataChanged = () => { void refreshAuthRequired(); void refreshAuthEnforced(); void refreshServerMode() }
+    const onServerConfigChanged = () => { void refreshAuthRequired(); void refreshAuthEnforced(); void refreshServerMode() }
     window.addEventListener('auth-changed', onAuthChanged)
     window.addEventListener('data-changed', onDataChanged)
     window.addEventListener('server-config-changed', onServerConfigChanged)
@@ -164,13 +185,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('data-changed', onDataChanged)
       window.removeEventListener('server-config-changed', onServerConfigChanged)
     }
-  }, [refreshAuthRequired, refreshServerMode])
+  }, [refreshAuthRequired, refreshAuthEnforced, refreshServerMode])
 
   // If auth is not required, ensure we always have a selected user (admin) for local usage.
   useEffect(() => {
     async function ensureLocalUser() {
       if (isLoading) return
-      if (authRequired) return
+      if (authEnforced) return
       if (user) return
       try {
         const usersResult = await (window as any).api?.users?.list?.()
@@ -184,20 +205,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     void ensureLocalUser()
-  }, [authRequired, user, isLoading])
+  }, [authEnforced, user, isLoading])
 
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       // Ensure latest flags (especially after switching network mode)
       const mode = await refreshServerMode()
       const requiredNow = await refreshAuthRequired()
+      const enforcedNow = await refreshAuthEnforced()
       const needsToken = mode === 'client'
 
       const result = await (window as any).api?.auth?.login?.({ username, password })
       
       if (result?.success && result?.user) {
         const token = typeof result?.token === 'string' ? result.token : null
-        if (requiredNow && needsToken && !token) {
+        if (enforcedNow && needsToken && !token) {
           return { success: false, error: 'Login fehlgeschlagen (kein Token vom Server)' }
         }
         if (token) {
@@ -222,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       return { success: false, error: e?.message || 'Login fehlgeschlagen' }
     }
-  }, [refreshServerMode, refreshAuthRequired])
+  }, [refreshServerMode, refreshAuthRequired, refreshAuthEnforced])
 
   const logout = useCallback(() => {
     // Invalidate server/main-process session token (best-effort)
@@ -260,9 +282,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextValue = {
     user,
-    isAuthenticated: authRequired ? (!!user && (!tokenRequired || !!authToken)) : !!user,
+    isAuthenticated: authEnforced ? (!!user && (!tokenRequired || !!authToken)) : !!user,
     isLoading,
     authRequired,
+    authEnforced,
     login,
     logout,
     refreshUser,
@@ -293,10 +316,10 @@ export function useAuth(): AuthContextValue {
  * Hook to require authentication - redirects to login if not authenticated
  */
 export function useRequireAuth(): { isAuthenticated: boolean; isLoading: boolean } {
-  const { isAuthenticated, isLoading, authRequired } = useAuth()
+  const { isAuthenticated, isLoading, authEnforced } = useAuth()
   
   // If auth is not required, always return authenticated
-  if (!authRequired) {
+  if (!authEnforced) {
     return { isAuthenticated: true, isLoading }
   }
   

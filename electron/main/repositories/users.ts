@@ -1,4 +1,5 @@
 import { getDb } from '../db/database'
+import { getSetting } from '../services/settings'
 import crypto from 'node:crypto'
 
 /**
@@ -384,6 +385,21 @@ export function isAuthRequired(): boolean {
   const d = getDb()
   const row = d.prepare('SELECT COUNT(*) as count FROM users WHERE password_hash IS NOT NULL AND is_active = 1').get() as any
   return (row?.count || 0) > 0
+}
+
+/**
+ * Effective auth enforcement depending on server mode.
+ *
+ * - If no active user has a password: never require auth.
+ * - In local mode: auth can be disabled even if passwords exist (setting).
+ * - In server/client mode: auth is always enforced when passwords exist.
+ */
+export function isAuthEnforced(mode: 'local' | 'server' | 'client'): boolean {
+  const requiredByPasswords = isAuthRequired()
+  if (!requiredByPasswords) return false
+  if (mode !== 'local') return true
+  const requireInLocal = getSetting<boolean>('auth.requireInLocalMode')
+  return requireInLocal === true
 }
 
 /**

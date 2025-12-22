@@ -85,7 +85,7 @@ export function GeneralPane({
               <option value="fiery-ocean">Fiery Ocean ●</option>
               <option value="peachy-delight">Peachy Delight ●</option>
               <option value="pastel-dreamland">Pastel Dreamland ●</option>
-              <option value="ocean-breeze">Ocean Breeze ●</option>
+              <option value="ocean-breeze">Earthy Palette ●</option>
               <option value="earthy-tones">Earthy Tones ●</option>
               <option value="monochrome-harmony">Monochrome Harmony ●</option>
               <option value="vintage-charm">Vintage Charm ●</option>

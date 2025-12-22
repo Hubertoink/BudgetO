@@ -2059,6 +2059,18 @@ export function registerIpcHandlers() {
         return { required: isAuthRequired() }
     })
 
+    ipcMain.handle('auth.isEnforced', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'auth.isEnforced', {})
+        }
+
+        const { isAuthEnforced } = await import('../repositories/users')
+        return { enforced: isAuthEnforced(cfg.mode) }
+    })
+
     ipcMain.handle('auth.logout', async () => {
         const { getServerConfig, remoteCall, setClientAuthToken } = await import('../services/apiServer')
         const cfg = getServerConfig()

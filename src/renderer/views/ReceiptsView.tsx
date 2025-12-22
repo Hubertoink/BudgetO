@@ -3,8 +3,8 @@ import AttachmentsModal from '../components/modals/AttachmentsModal'
 import { useAuth } from '../context/AuthContext'
 
 export default function ReceiptsView() {
-    const { authRequired, isAuthenticated } = useAuth()
-    const allowData = !authRequired || isAuthenticated
+    const { authEnforced, isAuthenticated } = useAuth()
+    const allowData = !authEnforced || isAuthenticated
     const [rows, setRows] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string | null; fileCount?: number }>>([])
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(20)

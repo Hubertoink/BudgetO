@@ -147,6 +147,12 @@ function registerHandlers() {
     return { required: isAuthRequired() }
   })
 
+  apiHandlers.set('auth.isEnforced', async () => {
+    const { isAuthEnforced } = await import('../repositories/users')
+    const cfg = getServerConfig()
+    return { enforced: isAuthEnforced(cfg.mode) }
+  })
+
   apiHandlers.set('auth.logout', async (_body, authUser) => {
     const { deleteSessionByToken } = await import('../repositories/users')
     if (!authUser?.token) return { success: true }
@@ -216,7 +222,7 @@ function registerHandlers() {
     const { isAuthRequired } = await import('../repositories/users')
     if (isAuthRequired()) {
       if (!authUser) throw new Error('Unauthorized')
-      if (authUser.role !== 'ADMIN' && authUser.role !== 'KASSE') throw new Error('Forbidden')
+      // Read access is safe for all authenticated roles (READONLY still needs UI preferences).
     }
     const { getSetting } = await import('./settings')
     const value = getSetting(body.key)
@@ -227,7 +233,11 @@ function registerHandlers() {
     const { isAuthRequired } = await import('../repositories/users')
     if (isAuthRequired()) {
       if (!authUser) throw new Error('Unauthorized')
-      if (authUser.role !== 'ADMIN' && authUser.role !== 'KASSE') throw new Error('Forbidden')
+      const key = String(body?.key || '')
+      const allowReadonlyWrite = key === 'journal.cols' || key === 'journal.order'
+      if (authUser.role !== 'ADMIN' && authUser.role !== 'KASSE' && !allowReadonlyWrite) {
+        throw new Error('Forbidden')
+      }
     }
     const { setSetting } = await import('./settings')
     setSetting(body.key, body.value)
@@ -773,11 +783,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const body = await parseBody(req)
 
       // Authentication (only enforced if at least one active user has a password)
-      const { isAuthRequired, getUserBySessionToken } = await import('../repositories/users')
-      const mustAuth = isAuthRequired()
+      const { isAuthEnforced, getUserBySessionToken } = await import('../repositories/users')
+      const mustAuth = isAuthEnforced(getServerConfig().mode)
 
       let authUser: any = undefined
-      const isAuthFreeRoute = route === 'auth.login' || route === 'auth.isRequired' || route === 'auth.logout' || route === 'meta.getChangeSeq'
+      const isAuthFreeRoute =
+        route === 'auth.login' ||
+        route === 'auth.isRequired' ||
+        route === 'auth.isEnforced' ||
+        route === 'auth.logout' ||
+        route === 'meta.getChangeSeq'
       if (!isAuthFreeRoute) {
         if (mustAuth) {
           const authHeader = String(req.headers.authorization || '')

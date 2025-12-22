@@ -159,8 +159,8 @@ export default function JournalView({
     page: pageProp,
     setPage: setPageProp
 }: JournalViewProps) {
-    const { authRequired, isAuthenticated, canWrite } = useAuth()
-    const allowData = !authRequired || isAuthenticated
+    const { authEnforced, isAuthenticated, canWrite } = useAuth()
+    const allowData = !authEnforced || isAuthenticated
     // ==================== STATE ====================
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])

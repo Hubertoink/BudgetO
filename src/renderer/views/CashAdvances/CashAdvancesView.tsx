@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 
 type CashAdvanceStatus = 'OPEN' | 'RESOLVED' | 'OVERDUE'
 
@@ -49,6 +50,7 @@ type CashAdvanceWithDetails = CashAdvance & {
 
 export default function CashAdvancesView() {
   const { notify } = useToast()
+  const { canWrite } = useAuth()
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [loading, setLoading] = useState(false)
@@ -139,10 +141,20 @@ export default function CashAdvancesView() {
   useEffect(() => { load() }, [load])
   useEffect(() => { if (selectedId) loadDetail(selectedId) }, [loadDetail, selectedId])
 
+  useEffect(() => {
+    if (canWrite) return
+    setCreateModal(null)
+    setPartialModal(null)
+    setSettleModal(null)
+    setResolveModal(null)
+    setDeleteConfirmModal(null)
+  }, [canWrite])
+
   // ─────────────────────────────────────────────────────────────────────────
   // Create Cash Advance
   // ─────────────────────────────────────────────────────────────────────────
   const openCreate = async () => {
+    if (!canWrite) return
     try {
       const res = await (window as any).api?.cashAdvances?.nextOrderNumber?.()
       const today = new Date().toISOString().slice(0, 10)
@@ -169,6 +181,7 @@ export default function CashAdvancesView() {
   }
 
   const createCashAdvance = async () => {
+    if (!canWrite) return
     if (!createModal) return
     if (!createModal.orderNumber.trim()) {
       notify('error', 'Anordnungsnummer ist erforderlich')
@@ -226,6 +239,7 @@ export default function CashAdvancesView() {
   // Add Partial (Teil-Vorschuss vergeben)
   // ─────────────────────────────────────────────────────────────────────────
   const addPartial = async () => {
+    if (!canWrite) return
     if (!partialModal) return
     const amount = parseFloat(partialModal.amount.replace(',', '.'))
     if (isNaN(amount) || amount <= 0) {
@@ -257,6 +271,7 @@ export default function CashAdvancesView() {
   // Delete Partial (Teil-Vorschuss löschen)
   // ─────────────────────────────────────────────────────────────────────────
   const confirmDeletePartial = async () => {
+    if (!canWrite) return
     if (!deleteConfirmModal) return
     try {
       await (window as any).api?.cashAdvances?.partials?.delete?.({ id: deleteConfirmModal.partialId })
@@ -270,6 +285,7 @@ export default function CashAdvancesView() {
   }
 
   const openDeleteConfirm = (p: PartialCashAdvance) => {
+    if (!canWrite) return
     setDeleteConfirmModal({
       partialId: p.id,
       recipientName: p.recipientName || 'Unbekannt',
@@ -281,6 +297,7 @@ export default function CashAdvancesView() {
   // Settle Partial (Teil-Vorschuss auflösen)
   // ─────────────────────────────────────────────────────────────────────────
   const settlePartial = async () => {
+    if (!canWrite) return
     if (!settleModal) return
     const settledAmount = parseFloat(settleModal.settledAmount.replace(',', '.'))
     if (isNaN(settledAmount) || settledAmount < 0) {
@@ -306,6 +323,7 @@ export default function CashAdvancesView() {
   // Resolve (irreversible close)
   // ─────────────────────────────────────────────────────────────────────────
   const openResolve = () => {
+    if (!canWrite) return
     if (!detail) return
     const allPartialsSettled = detail.partials.every((p) => p.isSettled)
     if (!allPartialsSettled) {
@@ -316,6 +334,7 @@ export default function CashAdvancesView() {
   }
 
   const confirmResolve = async () => {
+    if (!canWrite) return
     if (!detail || !resolveModal) return
     if (!resolveModal.confirmIrreversible) {
       notify('error', 'Bitte bestätige, dass der Abschluss irreversibel ist')
@@ -363,7 +382,7 @@ export default function CashAdvancesView() {
         <h1 style={{ margin: 0 }}>Barvorschüsse</h1>
         <div className="helper">Kassier holt Vorschuss → vergibt an Personen → Abrechnung</div>
       </div>
-      <button className="btn primary" onClick={openCreate}>+ Barvorschuss</button>
+      {canWrite && <button className="btn primary" onClick={openCreate}>+ Barvorschuss</button>}
     </div>
   )
 
@@ -535,21 +554,23 @@ export default function CashAdvancesView() {
                     (() => {
                       const canResolve = detail.partials.every((p) => p.isSettled)
                       return (
-                    <button
-                      className="btn primary"
-                      onClick={openResolve}
-                      aria-disabled={!canResolve}
-                      title={!canResolve
-                        ? 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind'
-                        : undefined}
-                      style={{
-                        fontSize: 13,
-                        opacity: canResolve ? 1 : 0.6,
-                        cursor: canResolve ? 'pointer' : 'not-allowed'
-                      }}
-                    >
-                      ✓ Abschließen
-                    </button>
+                    canWrite ? (
+                      <button
+                        className="btn primary"
+                        onClick={openResolve}
+                        aria-disabled={!canResolve}
+                        title={!canResolve
+                          ? 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind'
+                          : undefined}
+                        style={{
+                          fontSize: 13,
+                          opacity: canResolve ? 1 : 0.6,
+                          cursor: canResolve ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        ✓ Abschließen
+                      </button>
+                    ) : null
                       )
                     })()
                   )}
@@ -581,16 +602,18 @@ export default function CashAdvancesView() {
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn primary"
-                disabled={detail.status === 'RESOLVED'}
-                onClick={() => {
-                  const today = new Date().toISOString().slice(0, 10)
-                  setPartialModal({ cashAdvanceId: detail.id, recipientName: '', amount: '', issuedAt: today, description: '' })
-                }}
-              >
-                + Vorschuss vergeben
-              </button>
+              {canWrite && (
+                <button
+                  className="btn primary"
+                  disabled={detail.status === 'RESOLVED'}
+                  onClick={() => {
+                    const today = new Date().toISOString().slice(0, 10)
+                    setPartialModal({ cashAdvanceId: detail.id, recipientName: '', amount: '', issuedAt: today, description: '' })
+                  }}
+                >
+                  + Vorschuss vergeben
+                </button>
+              )}
             </div>
 
             {/* Teil-Vorschüsse */}
@@ -625,35 +648,37 @@ export default function CashAdvancesView() {
                               <div className="helper" style={{ fontSize: 11 }}>{p.settledAt}</div>
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', gap: 4, marginTop: 8, justifyContent: 'flex-end' }}>
-                              <button
-                                className="btn primary"
-                                style={{ fontSize: 12, padding: '4px 10px' }}
-                                disabled={detail.status === 'RESOLVED'}
-                                onClick={() => {
-                                  const today = new Date().toISOString().slice(0, 10)
-                                  setSettleModal({
-                                    partialId: p.id,
-                                    recipientName: p.recipientName || 'Unbekannt',
-                                    originalAmount: p.amount,
-                                    settledAmount: '',
-                                    settledAt: today
-                                  })
-                                }}
-                                title="Abrechnen"
-                              >
-                                💰 Abrechnen
-                              </button>
-                              <button
-                                className="btn ghost danger"
-                                style={{ fontSize: 12, padding: '4px 8px' }}
-                                disabled={detail.status === 'RESOLVED'}
-                                onClick={() => openDeleteConfirm(p)}
-                                title="Löschen"
-                              >
-                                🗑
-                              </button>
-                            </div>
+                            canWrite ? (
+                              <div style={{ display: 'flex', gap: 4, marginTop: 8, justifyContent: 'flex-end' }}>
+                                <button
+                                  className="btn primary"
+                                  style={{ fontSize: 12, padding: '4px 10px' }}
+                                  disabled={detail.status === 'RESOLVED'}
+                                  onClick={() => {
+                                    const today = new Date().toISOString().slice(0, 10)
+                                    setSettleModal({
+                                      partialId: p.id,
+                                      recipientName: p.recipientName || 'Unbekannt',
+                                      originalAmount: p.amount,
+                                      settledAmount: '',
+                                      settledAt: today
+                                    })
+                                  }}
+                                  title="Abrechnen"
+                                >
+                                  💰 Abrechnen
+                                </button>
+                                <button
+                                  className="btn ghost danger"
+                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                                  disabled={detail.status === 'RESOLVED'}
+                                  onClick={() => openDeleteConfirm(p)}
+                                  title="Löschen"
+                                >
+                                  🗑
+                                </button>
+                              </div>
+                            ) : null
                           )}
                         </div>
                       </div>
@@ -674,7 +699,7 @@ export default function CashAdvancesView() {
       </div>
 
       {/* Create Modal */}
-      {createModal && createPortal(
+      {canWrite && createModal && createPortal(
         <div className="modal-overlay" onClick={() => setCreateModal(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <ModalHeader title="Barvorschuss anlegen" onClose={() => setCreateModal(null)} />
@@ -774,7 +799,7 @@ export default function CashAdvancesView() {
       )}
 
       {/* Partial Modal (Vorschuss vergeben) */}
-      {partialModal && createPortal(
+      {canWrite && partialModal && createPortal(
         <div className="modal-overlay" onClick={() => setPartialModal(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader title="Teil-Vorschuss vergeben" onClose={() => setPartialModal(null)} />
@@ -837,7 +862,7 @@ export default function CashAdvancesView() {
       )}
 
       {/* Settle Modal (Vorschuss abrechnen) */}
-      {settleModal && createPortal(
+      {canWrite && settleModal && createPortal(
         <div className="modal-overlay" onClick={() => setSettleModal(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader title="Teil-Vorschuss abrechnen" onClose={() => setSettleModal(null)} />
@@ -895,7 +920,7 @@ export default function CashAdvancesView() {
       )}
 
       {/* Resolve Modal (irreversibel abschließen) */}
-      {resolveModal && detail && createPortal(
+      {canWrite && resolveModal && detail && createPortal(
         <div className="modal-overlay" onClick={() => setResolveModal(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <ModalHeader title="Barvorschuss abschließen" onClose={() => setResolveModal(null)} />
@@ -966,7 +991,7 @@ export default function CashAdvancesView() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmModal && createPortal(
+      {canWrite && deleteConfirmModal && createPortal(
         <div className="modal-backdrop" onClick={() => setDeleteConfirmModal(null)}>
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Teil-Vorschuss löschen?" onClose={() => setDeleteConfirmModal(null)} />
