@@ -71,33 +71,10 @@ function contrastText(bg?: string | null) {
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
 function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
-    const [org, setOrg] = useState<string>('')
-    const [cashier, setCashier] = useState<string>('')
-    useEffect(() => {
-        let cancelled = false
-        async function load() {
-            try {
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-                const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
-                if (!cancelled) {
-                    setOrg((on?.value as any) || '')
-                    setCashier((cn?.value as any) || '')
-                }
-            } catch { }
-        }
-        load()
-        const onChanged = () => load()
-        window.addEventListener('data-changed', onChanged)
-        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-    }, [])
-    const text = [org || null, cashier || null].filter(Boolean).join(' | ')
     return (
         <div className="inline-flex items-center gap-8">
             <img src={appLogo} alt="BudgetO" width={24} height={24} style={{ borderRadius: 4, display: 'block' }} />
             <OrgSwitcher notify={notify} />
-            {text ? (
-                <div className="helper text-ellipsis" title={text}>{text}</div>
-            ) : null}
         </div>
     )
 }
@@ -328,7 +305,7 @@ function AppInner() {
     const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
     type AmountMode = 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
     const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
-    const [exportOrgName, setExportOrgName] = useState<string>('')
+    const [activeOrgName, setActiveOrgName] = useState<string>('')
     const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
     const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
     const [exportType, setExportType] = useState<'standard' | 'fiscal'>('standard')
@@ -381,19 +358,23 @@ function AppInner() {
         window.addEventListener('open-export-options', onOpenExport as any)
         return () => window.removeEventListener('open-export-options', onOpenExport as any)
     }, [])
-    // Prefill export org name from settings when modal opens
+    // Keep active Sachgebiet name available for exports
     useEffect(() => {
         let cancelled = false
-        async function loadOrg() {
-            if (!showExportOptions) return
+        async function load() {
             try {
-                const res = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-                if (!cancelled) setExportOrgName((res?.value as any) || '')
-            } catch { }
+                const res = await (window as any).api?.organizations?.active?.()
+                const name = String(res?.organization?.name || '')
+                if (!cancelled) setActiveOrgName(name)
+            } catch {
+                // ignore
+            }
         }
-        loadOrg()
-        return () => { cancelled = true }
-    }, [showExportOptions])
+        load()
+        const onChanged = () => load()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
 
     // Prefill modal filters from current Reports filters when modal opens
     useEffect(() => {
@@ -1231,8 +1212,6 @@ function AppInner() {
                     onClose={() => setShowExportOptions(false)}
                     fields={exportFields}
                     setFields={setExportFields}
-                    orgName={exportOrgName}
-                    setOrgName={setExportOrgName}
                     amountMode={exportAmountMode}
                     setAmountMode={setExportAmountMode}
                     sortDir={exportSortDir}
@@ -1271,7 +1250,7 @@ function AppInner() {
                                     includeVoucherList,
                                     includeBudgets,
                                     categoryId: exportCategoryId ?? undefined,
-                                    orgName: exportOrgName || undefined
+                                    orgName: activeOrgName || undefined
                                 })
                                 if (res) {
                                     notify('success', `Jahresabschluss exportiert: ${res.filePath}`, 6000, {
@@ -1292,7 +1271,7 @@ function AppInner() {
                                         type: exportFilterType || undefined
                                     },
                                     fields: exportFields,
-                                    orgName: exportOrgName || undefined,
+                                    orgName: activeOrgName || undefined,
                                     amountMode: exportAmountMode,
                                     sort: exportSortDir,
                                     sortBy: 'date'

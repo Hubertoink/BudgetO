@@ -16,8 +16,12 @@ export function StoragePane({ notify }: StoragePaneProps) {
   // Data management & security (moved from GeneralPane)
   const [importPick, setImportPick] = React.useState<null | { filePath: string; size?: number; mtime?: number; counts?: Record<string, number>; currentCounts?: Record<string, number> }>(null)
   const [busyImport, setBusyImport] = React.useState(false)
-  const [showDeleteAll, setShowDeleteAll] = React.useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = React.useState('')
+  const [busyDanger, setBusyDanger] = React.useState(false)
+  const [activeOrg, setActiveOrg] = React.useState<null | { id: string; name: string }>(null)
+  const [showResetOrg, setShowResetOrg] = React.useState(false)
+  const [resetConfirmText, setResetConfirmText] = React.useState('')
+  const [showDeleteOrg, setShowDeleteOrg] = React.useState(false)
+  const [deleteOrgConfirmText, setDeleteOrgConfirmText] = React.useState('')
   // Unified comparison modal state
   const [compareModal, setCompareModal] = React.useState<null | {
     mode: 'folder' | 'default'
@@ -59,6 +63,22 @@ export function StoragePane({ notify }: StoragePaneProps) {
       const res = await window.api?.backup?.inspectCurrent?.()
       return res?.counts || {}
     } catch { return {} }
+  }
+
+  async function ensureActiveOrgLoaded() {
+    if (activeOrg) return activeOrg
+    try {
+      const res = await (window as any).api?.organizations?.active?.()
+      const org = res?.organization
+      if (org?.id && org?.name) {
+        const next = { id: String(org.id), name: String(org.name) }
+        setActiveOrg(next)
+        return next
+      }
+    } catch {
+      // ignore
+    }
+    return null
   }
 
   async function openFolderCompare(picked: { root: string; dbPath: string; hasDb: boolean }) {
@@ -281,11 +301,29 @@ export function StoragePane({ notify }: StoragePaneProps) {
         <div className="storage-data-management">
           <div>
             <strong>Gefährliche Aktion</strong>
-            <div className="helper">Alle Buchungen löschen (inkl. Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
+            <div className="helper">Setzt dieses Sachgebiet vollständig zurück (Datenbank + Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
           </div>
           <div>
-            <button className="btn danger" onClick={() => { setDeleteConfirmText(''); setShowDeleteAll(true) }}>
-              Alle Buchungen löschen…
+            <button
+              className="btn danger"
+              onClick={async () => {
+                setResetConfirmText('')
+                await ensureActiveOrgLoaded()
+                setShowResetOrg(true)
+              }}
+            >
+              Sachgebiet zurücksetzen…
+            </button>
+            <button
+              className="btn danger"
+              style={{ marginLeft: 8 }}
+              onClick={async () => {
+                setDeleteOrgConfirmText('')
+                await ensureActiveOrgLoaded()
+                setShowDeleteOrg(true)
+              }}
+            >
+              Sachgebiet löschen…
             </button>
           </div>
         </div>
@@ -374,48 +412,98 @@ export function StoragePane({ notify }: StoragePaneProps) {
         </div>
       )}
 
-      {/* Delete All Confirmation Modal */}
-      {showDeleteAll && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal modal-grid">
+      {/* Reset current Sachgebiet Confirmation Modal */}
+      {showResetOrg && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyDanger && setShowResetOrg(false)}>
+          <div className="modal modal-grid" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Alle Buchungen löschen</h2>
-              <button className="btn ghost" onClick={() => setShowDeleteAll(false)}>
-                ✕
-              </button>
+              <h2>Sachgebiet zurücksetzen</h2>
+              <button className="btn ghost" onClick={() => setShowResetOrg(false)} aria-label="Schließen">✕</button>
             </div>
             <div className="helper">
-              Dieser Vorgang löscht ALLE Buchungen und zugehörige Anhänge dauerhaft. Dies kann nicht rückgängig gemacht werden.
+              Dieser Vorgang löscht die komplette Datenbank und alle Anhänge dieses Sachgebiets{activeOrg?.name ? ` ("${activeOrg.name}")` : ''} dauerhaft.
+              Danach wird eine leere Datenbank neu initialisiert. Dies kann nicht rückgängig gemacht werden.
+            </div>
+            <div className="field">
+              <label>Zur Bestätigung bitte exakt "ZURÜCKSETZEN" eingeben</label>
+              <input
+                className="input"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.currentTarget.value)}
+                placeholder="ZURÜCKSETZEN"
+              />
+            </div>
+            <div className="modal-actions-end">
+              <button className="btn" disabled={busyDanger} onClick={() => setShowResetOrg(false)}>Abbrechen</button>
+              <button
+                className="btn danger"
+                disabled={busyDanger || resetConfirmText !== 'ZURÜCKSETZEN'}
+                onClick={async () => {
+                  setBusyDanger(true)
+                  try {
+                    await (window as any).api?.organizations?.resetCurrentData?.()
+                    setShowResetOrg(false)
+                    notify('success', 'Sachgebiet zurückgesetzt. Neu laden …')
+                    window.dispatchEvent(new Event('data-changed'))
+                    window.setTimeout(() => window.location.reload(), 600)
+                  } catch (e: any) {
+                    notify('error', e?.message || String(e))
+                  } finally {
+                    setBusyDanger(false)
+                  }
+                }}
+              >
+                Ja, zurücksetzen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Sachgebiet Confirmation Modal */}
+      {showDeleteOrg && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyDanger && setShowDeleteOrg(false)}>
+          <div className="modal modal-grid" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Sachgebiet löschen</h2>
+              <button className="btn ghost" onClick={() => setShowDeleteOrg(false)} aria-label="Schließen">✕</button>
+            </div>
+            <div className="helper">
+              Dieses Sachgebiet{activeOrg?.name ? ` ("${activeOrg.name}")` : ''} wird vollständig gelöscht (inkl. Datenbank und Anhänge).
+              Dies ist irreversibel.
             </div>
             <div className="field">
               <label>Zur Bestätigung bitte exakt "LÖSCHEN" eingeben</label>
               <input
                 className="input"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.currentTarget.value)}
+                value={deleteOrgConfirmText}
+                onChange={(e) => setDeleteOrgConfirmText(e.currentTarget.value)}
                 placeholder="LÖSCHEN"
               />
             </div>
             <div className="modal-actions-end">
-              <button className="btn" onClick={() => setShowDeleteAll(false)}>
-                Abbrechen
-              </button>
+              <button className="btn" disabled={busyDanger} onClick={() => setShowDeleteOrg(false)}>Abbrechen</button>
               <button
                 className="btn danger"
-                disabled={deleteConfirmText !== 'LÖSCHEN'}
+                disabled={busyDanger || deleteOrgConfirmText !== 'LÖSCHEN'}
                 onClick={async () => {
+                  setBusyDanger(true)
                   try {
-                    const res = await window.api?.vouchers.clearAll?.()
-                    const n = res?.deleted ?? 0
-                    setShowDeleteAll(false)
-                    notify('success', `${n} Buchung(en) gelöscht.`)
+                    const org = await ensureActiveOrgLoaded()
+                    if (!org) throw new Error('Aktives Sachgebiet konnte nicht ermittelt werden')
+                    await (window as any).api?.organizations?.delete?.({ orgId: org.id, deleteData: true })
+                    setShowDeleteOrg(false)
+                    notify('success', 'Sachgebiet gelöscht. Neu laden …')
                     window.dispatchEvent(new Event('data-changed'))
+                    window.setTimeout(() => window.location.reload(), 600)
                   } catch (e: any) {
                     notify('error', e?.message || String(e))
+                  } finally {
+                    setBusyDanger(false)
                   }
                 }}
               >
-                Ja, alles löschen
+                Ja, löschen
               </button>
             </div>
           </div>

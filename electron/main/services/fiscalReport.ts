@@ -13,6 +13,7 @@ import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
 import { ensureExportsBaseDir } from './exportsDir'
+import { getActiveOrganization } from '../db/database'
 
 export interface FiscalReportOptions {
   fiscalYear: number
@@ -42,7 +43,7 @@ interface SphereData {
  */
 export async function generateFiscalReportPDF(options: FiscalReportOptions): Promise<{ filePath: string }> {
   const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false, categoryId } = options
-  const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'BudgetO')
+  const orgName = (options.orgName && options.orgName.trim()) || (getActiveOrganization()?.name || (getSetting<string>('org.name') || 'BudgetO'))
 
   // Create export directory
   const when = new Date()

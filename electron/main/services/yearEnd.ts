@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import ExcelJS from 'exceljs'
-import { getDb } from '../db/database'
+import { getDb, getActiveOrganization } from '../db/database'
 import { getSetting, setSetting } from './settings'
 import { summarizeVouchers, monthlyVouchers, listVouchersAdvanced, cashBalance as getCashBalance } from '../repositories/vouchers'
 import { writeAudit } from './audit'
@@ -39,7 +39,7 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     // Summary sheet
     const summary = summarizeVouchers({ from, to } as any)
     const ws1 = wb.addWorksheet('Zusammenfassung')
-    const orgName = (getSetting<string>('org.name') || '').trim()
+    const orgName = (getActiveOrganization()?.name || (getSetting<string>('org.name') || '')).trim()
     ws1.addRow([`Jahresabschluss ${year}${orgName ? ` – ${orgName}` : ''}`])
     ws1.addRow([`Zeitraum: ${from} – ${to}`])
     ws1.addRow([])

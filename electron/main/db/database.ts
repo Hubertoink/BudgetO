@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
+import { applyMigrations } from './migrations'
 
 const require = createRequire(import.meta.url)
 let BetterSqlite3: any
@@ -94,6 +95,8 @@ export function getDb(): DB {
     db = new BetterSqlite3(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')
+    // Critical: ensure schema exists (e.g. for freshly created organizations)
+    applyMigrations(db)
     return db
 }
 
@@ -108,6 +111,52 @@ export function closeDb() {
         db.close()
         db = undefined
     }
+}
+
+/**
+ * Hard reset of the currently active organization's data.
+ * Deletes the SQLite database file (including WAL/SHM) and clears the attachments folder.
+ * Then recreates schema via migrations on next open.
+ */
+export function resetCurrentOrganizationData(): { success: boolean } {
+    const { root, filesDir, dbPath } = getCurrentDbInfo()
+
+    // Ensure DB is closed before touching files
+    closeDb()
+
+    // Delete DB and WAL/SHM sidecars
+    for (const p of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+        try {
+            if (fs.existsSync(p)) fs.rmSync(p, { force: true })
+        } catch (e) {
+            console.warn('Could not delete DB file:', p, e)
+        }
+    }
+
+    // Clear attachments
+    try {
+        if (fs.existsSync(filesDir)) fs.rmSync(filesDir, { recursive: true, force: true })
+        fs.mkdirSync(filesDir, { recursive: true })
+    } catch (e) {
+        console.warn('Could not reset attachments folder:', e)
+    }
+
+    // Ensure root exists
+    try {
+        if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true })
+    } catch {
+        // ignore
+    }
+
+    // Re-open to recreate schema
+    try {
+        getDb()
+    } catch (e) {
+        // If this fails, we still consider the reset attempted; caller will surface the error.
+        throw e
+    }
+
+    return { success: true }
 }
 
 // Migrate database and attachments to a new root directory.
@@ -345,19 +394,33 @@ export function renameOrganization(orgId: string, newName: string): { success: b
  * Delete an organization and optionally its data.
  * Cannot delete the last organization or the currently active one.
  */
-export function deleteOrganization(orgId: string, deleteData: boolean = false): { success: boolean } {
+export function deleteOrganization(orgId: string, deleteData: boolean = false): { success: boolean; newActiveOrgId?: string } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     
     if (orgs.length <= 1) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
-    if (cfg.activeOrgId === orgId) throw new Error('Die aktive Organisation kann nicht gelöscht werden. Wechsle zuerst zu einer anderen.')
     
     const org = orgs.find(o => o.id === orgId)
     if (!org) throw new Error('Organisation nicht gefunden')
+
+    // If deleting the active org, switch to another org first
+    let newActiveOrgId: string | undefined
+    let nextDbRoot: string | undefined
+    if (cfg.activeOrgId === orgId) {
+        const next = orgs.find(o => o.id !== orgId)
+        if (!next) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
+        newActiveOrgId = next.id
+        nextDbRoot = next.dbRoot
+        closeDb()
+    }
     
     // Remove from list
     const newOrgs = orgs.filter(o => o.id !== orgId)
-    writeAppConfig({ ...cfg, organizations: newOrgs })
+    writeAppConfig({
+        ...cfg,
+        organizations: newOrgs,
+        ...(newActiveOrgId ? { activeOrgId: newActiveOrgId, dbRoot: nextDbRoot } : {})
+    })
     
     // Optionally delete data folder
     if (deleteData && org.dbRoot) {
@@ -368,7 +431,7 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
         }
     }
     
-    return { success: true }
+    return { success: true, ...(newActiveOrgId ? { newActiveOrgId } : {}) }
 }
 
 /**

@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react'
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, categoryId, setCategoryId, filterFrom, setFilterFrom, filterTo, setFilterTo, filterCategoryId, setFilterCategoryId, filterType, setFilterType, filterPM, setFilterPM }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, categoryId, setCategoryId, filterFrom, setFilterFrom, filterTo, setFilterTo, filterCategoryId, setFilterCategoryId, filterType, setFilterType, filterPM, setFilterPM }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
   setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
-  orgName: string
-  setOrgName: (v: string) => void
   amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
   setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
   sortDir: 'ASC' | 'DESC'
@@ -491,13 +489,6 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             </div>
           </>
         )}
-        
-        <div className="row">
-          <div className="field" style={{ gridColumn: '1 / span 2' }}>
-            <label>Organisationsname (optional)</label>
-            <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
-          </div>
-        </div>
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           {exportType === 'fiscal' ? (

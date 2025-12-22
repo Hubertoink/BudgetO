@@ -222,6 +222,7 @@ contextBridge.exposeInMainWorld('api', {
     organizations: {
         list: () => ipcRenderer.invoke('organizations.list'),
         active: () => ipcRenderer.invoke('organizations.active'),
+        resetCurrentData: () => ipcRenderer.invoke('organizations.resetCurrentData'),
         create: (payload: { name: string }) => ipcRenderer.invoke('organizations.create', payload),
         switch: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.switch', payload),
         rename: (payload: { orgId: string; name: string }) => ipcRenderer.invoke('organizations.rename', payload),

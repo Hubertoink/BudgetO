@@ -22,8 +22,6 @@ const eurFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EU
  * 
  * Handles:
  * - Organization name (for active organization in switcher)
- * - Organization display name (org.name setting)
- * - Cashier name
  * - Tax Exemption Certificate (Steuerbefreiungsbescheid)
  * - Annual Budget (Jahresbudget)
  */
@@ -32,12 +30,6 @@ export function OrgPane({ notify }: OrgPaneProps) {
   const [activeOrg, setActiveOrg] = React.useState<ActiveOrg | null>(null)
   const [activeOrgName, setActiveOrgName] = React.useState<string>('')
   const [savingOrg, setSavingOrg] = React.useState(false)
-  
-  // Organization display settings
-  const [orgName, setOrgName] = React.useState<string>('')
-  const [cashier, setCashier] = React.useState<string>('')
-  const [busy, setBusy] = React.useState(false)
-  const [error, setError] = React.useState<string>('')
   
   // Annual Budget state
   const [budgetYear, setBudgetYear] = React.useState<number>(new Date().getFullYear())
@@ -82,22 +74,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
   }, [budgetYear])
 
   React.useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-        const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
-        if (!cancelled) {
-          setOrgName((on?.value as any) || '')
-          setCashier((cn?.value as any) || '')
-        }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || String(e))
-      }
-    }
-    load()
     loadActiveOrg()
-    return () => { cancelled = true }
   }, [])
 
   async function saveAnnualBudget() {
@@ -131,20 +108,6 @@ export function OrgPane({ notify }: OrgPaneProps) {
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally { setSavingOrg(false) }
-  }
-
-  async function save() {
-    setBusy(true)
-    setError('')
-    try {
-      await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
-      await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
-      notify('success', 'Einstellungen gespeichert')
-      window.dispatchEvent(new Event('data-changed'))
-    } catch (e: any) {
-      setError(e?.message || String(e))
-      notify('error', e?.message || String(e))
-    } finally { setBusy(false) }
   }
 
   return (

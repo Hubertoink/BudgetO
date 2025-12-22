@@ -62,7 +62,6 @@ export default function SetupWizardModal({
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
     const [step, setStep] = useState<number>(0)
-    const [orgName, setOrgName] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
     const [tablePreset, setTablePreset] = useState<TablePreset>('standard')
     const [colsVisible, setColsVisible] = useState<Record<ColKey, boolean>>({
@@ -79,10 +78,8 @@ export default function SetupWizardModal({
         let alive = true
         ;(async () => {
             try {
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
                 const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
                 if (!alive) return
-                setOrgName((on?.value as any) || '')
                 setCashier((cn?.value as any) || '')
             } catch {}
         })()
@@ -243,8 +240,7 @@ export default function SetupWizardModal({
 
     async function finish(persistAndClose: boolean) {
         try {
-            // Persist org data
-            await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
+            // Persist org-related data
             await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
 
             // Persist UI preferences
@@ -462,7 +458,7 @@ export default function SetupWizardModal({
                 <div className="card" style={{ padding: 12 }}>
                     <div className="helper">Willkommen! Dieses kurze Setup richtet die wichtigsten Dinge ein. Du kannst jederzeit abbrechen und später in den Einstellungen alles ändern.</div>
                     <ul style={{ margin: '8px 0 0 18px', display: 'grid', gap: 6 }}>
-                        <li>Organisation: Name und Kassier/Nutzer</li>
+                        <li>Sachgebiet: Name (unter Einstellungen → Sachgebiet) und Kassier/Nutzer</li>
                         <li>Darstellung: Menü, Zeilenlayout/-höhe, Farben (mit Vorschau)</li>
                         <li>Buchungsansicht: Spaltenanordnung und Sichtbarkeit</li>
                         <li>Module, Kategorien & Tags: Vorschläge übernehmen</li>
@@ -474,12 +470,8 @@ export default function SetupWizardModal({
         if (step === 1) {
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-                    <div className="helper">Diese Angaben erscheinen z. B. in der Titelleiste und in Exporten.</div>
+                    <div className="helper">Der Sachgebietname wird aus dem aktiven Sachgebiet übernommen (Einstellungen → Sachgebiet).</div>
                     <div className="row">
-                        <div className="field" style={{ minWidth: 260 }}>
-                            <label>Organisationsname</label>
-                            <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Sportverein Musterstadt e.V." />
-                        </div>
                         <div className="field" style={{ minWidth: 220 }}>
                             <label>Kassier / Nutzer</label>
                             <input className="input" value={cashier} onChange={(e) => setCashier(e.target.value)} placeholder="z. B. Max Mustermann" />
