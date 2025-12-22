@@ -8,6 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
+import { getAnnualBudget } from '../repositories/annualBudgets'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
@@ -21,6 +22,7 @@ export interface FiscalReportOptions {
   includeBindings?: boolean
   includeVoucherList?: boolean
   includeBudgets?: boolean
+  categoryId?: number
 }
 
 interface SphereData {
@@ -39,14 +41,14 @@ interface SphereData {
  * Generate fiscal year report PDF for tax office
  */
 export async function generateFiscalReportPDF(options: FiscalReportOptions): Promise<{ filePath: string }> {
-  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false } = options
-  const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
+  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false, categoryId } = options
+  const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'BudgetO')
 
   // Create export directory
   const when = new Date()
   const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
   const baseDir = ensureExportsBaseDir()
-  const filePath = path.join(baseDir, `Finanzamt_${fiscalYear}_${stamp}.pdf`)
+  const filePath = path.join(baseDir, `Jahresabschluss_${fiscalYear}_${stamp}.pdf`)
 
   // 1. Get opening balance (previous year end)
   const previousYearEnd = `${fiscalYear - 1}-12-31`
@@ -60,7 +62,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   }
 
   // 2. Get overall summary for the fiscal year (used to compute movement)
-  const summary = summarizeVouchers({ from, to } as any)
+  const summary = summarizeVouchers({ from, to, categoryId } as any)
 
   // 4. Get data by sphere
   const spheres = [
@@ -71,7 +73,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   ]
 
   const sphereData: SphereData[] = spheres.map(s => {
-    const data = summarizeVouchers({ from, to, sphere: s.key as any } as any)
+    const data = summarizeVouchers({ from, to, sphere: s.key as any, categoryId } as any)
     const inData = data.byType.find((t: any) => t.key === 'IN') || { gross: 0, net: 0, vat: 0 }
     const outData = data.byType.find((t: any) => t.key === 'OUT') || { gross: 0, net: 0, vat: 0 }
     
@@ -140,11 +142,15 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     }
   }
 
-  // 7. Get voucher list if requested
+  // 7. Get voucher list if requested (filtered)
   let voucherRows: any[] = []
   if (includeVoucherList) {
-    const vouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC' })
-    voucherRows = Array.isArray(vouchers) ? vouchers : []
+    try {
+      const vouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC', categoryId } as any)
+      voucherRows = Array.isArray(vouchers) ? vouchers : []
+    } catch {
+      voucherRows = []
+    }
   }
 
   // Helper functions
@@ -155,6 +161,21 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   const totalOutGross = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross || 0)
   const totalInNet = summary.byType.find((t: any) => t.key === 'IN')?.net || 0
   const totalOutNet = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.net || 0)
+
+  // Annual budget (Jahresbudget): use filtered net spend for this report scope.
+  // Net spend reduces remaining budget; income increases it.
+  let annualBudgeted = 0
+  let annualBudgetRemaining = 0
+  let annualBudgetPct = 0
+  try {
+    const budget = getAnnualBudget({ year: fiscalYear, costCenterId: null })
+    annualBudgeted = Number(budget?.amount ?? 0) || 0
+    const netSpent = (Number(totalOutGross) || 0) - (Number(totalInGross) || 0)
+    annualBudgetRemaining = annualBudgeted - netSpent
+    annualBudgetPct = annualBudgeted > 0 ? Math.min(100, Math.max(0, (netSpent / annualBudgeted) * 100)) : 0
+  } catch {
+    annualBudgeted = 0
+  }
 
   // 3. Derive balances: Endbestand = Anfangsbestand + (IN - OUT)
   const yearMovement = (Number(totalInGross) || 0) - (Number(totalOutGross) || 0)
@@ -311,13 +332,23 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
       <span class="summary-label">Endbestand (31.12.${fiscalYear}):</span>
       <span class="summary-value ${closingBalance >= 0 ? 'positive' : 'negative'}">${euro(closingBalance)}</span>
     </div>
+    ${annualBudgeted > 0 ? `
+    <div class="summary-row">
+      <span class="summary-label">Jahresbudget (Plan):</span>
+      <span class="summary-value">${euro(annualBudgeted)}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Restbudget (Plan-Ist):</span>
+      <span class="summary-value ${annualBudgetRemaining >= 0 ? 'positive' : 'negative'}">${euro(annualBudgetRemaining)} <span style="font-size:10pt; color:#666;">(${annualBudgetPct.toFixed(0)}%)</span></span>
+    </div>
+    ` : ''}
   </div>
 
-  <h2>2. Einnahmen nach Sphären</h2>
+  <h2>2. Einnahmen nach Kategorien</h2>
   <table>
     <thead>
       <tr>
-        <th>Sphäre</th>
+        <th>Kategorie</th>
         <th class="number">Brutto</th>
       </tr>
     </thead>
@@ -335,11 +366,11 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </tbody>
   </table>
 
-  <h2>3. Ausgaben nach Sphären</h2>
+  <h2>3. Ausgaben nach Kategorien</h2>
   <table>
     <thead>
       <tr>
-        <th>Sphäre</th>
+        <th>Kategorie</th>
         <th class="number">Brutto</th>
       </tr>
     </thead>
@@ -357,11 +388,11 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </tbody>
   </table>
 
-  <h2>4. Saldo nach Sphären</h2>
+  <h2>4. Saldo nach Kategorien</h2>
   <table>
     <thead>
       <tr>
-        <th>Sphäre</th>
+        <th>Kategorie</th>
         <th class="number">Einnahmen</th>
         <th class="number">Ausgaben</th>
         <th class="number">Saldo</th>
@@ -424,7 +455,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     <thead>
       <tr>
         <th>Budget</th>
-        <th>Sphäre</th>
+        <th>Kategorie</th>
         <th class="number">Geplant</th>
         <th class="number">Ausgegeben</th>
         <th class="number">Einnahmen</th>
@@ -465,7 +496,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
         <th>Datum</th>
         <th>Beleg-Nr.</th>
         <th>Typ</th>
-        <th>Sphäre</th>
+        <th>Kategorie</th>
         <th>Beschreibung</th>
         <th class="number">Brutto</th>
       </tr>
@@ -500,8 +531,8 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   </div>
 
   <div class="footer">
-    VereinO - Vereinsverwaltung<br>
-    Automatisch erstellter Jahresabschluss für das Finanzamt
+    BudgetO - Finanzverwaltung<br>
+    Automatisch erstellter Jahresabschluss
   </div>
 </body>
 </html>`

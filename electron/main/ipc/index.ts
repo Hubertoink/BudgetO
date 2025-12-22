@@ -28,7 +28,7 @@ import * as mp from '../repositories/members_payments'
 export function registerIpcHandlers() {
     // App info
     ipcMain.handle('app.version', async () => {
-        try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'VereinO' } }
+        try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'BudgetO' } }
     })
     // Window controls (frameless)
     ipcMain.handle('window.minimize', async () => {
@@ -264,6 +264,7 @@ export function registerIpcHandlers() {
             limit: 100000,
             paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
             sphere: (parsed.filters?.sphere as any) || undefined,
+            categoryId: (parsed.filters as any)?.categoryId,
             type: (parsed.filters?.type as any) || undefined,
             from: parsed.from,
             to: parsed.to,
@@ -283,7 +284,7 @@ export function registerIpcHandlers() {
         const defaultCols = ['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'] as const
         const colsSel = (parsed.fields && parsed.fields.length ? parsed.fields : defaultCols) as string[]
         const headerMap: Record<string, string> = {
-            date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Sphäre', description: 'Beschreibung', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
+            date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Kategorie', description: 'Beschreibung', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
         }
         const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
         const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
@@ -299,11 +300,12 @@ export function registerIpcHandlers() {
             const summary = summarizeVouchers({
                 paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
                 sphere: (parsed.filters?.sphere as any) || undefined,
+                categoryId: (parsed.filters as any)?.categoryId,
                 type: (parsed.filters?.type as any) || undefined,
                 from: parsed.from,
                 to: parsed.to
             } as any)
-            const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, type: (parsed.filters?.type as any) || undefined })
+            const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, categoryId: (parsed.filters as any)?.categoryId, type: (parsed.filters?.type as any) || undefined } as any)
             // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
             const d2 = getDb()
             const p2: any[] = []
@@ -312,6 +314,7 @@ export function registerIpcHandlers() {
             if (parsed.to) { wh2.push('date <= ?'); p2.push(parsed.to) }
             if (parsed.filters?.paymentMethod) { wh2.push('payment_method = ?'); p2.push(parsed.filters.paymentMethod) }
             if (parsed.filters?.sphere) { wh2.push('sphere = ?'); p2.push(parsed.filters.sphere) }
+            if (typeof (parsed.filters as any)?.categoryId === 'number') { wh2.push('category_id = ?'); p2.push((parsed.filters as any).categoryId) }
             const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
             const detailed = d2.prepare(`
                 SELECT strftime('%Y-%m', date) as month,
@@ -322,13 +325,54 @@ export function registerIpcHandlers() {
                 GROUP BY strftime('%Y-%m', date)
                 ORDER BY month ASC
             `).all(...p2) as any[]
-            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
+            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'BudgetO') as string
             const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
 
-            // Prepare data for sphere chart
-            const sphereAgg = (summary.bySphere as any[]).map(s => ({ key: s.key as string, gross: Number(s.gross) }))
-            const totalSphere = Math.max(0.0001, sphereAgg.reduce((a, b) => a + Math.abs(b.gross), 0))
-            const colors: Record<string, string> = { IDEELL: '#6AA6FF', ZWECK: '#00C853', VERMOEGEN: '#FFC107', WGB: '#9C27B0' }
+            // Prepare data for category chart (Custom Categories)
+            const categoryIdFilter = typeof (parsed.filters as any)?.categoryId === 'number' ? Number((parsed.filters as any).categoryId) : null
+            let categoryAgg: Array<{ key: string; gross: number; color?: string | null }> = []
+            try {
+                if (categoryIdFilter != null) {
+                    let cat: any = null
+                    try {
+                        cat = d2.prepare('SELECT name, color FROM custom_categories WHERE id = ?').get(categoryIdFilter)
+                    } catch {
+                        // ignore
+                    }
+                    if (!cat) {
+                        try {
+                            cat = d2.prepare('SELECT name, NULL as color FROM categories WHERE id = ?').get(categoryIdFilter)
+                        } catch {
+                            // ignore
+                        }
+                    }
+                    const name = String(cat?.name || `#${categoryIdFilter}`)
+                    categoryAgg = [{ key: name, gross: Number((summary as any)?.totals?.gross ?? 0) || 0, color: (cat?.color as any) || null }]
+                } else {
+                    const { summarizeVouchersByCategory } = await import('../repositories/vouchers')
+                    const rows = summarizeVouchersByCategory({
+                        from: parsed.from,
+                        to: parsed.to,
+                        paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                        type: (parsed.filters?.type as any) || undefined
+                    } as any)
+                    categoryAgg = rows.map((r: any) => ({
+                        key: String(r.categoryName || 'Ohne Kategorie'),
+                        gross: Number(r.gross) || 0,
+                        color: (r.categoryColor as any) || null
+                    }))
+                }
+            } catch {
+                categoryAgg = []
+            }
+
+            const totalCategory = Math.max(0.0001, categoryAgg.reduce((a, b) => a + Math.abs(b.gross), 0))
+            const fallbackPalette = ['#6AA6FF', '#00C853', '#FFC107', '#9C27B0', '#F06A6A', '#4CC38A', '#f9a825']
+            const colorForCategory = (idx: number, color?: string | null) => {
+                const c = String(color || '').trim()
+                return c ? c : fallbackPalette[idx % fallbackPalette.length]
+            }
+
             function arcPath(cx: number, cy: number, r: number, r2: number, start: number, end: number) {
                 const toXY = (ang: number, rad: number) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)]
                 const [x1, y1] = toXY(start, r)
@@ -338,18 +382,18 @@ export function registerIpcHandlers() {
                 const large = end - start > Math.PI ? 1 : 0
                 return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${r2} ${r2} 0 ${large} 0 ${x4} ${y4} Z`
             }
-            function sphereDonutSVG(size = 160) {
+            function categoryDonutSVG(size = 160) {
                 const cx = size / 2, cy = size / 2, r = size / 2 - 4, r2 = r * 0.62
                 let a0 = -Math.PI / 2
-                const parts = sphereAgg.map(s => {
-                    const frac = Math.abs(s.gross) / totalSphere
+                const parts = categoryAgg.map((s, idx) => {
+                    const frac = Math.abs(s.gross) / totalCategory
                     const a1 = a0 + frac * Math.PI * 2
                     const d = arcPath(cx, cy, r, r2, a0, a1)
-                    const seg = `<path d="${d}" fill="${colors[s.key] || '#888'}" />`
+                    const seg = `<path d="${d}" fill="${colorForCategory(idx, (s as any).color)}" />`
                     a0 = a1
                     return seg
                 }).join('')
-                return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Sphären-Donut">${parts}</svg>`
+                return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Kategorie-Donut">${parts}</svg>`
             }
 
             // Helpers
@@ -359,6 +403,47 @@ export function registerIpcHandlers() {
             const totalIn = (summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0)
             const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
             const saldo = Math.round((totalIn - totalOut) * 100) / 100
+
+            // Optional: annual budget (Jahresbudget) for the selected year.
+            // - If the report has an explicit range, we use that range for net spend.
+            // - If no range is set, we fall back to the current year and compute net spend for that year.
+            let annualBudgeted = 0
+            let annualBudgetRemaining = 0
+            let annualBudgetPct = 0
+            try {
+                const yearStr = (parsed.from && String(parsed.from).slice(0, 4)) || (parsed.to && String(parsed.to).slice(0, 4))
+                const budgetYear = Number.isFinite(Number(yearStr)) ? Number(yearStr) : new Date().getFullYear()
+                const { getAnnualBudget } = await import('../repositories/annualBudgets')
+                const budget = getAnnualBudget({ year: budgetYear, costCenterId: null })
+                annualBudgeted = Number(budget?.amount ?? 0) || 0
+
+                if (annualBudgeted > 0) {
+                    const hasRange = Boolean(parsed.from || parsed.to)
+
+                    let netSpent = (Number(totalOut) || 0) - (Number(totalIn) || 0)
+                    if (!hasRange) {
+                        const yearStart = `${budgetYear}-01-01`
+                        const yearEnd = `${budgetYear}-12-31`
+                        const budgetSummary = summarizeVouchers({
+                            paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                            sphere: (parsed.filters?.sphere as any) || undefined,
+                            categoryId: (parsed.filters as any)?.categoryId,
+                            // NOTE: Intentionally no type filter; budget should consider full year movement.
+                            from: yearStart,
+                            to: yearEnd
+                        } as any)
+
+                        const inY = Number(budgetSummary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0)
+                        const outY = Math.abs(Number(budgetSummary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0))
+                        netSpent = outY - inY
+                    }
+
+                    annualBudgetRemaining = annualBudgeted - netSpent
+                    annualBudgetPct = annualBudgeted > 0 ? Math.min(100, Math.max(0, (netSpent / annualBudgeted) * 100)) : 0
+                }
+            } catch {
+                // ignore; no annual budget information
+            }
 
             const html = `<!doctype html>
 <!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Controlling-Bericht</title>
@@ -406,14 +491,16 @@ export function registerIpcHandlers() {
         <div class="kpi"><div class="label">Einnahmen (Brutto)</div><div class="value">${totalIn.toFixed(2)} €</div></div>
         <div class="kpi"><div class="label">Ausgaben (Brutto)</div><div class="value">${totalOut.toFixed(2)} €</div></div>
         <div class="kpi"><div class="label">Saldo</div><div class="value">${saldo.toFixed(2)} €</div></div>
+        ${annualBudgeted > 0 ? `<div class="kpi"><div class="label">Jahresbudget (Plan)</div><div class="value">${euro(annualBudgeted)}</div></div>` : ''}
+        ${annualBudgeted > 0 ? `<div class="kpi"><div class="label">Restbudget (Plan-Ist)</div><div class="value">${euro(annualBudgetRemaining)} <span class="badge">${annualBudgetPct.toFixed(0)}%</span></div></div>` : ''}
     </div>
     <div class="grid">
         <div class="card">
-            <div class="title">Nach Sphäre</div>
+            <div class="title">Nach Kategorie</div>
             <div style="display:flex; gap:16px; align-items:center;">
-                <div>${sphereDonutSVG(160)}</div>
+                <div>${categoryDonutSVG(160)}</div>
                 <div class="legend">
-                    ${(summary.bySphere as any[]).map(s => `<span class="legend-item"><span class="sw" style="background:${colors[(s as any).key] || '#888'}"></span>${esc((s as any).key)} · ${euro(Number((s as any).gross))}</span>`).join('')}
+                    ${categoryAgg.map((s, idx) => `<span class="legend-item"><span class="sw" style="background:${colorForCategory(idx, (s as any).color)}"></span>${esc((s as any).key)} · ${euro(Number((s as any).gross))}</span>`).join('')}
                 </div>
             </div>
         </div>
@@ -620,7 +707,7 @@ export function registerIpcHandlers() {
                     <th class="nowrap">Datum</th>
                     <th class="nowrap">Nr.</th>
                     <th class="nowrap">Typ</th>
-                    <th class="nowrap">Sphäre</th>
+                    <th class="nowrap">Kategorie</th>
                     <th>Beschreibung</th>
                     <th class="nowrap">Zahlweg</th>
                     <th class="right nowrap">Brutto</th>
@@ -643,7 +730,7 @@ export function registerIpcHandlers() {
         </table>
         <div class="muted">Insgesamt ${rows.length} Beleg(e).</div>
     </div>
-    <div class="footer">VereinO · Automatisch erstellt</div>
+    <div class="footer">BudgetO · Automatisch erstellt</div>
 </body></html>`
 
             const win = new BrowserWindow({ show: false, width: 900, height: 1200 })
@@ -653,7 +740,7 @@ export function registerIpcHandlers() {
             try { win.destroy() } catch { }
             return ReportsExportOutput.parse({ filePath })
         } else if (parsed.format === 'XLSX') {
-            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
+            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'BudgetO') as string
             const filePath = path.join(baseDir, `${reportBase}_${stamp}.xlsx`)
             const wb = new ExcelJS.Workbook()
             const ws = wb.addWorksheet('Export')
@@ -726,6 +813,7 @@ export function registerIpcHandlers() {
             includeBindings: parsed.includeBindings ?? false,
             includeVoucherList: parsed.includeVoucherList ?? false,
             includeBudgets: parsed.includeBudgets ?? false,
+            categoryId: (parsed as any).categoryId,
             orgName: parsed.orgName
         })
         return FiscalReportOutput.parse(result)
@@ -1213,7 +1301,7 @@ export function registerIpcHandlers() {
         if (!fs.existsSync(dbPath)) throw new Error('Datenbankdatei nicht gefunden')
         const now = new Date()
         const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-        const defaultName = `VereinO_database_${stamp}.sqlite`
+        const defaultName = `BudgetO_database_${stamp}.sqlite`
         const save = await dialog.showSaveDialog({ title: 'Datenbank exportieren …', defaultPath: defaultName, filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }] })
         // Graceful cancel: return empty path instead of throwing
         if (save.canceled || !save.filePath) return DbExportOutput.parse({ filePath: '' as any })

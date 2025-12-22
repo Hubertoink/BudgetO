@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, categoryId, setCategoryId, filterFrom, setFilterFrom, filterTo, setFilterTo, filterCategoryId, setFilterCategoryId, filterType, setFilterType, filterPM, setFilterPM }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -24,12 +24,27 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setIncludeVoucherList?: (v: boolean) => void
   includeBudgets?: boolean
   setIncludeBudgets?: (v: boolean) => void
+  // Optional: Kategorie-Filter (wichtig für Jahresabschluss)
+  categoryId?: number | null
+  setCategoryId?: (v: number | null) => void
+
+  // Optional: Filter (Standard-Export)
+  filterFrom?: string
+  setFilterFrom?: (v: string) => void
+  filterTo?: string
+  setFilterTo?: (v: string) => void
+  filterCategoryId?: number | null
+  setFilterCategoryId?: (v: number | null) => void
+  filterType?: 'IN' | 'OUT' | 'TRANSFER' | null
+  setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
+  filterPM?: 'BAR' | 'BANK' | null
+  setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
     { key: 'voucherNo', label: 'Nr.' },
     { key: 'type', label: 'Typ' },
-    { key: 'sphere', label: 'Sphäre' },
+    { key: 'sphere', label: 'Kategorie' },
     { key: 'description', label: 'Beschreibung' },
     { key: 'paymentMethod', label: 'Zahlweg' },
     { key: 'netAmount', label: 'Netto' },
@@ -37,6 +52,46 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     { key: 'grossAmount', label: 'Brutto' },
     { key: 'tags', label: 'Tags' }
   ]
+
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([])
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+
+  // Load available years (years with actual bookings)
+  useEffect(() => {
+    let cancelled = false
+    if (!open) return
+    ;(async () => {
+      try {
+        const res = await (window as any).api?.reports?.years?.()
+        if (!cancelled && res?.years) {
+          setAvailableYears(res.years.sort((a: number, b: number) => b - a))
+        }
+      } catch {
+        if (!cancelled) setAvailableYears([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [open])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!open) return
+    const shouldLoadCategories = Boolean(setCategoryId || setFilterCategoryId)
+    if (!shouldLoadCategories) return
+    ;(async () => {
+      try {
+        const res = await (window as any).api?.customCategories?.list?.({ includeInactive: false })
+        const rows = (res?.rows || res?.categories || []) as any[]
+        const mapped = rows
+          .filter((r) => r && typeof r.id === 'number')
+          .map((r) => ({ id: Number(r.id), name: String(r.name || `#${r.id}`) }))
+        if (!cancelled) setCategories(mapped)
+      } catch {
+        if (!cancelled) setCategories([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [open, setCategoryId, setFilterCategoryId])
   const toggle = (k: any) => {
     const set = new Set(fields)
     if (set.has(k)) set.delete(k)
@@ -77,7 +132,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   if (!open) return null
   
   const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - i)
+  // For fiscal export year dropdown, include current year + availableYears
+  const fiscalYears = [...new Set([currentYear, ...availableYears])].sort((a, b) => b - a)
   
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -112,13 +168,13 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 onClick={() => setExportType('fiscal')} 
                 style={{ background: exportType === 'fiscal' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
               >
-                🏛️ Finanzamt (Jahresabschluss)
+                🏛️ Jahresabschluss
               </button>
             </div>
             <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
               {exportType === 'standard' 
                 ? 'Standard-Export für Controlling und Analyse mit frei wählbaren Feldern und Zeitraum' 
-                : 'Spezieller Jahresabschluss-Report für das Finanzamt nach § 64 AO mit Sphärentrennung'}
+                : 'Jahresabschluss-Report (PDF) – optional nach Kategorie gefiltert'}
             </div>
           </div>
         )}
@@ -133,7 +189,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 value={fiscalYear || currentYear} 
                 onChange={(e) => setFiscalYear(Number(e.target.value))}
               >
-                {years.map(y => (
+                {fiscalYears.map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
@@ -141,6 +197,25 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 Zeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
               </div>
             </div>
+
+            {setCategoryId && (
+              <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                <label>Kategorie (optional)</label>
+                <select
+                  className="input"
+                  value={categoryId ?? ''}
+                  onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Alle</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                  Filtert den Jahresabschluss auf eine Kategorie.
+                </div>
+              </div>
+            )}
             
             <div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Zusätzliche Optionen</label>
@@ -197,6 +272,209 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
               <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags" gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
             </div>
+
+            {/* Filter Section - clean card design */}
+            <div 
+              className="export-filter-card"
+              style={{ 
+                gridColumn: '1 / span 2',
+                background: 'color-mix(in oklab, var(--accent) 6%, var(--surface))',
+                border: '1px solid color-mix(in oklab, var(--accent) 20%, var(--border))',
+                borderRadius: 8,
+                padding: '10px 12px',
+                marginTop: 4
+              }}
+            >
+              {/* Header with info tooltip */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 15 }}>🔍</span>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Daten filtern</span>
+                <div 
+                  className="export-filter-info-trigger"
+                  style={{ 
+                    position: 'relative',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    color: 'var(--on-accent, #fff)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'help',
+                    userSelect: 'none'
+                  }}
+                >
+                  i
+                  <div 
+                    className="export-filter-info-popup"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 260,
+                      padding: '10px 12px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      color: 'var(--text)',
+                      zIndex: 100,
+                      pointerEvents: 'none',
+                      opacity: 0,
+                      transition: 'opacity 0.15s ease'
+                    }}
+                  >
+                    <strong>Wozu Filter?</strong><br/>
+                    Grenze den Export auf einen bestimmten Zeitraum, eine Kategorie, Buchungstyp oder Zahlweg ein. So erhältst du genau die Daten, die du benötigst.
+                  </div>
+                </div>
+                {/* Active filter indicator */}
+                {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM) && (
+                  <span 
+                    style={{ 
+                      marginLeft: 'auto',
+                      fontSize: 11,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      background: 'var(--accent)',
+                      color: 'var(--on-accent, #fff)',
+                      fontWeight: 500
+                    }}
+                  >
+                    Filter aktiv
+                  </span>
+                )}
+              </div>
+
+              {/* Year quick-select buttons - only years with bookings */}
+              {availableYears.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 5 }}>Jahr</div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {availableYears.map((y) => {
+                      const yStart = `${y}-01-01`
+                      const yEnd = `${y}-12-31`
+                      const isActive = filterFrom === yStart && filterTo === yEnd
+                      return (
+                        <button
+                          key={y}
+                          className="btn"
+                          onClick={() => {
+                            if (isActive) {
+                              setFilterFrom?.('')
+                              setFilterTo?.('')
+                            } else {
+                              setFilterFrom?.(yStart)
+                              setFilterTo?.(yEnd)
+                            }
+                          }}
+                          style={{
+                            minWidth: 48,
+                            padding: '3px 8px',
+                            fontSize: 12,
+                            fontWeight: isActive ? 600 : 400,
+                            background: isActive 
+                              ? 'var(--accent)' 
+                              : 'var(--surface)',
+                            color: isActive ? 'var(--on-accent, #fff)' : 'var(--text)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 6
+                          }}
+                        >
+                          {y}
+                        </button>
+                      )
+                    })}
+                    {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM) && (
+                      <button
+                        className="btn ghost"
+                        onClick={() => { setFilterFrom?.(''); setFilterTo?.(''); setFilterCategoryId?.(null); setFilterType?.(null); setFilterPM?.(null) }}
+                        style={{ fontSize: 11, padding: '3px 6px' }}
+                        title="Alle Filter zurücksetzen"
+                      >
+                        ✕ Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Date range inputs */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Von</div>
+                  <input
+                    className="input"
+                    type="date"
+                    value={filterFrom ?? ''}
+                    onChange={(e) => setFilterFrom?.(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Bis</div>
+                  <input
+                    className="input"
+                    type="date"
+                    value={filterTo ?? ''}
+                    onChange={(e) => setFilterTo?.(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* Dropdowns row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Kategorie</div>
+                  <select
+                    className="input"
+                    value={filterCategoryId ?? ''}
+                    onChange={(e) => setFilterCategoryId?.(e.target.value ? Number(e.target.value) : null)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Alle</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Typ</div>
+                  <select
+                    className="input"
+                    value={filterType ?? ''}
+                    onChange={(e) => setFilterType?.(e.target.value ? (e.target.value as any) : null)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Alle</option>
+                    <option value="IN">Einnahme</option>
+                    <option value="OUT">Ausgabe</option>
+                    <option value="TRANSFER">Umbuchung</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Zahlweg</div>
+                  <select
+                    className="input"
+                    value={filterPM ?? ''}
+                    onChange={(e) => setFilterPM?.(e.target.value ? (e.target.value as any) : null)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Alle</option>
+                    <option value="BAR">Bar</option>
+                    <option value="BANK">Bank</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Betragsdarstellung</label>
               <div className="btn-group" role="group">
@@ -223,7 +501,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           {exportType === 'fiscal' ? (
-            <button className="btn primary" onClick={() => onExport('PDF_FISCAL')}>📄 PDF (Finanzamt)</button>
+            <button className="btn primary" onClick={() => onExport('PDF_FISCAL')}>📄 PDF (Jahresabschluss)</button>
           ) : (
             <>
               <button className="btn" onClick={() => onExport('CSV')}>CSV</button>

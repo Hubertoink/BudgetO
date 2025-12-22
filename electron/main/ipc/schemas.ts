@@ -89,6 +89,7 @@ export const FiscalReportInput = z.object({
     includeBindings: z.boolean().optional(),
     includeVoucherList: z.boolean().optional(),
     includeBudgets: z.boolean().optional(),
+    categoryId: z.number().optional(),
     orgName: z.string().optional()
 })
 export const FiscalReportOutput = z.object({ filePath: z.string() })

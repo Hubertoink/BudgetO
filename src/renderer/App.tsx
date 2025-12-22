@@ -335,6 +335,14 @@ function AppInner() {
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
     const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
+    const [exportCategoryId, setExportCategoryId] = useState<number | null>(null)
+
+    // Standard-Export: Filter direkt im Modal (default: übernimmt Reports-Filter beim Öffnen)
+    const [exportFilterFrom, setExportFilterFrom] = useState<string>('')
+    const [exportFilterTo, setExportFilterTo] = useState<string>('')
+    const [exportFilterCategoryId, setExportFilterCategoryId] = useState<number | null>(null)
+    const [exportFilterType, setExportFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
+    const [exportFilterPM, setExportFilterPM] = useState<'BAR' | 'BANK' | null>(null)
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -384,6 +392,16 @@ function AppInner() {
         }
         loadOrg()
         return () => { cancelled = true }
+    }, [showExportOptions])
+
+    // Prefill modal filters from current Reports filters when modal opens
+    useEffect(() => {
+        if (!showExportOptions) return
+        setExportFilterFrom(reportsFrom || '')
+        setExportFilterTo(reportsTo || '')
+        setExportFilterCategoryId(null)
+        setExportFilterType(reportsFilterType)
+        setExportFilterPM(reportsFilterPM)
     }, [showExportOptions])
 
     // Global handler: jump from invoice detail (linked booking) to Journal view filtered
@@ -1203,8 +1221,8 @@ function AppInner() {
                     setAmountMode={setExportAmountMode}
                     sortDir={exportSortDir}
                     setSortDir={setExportSortDir}
-                    dateFrom={reportsFrom}
-                    dateTo={reportsTo}
+                    dateFrom={exportFilterFrom || reportsFrom}
+                    dateTo={exportFilterTo || reportsTo}
                     exportType={exportType}
                     setExportType={setExportType}
                     fiscalYear={fiscalYear}
@@ -1215,6 +1233,18 @@ function AppInner() {
                     setIncludeVoucherList={setIncludeVoucherList}
                     includeBudgets={includeBudgets}
                     setIncludeBudgets={setIncludeBudgets}
+                    categoryId={exportCategoryId}
+                    setCategoryId={setExportCategoryId}
+                    filterFrom={exportFilterFrom}
+                    setFilterFrom={setExportFilterFrom}
+                    filterTo={exportFilterTo}
+                    setFilterTo={setExportFilterTo}
+                    filterCategoryId={exportFilterCategoryId}
+                    setFilterCategoryId={setExportFilterCategoryId}
+                    filterType={exportFilterType}
+                    setFilterType={setExportFilterType}
+                    filterPM={exportFilterPM}
+                    setFilterPM={setExportFilterPM}
                     onExport={async (fmt) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -1224,10 +1254,11 @@ function AppInner() {
                                     includeBindings,
                                     includeVoucherList,
                                     includeBudgets,
+                                    categoryId: exportCategoryId ?? undefined,
                                     orgName: exportOrgName || undefined
                                 })
                                 if (res) {
-                                    notify('success', `Finanzamt-Report exportiert: ${res.filePath}`, 6000, {
+                                    notify('success', `Jahresabschluss exportiert: ${res.filePath}`, 6000, {
                                         label: 'Ordner öffnen',
                                         onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
                                     })
@@ -1237,9 +1268,13 @@ function AppInner() {
                                 const res = await window.api?.reports.export?.({
                                     type: 'JOURNAL',
                                     format: fmt,
-                                    from: reportsFrom || '',
-                                    to: reportsTo || '',
-                                    filters: { paymentMethod: reportsFilterPM || undefined, sphere: reportsFilterSphere || undefined, type: reportsFilterType || undefined },
+                                    from: exportFilterFrom || '',
+                                    to: exportFilterTo || '',
+                                    filters: {
+                                        paymentMethod: exportFilterPM || undefined,
+                                        categoryId: typeof exportFilterCategoryId === 'number' ? exportFilterCategoryId : undefined,
+                                        type: exportFilterType || undefined
+                                    },
                                     fields: exportFields,
                                     orgName: exportOrgName || undefined,
                                     amountMode: exportAmountMode,

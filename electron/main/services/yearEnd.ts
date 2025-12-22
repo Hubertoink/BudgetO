@@ -62,9 +62,9 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     for (let c = 1; c <= 3; c++) totalsRow.getCell(c).numFmt = CURRENCY_FMT
     // By sphere table below
     ws1.addRow([])
-    ws1.addRow(['Nach Sphäre', '', ''])
+    ws1.addRow(['Nach Kategorie', '', ''])
     ws1.getRow(ws1.rowCount).font = { bold: true }
-    ws1.addRow(['Sphäre', 'Brutto', 'Netto'])
+    ws1.addRow(['Kategorie', 'Brutto', 'Netto'])
     for (const s of summary.bySphere) {
         const r = ws1.addRow([s.key, s.gross, s.net])
         r.getCell(2).numFmt = CURRENCY_FMT
@@ -78,7 +78,7 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     // Journal sheet
     const rows = listVouchersAdvanced({ from, to, limit: 200000 })
     const ws2 = wb.addWorksheet('Journal')
-    const head = ['Datum', 'Nr.', 'Typ', 'Sphäre', 'Beschreibung', 'Zahlweg', 'Netto', 'MwSt', 'Brutto', 'Tags']
+    const head = ['Datum', 'Nr.', 'Typ', 'Kategorie', 'Beschreibung', 'Zahlweg', 'Netto', 'MwSt', 'Brutto', 'Tags']
     ws2.addRow(head)
     const startRow = 2
     for (const r of rows) {
@@ -104,7 +104,7 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     ws2.getColumn(1).width = 12 // Datum
     ws2.getColumn(2).width = 8  // Nr.
     ws2.getColumn(3).width = 10 // Typ
-    ws2.getColumn(4).width = 10 // Sphäre
+    ws2.getColumn(4).width = 14 // Kategorie
     ws2.getColumn(5).width = 40 // Beschreibung
     ws2.getColumn(6).width = 12 // Zahlweg
     ws2.getColumn(7).width = 14 // Netto

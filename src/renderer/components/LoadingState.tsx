@@ -8,7 +8,7 @@ interface LoadingStateProps {
 /**
  * LoadingState - Einheitliche Lade-Anzeige mit App-Icon
  * 
- * Zeigt das VereinO Icon mit Spinner-Animation und optionalem Text
+ * Zeigt das BudgetO Icon mit Spinner-Animation und optionalem Text
  * Kann in verschiedenen Größen verwendet werden
  */
 export default function LoadingState({ 
@@ -70,7 +70,7 @@ export default function LoadingState({
           />
         </svg>
 
-        {/* VereinO Icon - simplified euro symbol with circle */}
+        {/* BudgetO Icon - simplified euro symbol with circle */}
         <div
           style={{
             position: 'absolute',
@@ -108,7 +108,7 @@ export default function LoadingState({
           marginTop: -8
         }}
       >
-        VereinO · Nikolas Häfner
+        BudgetO · Nikolas Häfner
       </div>
     </div>
   )

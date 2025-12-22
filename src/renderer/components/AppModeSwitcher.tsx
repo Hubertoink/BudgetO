@@ -78,7 +78,7 @@ export function AppModeSwitcher() {
             </>
           ) : (
             <>
-              <strong>Cloud-Modus:</strong> Verbindung zu einem VereinO Cloud-Backend. 
+              <strong>Cloud-Modus:</strong> Verbindung zu einem BudgetO Cloud-Backend. 
               Ermöglicht Mehrbenutzerzugriff und zentrale Datenhaltung auf einem Server.
             </>
           )}

@@ -305,6 +305,7 @@ export function listVouchersAdvanced(filters: {
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -314,7 +315,7 @@ export function listVouchersAdvanced(filters: {
     tag?: string
 }) {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag } = filters
     let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.category_id as categoryId,
                                         (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
                                         (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
@@ -345,6 +346,7 @@ export function listVouchersAdvanced(filters: {
     const wh: string[] = []
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
+    if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
@@ -798,16 +800,18 @@ export function monthlyVouchers(filters: {
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
 }) {
     const d = getDb()
-    const { from, to, paymentMethod, sphere, type } = filters
+    const { from, to, paymentMethod, sphere, categoryId, type } = filters
     const params: any[] = []
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
     if (to) { wh.push('date <= ?'); params.push(to) }
     if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
+    if (typeof categoryId === 'number') { wh.push('category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('type = ?'); params.push(type) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const rows = d.prepare(`

@@ -1785,6 +1785,39 @@ tbody tr.row-flash {
     display: inline-block;
 }
 
+/* Reports: Category donut legend formatting */
+.report-chart-header--category {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.legend-container--category {
+    max-width: min(520px, 60vw);
+}
+
+.legend--category {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 14px;
+    align-items: start;
+}
+
+.legend--category .legend-item {
+    min-width: 0;
+}
+
+.legend--category .legend-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .legend-container--category { max-width: 100%; }
+    .legend--category { grid-template-columns: 1fr; }
+}
+
 /* Inputs hover/focus for better affordance */
 .input:hover,
 select:hover,
@@ -3205,6 +3238,18 @@ label .req-asterisk {
     position: relative;
 }
 
+.donut-svg-container {
+    position: relative;
+    width: 360px;
+    max-width: 100%;
+}
+
+.chart-tooltip-follow {
+    left: 0;
+    top: 0;
+    transform: translate(-50%, calc(-100% - 12px));
+}
+
 .legend-container {
     display: flex;
     gap: 8px;
@@ -3855,4 +3900,9 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .background-preview.bg-snow-houses {
     background-image: url('./assets/a_snow_covered_houses_and_a_street_light.png');
+}
+/* Export filter info tooltip */
+.export-filter-info-trigger:hover .export-filter-info-popup {
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }

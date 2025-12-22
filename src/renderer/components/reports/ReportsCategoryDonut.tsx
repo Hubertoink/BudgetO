@@ -8,7 +8,9 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
   const [rows, setRows] = useState<Row[]>([])
   const [error, setError] = useState<string | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number } | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const svgWrapRef = useRef<HTMLDivElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   useEffect(() => {
@@ -72,14 +74,14 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
 
   return (
     <div className="card report-chart-card">
-      <div className="report-chart-header">
+      <div className="report-chart-header report-chart-header--category">
         <strong>Nach Kategorie</strong>
-        <div className="legend-container">
-          <div className="legend">
+        <div className="legend-container legend-container--category">
+          <div className="legend legend--category">
             {arcs.map(a => (
               <span key={`${a.row.categoryId ?? 'NULL'}-${a.idx}`} className="legend-item">
                 <span className="legend-swatch" style={{ background: colors(a.row, a.idx) }}></span>
-                {a.row.categoryName}
+                <span className="legend-label" title={a.row.categoryName}>{a.row.categoryName}</span>
               </span>
             ))}
           </div>
@@ -91,29 +93,49 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
       )}
       {!loading && (
         <div className="donut-chart-wrapper">
-          {(() => {
-            const idx = hoverIdx
-            if (idx == null || !arcs[idx]) return null
-            const a = arcs[idx]
-            const pct = Math.round(a.frac * 100)
-            const c = colors(a.row, a.idx)
-            return (
-              <div className="chart-tooltip">
-                <div className="chart-tooltip-header">{a.row.categoryName}</div>
-                <div className="chart-tooltip-row"><span>Betrag</span> <strong style={{ color: c }}>{eurFmt.format(a.gross)}</strong></div>
-                <div className="chart-tooltip-row"><span>Anteil</span> <strong>{pct}%</strong></div>
-              </div>
-            )
-          })()}
-          <svg ref={svgRef} width={size.w} height={size.h} role="img" aria-label="Nach Kategorie">
-            {arcs.map((a, arcIdx) => {
+          <div ref={svgWrapRef} className="donut-svg-container">
+            {(() => {
+              const idx = hoverIdx
+              if (idx == null || !arcs[idx] || !tooltipPos) return null
+              const a = arcs[idx]
+              const pct = Math.round(a.frac * 100)
+              const c = colors(a.row, a.idx)
+              return (
+                <div className="chart-tooltip chart-tooltip-follow" style={{ left: tooltipPos.left, top: tooltipPos.top }}>
+                  <div className="chart-tooltip-header">{a.row.categoryName}</div>
+                  <div className="chart-tooltip-row"><span>Betrag</span> <strong style={{ color: c }}>{eurFmt.format(a.gross)}</strong></div>
+                  <div className="chart-tooltip-row"><span>Anteil</span> <strong>{pct}%</strong></div>
+                </div>
+              )
+            })()}
+            <svg ref={svgRef} width={size.w} height={size.h} role="img" aria-label="Nach Kategorie">
+              {arcs.map((a, arcIdx) => {
               const isSingle100 = arcs.length === 1 && Math.abs(a.frac - 1) < 0.0001
               const c = colors(a.row, a.idx)
+
+              const updateTooltipFromEvent = (ev: React.MouseEvent<SVGGElement>) => {
+                const wrap = svgWrapRef.current
+                if (!wrap) return
+                const rect = wrap.getBoundingClientRect()
+                const x = ev.clientX - rect.left
+                const y = ev.clientY - rect.top
+                // Clamp so the tooltip doesn't go too far off-screen.
+                const pad = 70
+                const left = Math.min(Math.max(x, pad), rect.width - pad)
+                const top = Math.min(Math.max(y, pad), rect.height - pad)
+                setTooltipPos({ left, top })
+              }
+
               if (isSingle100) {
                 const outerCircle = `M ${cx - outerR} ${cy} A ${outerR} ${outerR} 0 1 1 ${cx + outerR} ${cy} A ${outerR} ${outerR} 0 1 1 ${cx - outerR} ${cy} Z`
                 const innerCircle = `M ${cx - innerR} ${cy} A ${innerR} ${innerR} 0 1 0 ${cx + innerR} ${cy} A ${innerR} ${innerR} 0 1 0 ${cx - innerR} ${cy} Z`
                 return (
-                  <g key={arcIdx} onMouseEnter={() => setHoverIdx(arcIdx)} onMouseLeave={() => setHoverIdx(null)}>
+                  <g
+                    key={arcIdx}
+                    onMouseEnter={(ev) => { setHoverIdx(arcIdx); updateTooltipFromEvent(ev) }}
+                    onMouseMove={updateTooltipFromEvent}
+                    onMouseLeave={() => { setHoverIdx(null); setTooltipPos(null) }}
+                  >
                     <path d={outerCircle} fill={c} />
                     <path d={innerCircle} fill="var(--bg)" />
                     <text x={cx} y={cy} textAnchor="middle" fontSize="11" fill="#fff">100%</text>
@@ -142,15 +164,21 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
               const ly = cy + (innerR + (outerR - innerR) * 0.62) * Math.sin(mid)
               const pct = Math.round(a.frac * 100)
               return (
-                <g key={arcIdx} onMouseEnter={() => setHoverIdx(arcIdx)} onMouseLeave={() => setHoverIdx(null)}>
+                <g
+                  key={arcIdx}
+                  onMouseEnter={(ev) => { setHoverIdx(arcIdx); updateTooltipFromEvent(ev) }}
+                  onMouseMove={updateTooltipFromEvent}
+                  onMouseLeave={() => { setHoverIdx(null); setTooltipPos(null) }}
+                >
                   <path d={d} fill={c} />
                   {pct >= 7 && (
                     <text x={lx} y={ly} textAnchor="middle" fontSize="11" fill="#fff">{`${pct}%`}</text>
                   )}
                 </g>
               )
-            })}
-          </svg>
+              })}
+            </svg>
+          </div>
           <div>
             <div className="helper">Summe (Brutto)</div>
             <div>{eurFmt.format(rows.reduce((a, b) => a + (Number(b.gross) || 0), 0))}</div>
