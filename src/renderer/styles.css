@@ -723,6 +723,13 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
     /* Use base Standard palette from :root[data-theme] */
 }
 
+/* Standard theme: improve contrast on accent buttons in dark mode */
+:root[data-theme="dark"][data-color-theme="default"] .btn.primary,
+:root[data-theme="dark"][data-color-theme="default"] .btn-accent,
+:root[data-theme="dark"][data-color-theme="default"] .btn-group .btn-option.active {
+    color: #fff;
+}
+
 /* Fiery Ocean */
 :root[data-color-theme="fiery-ocean"] {
     /* Palette: barn red, fire brick, papaya whip, prussian blue, air superiority blue */
