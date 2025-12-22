@@ -426,10 +426,15 @@ function AppInner() {
         return () => window.removeEventListener('apply-voucher-jump' as any, onVoucherJump as any)
     }, [])
 
-    // UI preference: date format (ISO vs PRETTY)
-    type DateFmt = 'ISO' | 'PRETTY'
+    // UI preference: date format (ISO vs PRETTY vs SHORT)
+    type DateFmt = 'ISO' | 'PRETTY' | 'SHORT'
     const [dateFmt, setDateFmt] = useState<DateFmt>(() => {
-        try { return (localStorage.getItem('ui.dateFmt') as DateFmt) || 'ISO' } catch { return 'ISO' }
+        try {
+            const stored = localStorage.getItem('ui.dateFmt') as DateFmt | null
+            return stored === 'PRETTY' || stored === 'SHORT' || stored === 'ISO' ? stored : 'ISO'
+        } catch {
+            return 'ISO'
+        }
     })
     useEffect(() => { try { localStorage.setItem('ui.dateFmt', dateFmt) } catch { } }, [dateFmt])
     const fmtDate = useMemo(() => {
@@ -444,7 +449,18 @@ function AppInner() {
             const dd = String(d).padStart(2, '0')
             return `${dd} ${mon} ${y}`
         }
-        return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : (s || '')
+        const short = (s?: string) => {
+            if (!s) return ''
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+            if (!m) return s
+            const yy = m[1].slice(2)
+            return `${m[3]}.${m[2]}.${yy}`
+        }
+        return (s?: string) => {
+            if (dateFmt === 'PRETTY') return pretty(s)
+            if (dateFmt === 'SHORT') return short(s)
+            return s || ''
+        }
     }, [dateFmt])
 
     // Quick-Add modal state and actions

@@ -105,6 +105,9 @@
     align-items: flex-start;
     gap: 6px;
     user-select: none;
+    /* Important: prevent the (closed) flyout area from blocking clicks behind it.
+       Only the handle and the open panel should be interactive. */
+    pointer-events: none;
 }
 
 .status-flyout__panel {
@@ -142,6 +145,7 @@
     place-items: center;
     padding: 0;
     transition: background .1s, transform .1s, box-shadow .1s, border-color .15s;
+    pointer-events: auto;
 }
 
 .status-flyout__handle:hover,

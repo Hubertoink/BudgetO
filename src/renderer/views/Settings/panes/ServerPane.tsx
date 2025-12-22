@@ -89,6 +89,20 @@ export function ServerPane({ notify }: ServerPaneProps) {
     loadConfig().finally(() => setLoading(false))
   }, [loadConfig])
 
+  // Keep the settings pane in sync when server is started/stopped elsewhere (e.g. StatusFlyout).
+  useEffect(() => {
+    const onStatusChanged = () => {
+      // Fire-and-forget refresh
+      void loadConfig()
+    }
+    window.addEventListener('server-status-changed', onStatusChanged)
+    window.addEventListener('server-config-changed', onStatusChanged)
+    return () => {
+      window.removeEventListener('server-status-changed', onStatusChanged)
+      window.removeEventListener('server-config-changed', onStatusChanged)
+    }
+  }, [loadConfig])
+
   function modeLabel(mode: ServerMode): string {
     if (mode === 'local') return 'Lokal'
     if (mode === 'server') return 'Server'
@@ -161,6 +175,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
       }
       // Reload status immediately
       await loadConfig()
+      try { window.dispatchEvent(new Event('server-status-changed')) } catch {}
     } catch (e: any) {
       notify('error', e?.message || 'Server konnte nicht gestartet werden')
     } finally {
@@ -175,6 +190,7 @@ export function ServerPane({ notify }: ServerPaneProps) {
       notify('info', 'Server gestoppt')
       // Reload status immediately
       await loadConfig()
+      try { window.dispatchEvent(new Event('server-status-changed')) } catch {}
     } catch (e: any) {
       notify('error', e?.message || 'Fehler beim Stoppen')
     } finally {

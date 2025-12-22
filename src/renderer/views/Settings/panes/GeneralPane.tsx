@@ -49,6 +49,7 @@ export function GeneralPane({
   // Date format examples
   const sample = '2025-01-15'
   const pretty = '15. Jan 2025'
+  const short = '15.01.25'
 
   return (
     <div className="settings-pane">
@@ -298,6 +299,13 @@ export function GeneralPane({
                 onClick={() => setDateFmt('PRETTY')}
               >
                 {pretty}
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${dateFmt === 'SHORT' ? 'active' : ''}`}
+                onClick={() => setDateFmt('SHORT')}
+              >
+                {short}
               </button>
             </div>
           </div>

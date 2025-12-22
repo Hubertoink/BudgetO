@@ -123,8 +123,31 @@ export default function InvoicesView() {
   const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
 
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
-  const fmtDateLocal = useMemo(() => { const pretty = (s?: string) => { if (!s) return ''; const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if (!m) return s || ''; const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3]); const dt = new Date(Date.UTC(y, mo - 1, d)); const mon = dt.toLocaleString('de-DE', { month: 'short' }).replace('.', ''); const dd = String(d).padStart(2, '0'); return `${dd} ${mon} ${y}` }; return (s?: string) => dateFmtPref === 'PRETTY' ? pretty(s) : (s || '') }, [dateFmtPref])
+  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY' | 'SHORT') || 'ISO' } catch { return 'ISO' } }, [])
+  const fmtDateLocal = useMemo(() => {
+    const pretty = (s?: string) => {
+      if (!s) return ''
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return s || ''
+      const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3])
+      const dt = new Date(Date.UTC(y, mo - 1, d))
+      const mon = dt.toLocaleString('de-DE', { month: 'short' }).replace('.', '')
+      const dd = String(d).padStart(2, '0')
+      return `${dd} ${mon} ${y}`
+    }
+    const short = (s?: string) => {
+      if (!s) return ''
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return s || ''
+      const yy = m[1].slice(2)
+      return `${m[3]}.${m[2]}.${yy}`
+    }
+    return (s?: string) => {
+      if (dateFmtPref === 'PRETTY') return pretty(s)
+      if (dateFmtPref === 'SHORT') return short(s)
+      return s || ''
+    }
+  }, [dateFmtPref])
 
   const [qDebounced, setQDebounced] = useState('')
   useEffect(() => { const t = setTimeout(() => setQDebounced(q.trim()), 250); return () => clearTimeout(t) }, [q])

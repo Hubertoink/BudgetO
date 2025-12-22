@@ -154,6 +154,7 @@ export function NetworkStatus() {
       } finally {
         setIsBusy(false)
         await loadStatus()
+        try { window.dispatchEvent(new Event('server-status-changed')) } catch {}
       }
     }
   }, [config, hasRemoteChanges, isBusy, status?.running])

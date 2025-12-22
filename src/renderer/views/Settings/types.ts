@@ -47,7 +47,7 @@ export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 
 export type JournalRowDensity = 'normal' | 'compact'
 
-export type DateFmt = 'ISO' | 'PRETTY'
+export type DateFmt = 'ISO' | 'PRETTY' | 'SHORT'
 
 export type ColKey = 
   | 'actions' 

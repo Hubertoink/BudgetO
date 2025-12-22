@@ -71,7 +71,7 @@ export default function InvoicesView() {
   // Currency/date formatters (respect global date preference if set)
   const { canWrite } = useAuth()
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
+  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY' | 'SHORT') || 'ISO' } catch { return 'ISO' } }, [])
   const fmtDateLocal = useMemo(() => {
     const pretty = (s?: string) => {
       if (!s) return ''
@@ -83,7 +83,18 @@ export default function InvoicesView() {
       const dd = String(d).padStart(2, '0')
       return `${dd} ${mon} ${y}`
     }
-    return (s?: string) => dateFmtPref === 'PRETTY' ? pretty(s) : (s || '')
+    const short = (s?: string) => {
+      if (!s) return ''
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '')
+      if (!m) return s || ''
+      const yy = m[1].slice(2)
+      return `${m[3]}.${m[2]}.${yy}`
+    }
+    return (s?: string) => {
+      if (dateFmtPref === 'PRETTY') return pretty(s)
+      if (dateFmtPref === 'SHORT') return short(s)
+      return s || ''
+    }
   }, [dateFmtPref])
 
   // Debounce search
