@@ -5,6 +5,7 @@ import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
+import { useAuth } from '../context/AuthContext'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {
@@ -68,6 +69,7 @@ export default function InvoicesView() {
   useEffect(() => { try { localStorage.setItem('invoices.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
 
   // Currency/date formatters (respect global date preference if set)
+  const { canWrite } = useAuth()
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
   const fmtDateLocal = useMemo(() => {
@@ -432,7 +434,7 @@ export default function InvoicesView() {
           </button>
           {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
           <div className="filter-divider" />
-          <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
+          {canWrite && <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>}
         </div>
       </div>
       {error && <div className="invoices-text-danger">{error}</div>}
