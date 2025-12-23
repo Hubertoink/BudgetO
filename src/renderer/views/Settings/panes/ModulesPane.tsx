@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { useModules } from '../../../context/moduleHooks'
-import type { ModuleInfo } from '../../../context/moduleTypes'
+import type { ModuleInfo, ModuleKey } from '../../../context/moduleTypes'
 import { useAuth } from '../../../context/authHooks'
+import { navItems } from '../../../utils/navItems'
 
 /**
  * ModulesPane - Settings pane for enabling/disabling BudgetO modules
@@ -9,9 +11,32 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
   const { canWrite } = useAuth()
   const { modules, loading, setModuleEnabled } = useModules()
 
+  const moduleOrder = useMemo(() => {
+    const order = new Map<ModuleKey, number>()
+    let idx = 0
+    for (const item of navItems) {
+      if (!item.moduleKey) continue
+      if (!order.has(item.moduleKey)) order.set(item.moduleKey, idx++)
+    }
+    return order
+  }, [])
+
   // BudgetO arbeitet ausschließlich mit eigenen Kategorien.
   // Daher wird dieses Modul nicht als optionales Toggle angeboten.
-  const visibleModules = modules.filter((m) => m.key !== 'custom-categories')
+  const visibleModules = useMemo(() => {
+    const filtered = modules.filter((m) => m.key !== 'custom-categories')
+    return filtered
+      .slice()
+      .sort((a, b) => {
+        const ai = moduleOrder.get(a.key as ModuleKey) ?? Number.POSITIVE_INFINITY
+        const bi = moduleOrder.get(b.key as ModuleKey) ?? Number.POSITIVE_INFINITY
+        if (ai !== bi) return ai - bi
+
+        // Fallbacks for modules that don't exist in navigation
+        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder
+        return a.name.localeCompare(b.name)
+      })
+  }, [modules, moduleOrder])
 
   const handleToggle = async (mod: ModuleInfo) => {
     if (!canWrite) return
