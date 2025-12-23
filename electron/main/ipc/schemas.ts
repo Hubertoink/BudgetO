@@ -255,6 +255,7 @@ export const VouchersListInput = z
         budgetId: z.number().optional(),
         q: z.string().optional()
         , tag: z.string().optional()
+        , taxonomyTermId: z.number().optional()
     })
     .optional()
 export const VouchersListOutput = z.object({
@@ -298,6 +299,15 @@ export const VouchersListOutput = z.object({
                 amount: z.number(),
                 code: z.string().optional(),
                 name: z.string().optional()
+            })).optional(),
+
+            // Taxonomy terms (for badges & filtering)
+            taxonomyTerms: z.array(z.object({
+                taxonomyId: z.number(),
+                taxonomyName: z.string(),
+                termId: z.number(),
+                termName: z.string(),
+                termColor: z.string().nullable().optional()
             })).optional()
         })
     ),
@@ -530,6 +540,7 @@ export const VouchersBatchAssignEarmarkInput = z.object({
     earmarkId: z.number(),
     paymentMethod: PaymentMethod.optional(),
     sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
@@ -545,6 +556,7 @@ export const VouchersBatchAssignBudgetInput = z.object({
     budgetId: z.number(),
     paymentMethod: PaymentMethod.optional(),
     sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
@@ -560,6 +572,7 @@ export const VouchersBatchAssignTagsInput = z.object({
     tags: z.array(z.string()).nonempty(),
     paymentMethod: PaymentMethod.optional(),
     sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
@@ -568,6 +581,155 @@ export const VouchersBatchAssignTagsInput = z.object({
 export const VouchersBatchAssignTagsOutput = z.object({ updated: z.number() })
 export type TVouchersBatchAssignTagsInput = z.infer<typeof VouchersBatchAssignTagsInput>
 export type TVouchersBatchAssignTagsOutput = z.infer<typeof VouchersBatchAssignTagsOutput>
+
+// Batch assign category to vouchers
+export const VouchersBatchAssignCategoryInput = z.object({
+    categoryIdToAssign: z.number(),
+    paymentMethod: PaymentMethod.optional(),
+    sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
+    type: VoucherType.optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    q: z.string().optional(),
+    onlyWithout: z.boolean().optional()
+})
+export const VouchersBatchAssignCategoryOutput = z.object({ updated: z.number() })
+export type TVouchersBatchAssignCategoryInput = z.infer<typeof VouchersBatchAssignCategoryInput>
+export type TVouchersBatchAssignCategoryOutput = z.infer<typeof VouchersBatchAssignCategoryOutput>
+
+// Dynamic Taxonomies (Kategorietaxonomien)
+export const CategoryTaxonomiesListInput = z
+    .object({
+        includeInactive: z.boolean().optional(),
+        includeCounts: z.boolean().optional()
+    })
+    .optional()
+
+export const CategoryTaxonomyShape = z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string().nullable(),
+    sortOrder: z.number(),
+    isActive: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string().nullable(),
+    termCount: z.number().optional(),
+    usageCount: z.number().optional()
+})
+
+export const CategoryTaxonomiesListOutput = z.object({
+    taxonomies: z.array(CategoryTaxonomyShape)
+})
+
+export const CategoryTaxonomyCreateInput = z.object({
+    name: z.string().min(1),
+    description: z.string().nullable().optional(),
+    sortOrder: z.number().optional()
+})
+export const CategoryTaxonomyCreateOutput = z.object({ id: z.number() })
+
+export const CategoryTaxonomyUpdateInput = z.object({
+    id: z.number(),
+    name: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    sortOrder: z.number().optional(),
+    isActive: z.boolean().optional()
+})
+export const CategoryTaxonomyUpdateOutput = z.object({ id: z.number() })
+
+export const CategoryTaxonomyDeleteInput = z.object({ id: z.number() })
+export const CategoryTaxonomyDeleteOutput = z.object({ id: z.number(), affectedVouchers: z.number() })
+
+export const CategoryTermsListInput = z.object({
+    taxonomyId: z.number(),
+    includeInactive: z.boolean().optional(),
+    includeUsage: z.boolean().optional()
+})
+
+export const CategoryTermShape = z.object({
+    id: z.number(),
+    taxonomyId: z.number(),
+    name: z.string(),
+    color: z.string().nullable(),
+    description: z.string().nullable(),
+    sortOrder: z.number(),
+    isActive: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string().nullable(),
+    usageCount: z.number().optional()
+})
+
+export const CategoryTermsListOutput = z.object({ terms: z.array(CategoryTermShape) })
+
+export const CategoryTermCreateInput = z.object({
+    taxonomyId: z.number(),
+    name: z.string().min(1),
+    color: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    sortOrder: z.number().optional()
+})
+export const CategoryTermCreateOutput = z.object({ id: z.number() })
+
+export const CategoryTermUpdateInput = z.object({
+    id: z.number(),
+    name: z.string().min(1).optional(),
+    color: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    sortOrder: z.number().optional(),
+    isActive: z.boolean().optional()
+})
+export const CategoryTermUpdateOutput = z.object({ id: z.number() })
+
+export const CategoryTermDeleteInput = z.object({ id: z.number() })
+export const CategoryTermDeleteOutput = z.object({ id: z.number(), affectedVouchers: z.number() })
+
+// Batch assign taxonomy term to vouchers
+export const VouchersBatchAssignTaxonomyTermInput = z.object({
+    taxonomyId: z.number(),
+    termId: z.number(),
+    paymentMethod: PaymentMethod.optional(),
+    sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
+    type: VoucherType.optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    q: z.string().optional(),
+    onlyWithout: z.boolean().optional()
+})
+export const VouchersBatchAssignTaxonomyTermOutput = z.object({ updated: z.number() })
+
+export type TCategoryTaxonomiesListInput = z.infer<typeof CategoryTaxonomiesListInput>
+export type TCategoryTaxonomiesListOutput = z.infer<typeof CategoryTaxonomiesListOutput>
+export type TCategoryTaxonomyCreateInput = z.infer<typeof CategoryTaxonomyCreateInput>
+export type TCategoryTaxonomyUpdateInput = z.infer<typeof CategoryTaxonomyUpdateInput>
+export type TCategoryTaxonomyDeleteInput = z.infer<typeof CategoryTaxonomyDeleteInput>
+export type TCategoryTermsListInput = z.infer<typeof CategoryTermsListInput>
+export type TCategoryTermCreateInput = z.infer<typeof CategoryTermCreateInput>
+export type TCategoryTermUpdateInput = z.infer<typeof CategoryTermUpdateInput>
+export type TCategoryTermDeleteInput = z.infer<typeof CategoryTermDeleteInput>
+export type TVouchersBatchAssignTaxonomyTermInput = z.infer<typeof VouchersBatchAssignTaxonomyTermInput>
+export type TVouchersBatchAssignTaxonomyTermOutput = z.infer<typeof VouchersBatchAssignTaxonomyTermOutput>
+
+// Voucher taxonomy assignments (single voucher edit modal)
+export const VoucherTaxonomyAssignmentShape = z.object({
+    taxonomyId: z.number(),
+    termId: z.number()
+})
+
+export const VouchersTaxonomyAssignmentsListInput = z.object({ voucherId: z.number() })
+export const VouchersTaxonomyAssignmentsListOutput = z.object({ assignments: z.array(VoucherTaxonomyAssignmentShape) })
+export type TVouchersTaxonomyAssignmentsListInput = z.infer<typeof VouchersTaxonomyAssignmentsListInput>
+export type TVouchersTaxonomyAssignmentsListOutput = z.infer<typeof VouchersTaxonomyAssignmentsListOutput>
+
+export const VouchersTaxonomyAssignmentSetInput = z.object({
+    voucherId: z.number(),
+    taxonomyId: z.number(),
+    termId: z.number().nullable()
+})
+export const VouchersTaxonomyAssignmentSetOutput = z.object({ ok: z.boolean() })
+export type TVouchersTaxonomyAssignmentSetInput = z.infer<typeof VouchersTaxonomyAssignmentSetInput>
+export type TVouchersTaxonomyAssignmentSetOutput = z.infer<typeof VouchersTaxonomyAssignmentSetOutput>
 
 // Bindings (Zweckbindungen)
 export const BindingUpsertInput = z.object({

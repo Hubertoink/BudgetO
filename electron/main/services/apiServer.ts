@@ -266,8 +266,16 @@ function registerHandlers() {
   
   // Vouchers
   apiHandlers.set('vouchers.list', async (body) => {
-    const { listVouchersAdvancedPaged } = await import('../repositories/vouchers')
-    return listVouchersAdvancedPaged(body)
+    const { listVouchersAdvancedPaged, getVoucherBudgets, getVoucherEarmarks, getVoucherTaxonomyTermsForVouchers } = await import('../repositories/vouchers')
+    const { rows, total } = listVouchersAdvancedPaged(body)
+    const txByVoucher = getVoucherTaxonomyTermsForVouchers((rows || []).map((r: any) => Number(r.id)))
+    const enrichedRows = (rows || []).map((r: any) => ({
+      ...r,
+      budgets: getVoucherBudgets(r.id),
+      earmarksAssigned: getVoucherEarmarks(r.id),
+      taxonomyTerms: txByVoucher[Number(r.id)] || []
+    }))
+    return { rows: enrichedRows, total }
   })
   
   apiHandlers.set('vouchers.create', async (body) => {
@@ -315,6 +323,26 @@ function registerHandlers() {
   apiHandlers.set('vouchers.batchAssignTags', async (body) => {
     const { batchAssignTags } = await import('../repositories/vouchers')
     return batchAssignTags(body)
+  })
+
+  apiHandlers.set('vouchers.batchAssignCategory', async (body) => {
+    const { batchAssignCategory } = await import('../repositories/vouchers')
+    return batchAssignCategory(body)
+  })
+
+  apiHandlers.set('vouchers.batchAssignTaxonomyTerm', async (body) => {
+    const { batchAssignCategoryTaxonomyTerm } = await import('../repositories/categoryTaxonomies')
+    return batchAssignCategoryTaxonomyTerm(body)
+  })
+
+  apiHandlers.set('vouchers.taxonomyAssignments.list', async (body) => {
+    const { listVoucherTaxonomyAssignments } = await import('../repositories/categoryTaxonomies')
+    return { assignments: listVoucherTaxonomyAssignments(body.voucherId) }
+  })
+
+  apiHandlers.set('vouchers.taxonomyAssignments.set', async (body) => {
+    const { setVoucherTaxonomyAssignment } = await import('../repositories/categoryTaxonomies')
+    return setVoucherTaxonomyAssignment(body)
   })
 
   apiHandlers.set('vouchers.clearAll', async (body) => {
@@ -464,6 +492,47 @@ function registerHandlers() {
   apiHandlers.set('customCategories.reorder', async (body) => {
     const { reorderCustomCategories } = await import('../repositories/customCategories')
     return reorderCustomCategories(body.orderedIds)
+  })
+
+  // Dynamic Category Taxonomies
+  apiHandlers.set('taxonomies.list', async (body) => {
+    const { listCategoryTaxonomies } = await import('../repositories/categoryTaxonomies')
+    return { taxonomies: listCategoryTaxonomies(body || {}) }
+  })
+
+  apiHandlers.set('taxonomies.create', async (body) => {
+    const { createCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+    return createCategoryTaxonomy(body)
+  })
+
+  apiHandlers.set('taxonomies.update', async (body) => {
+    const { updateCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+    return updateCategoryTaxonomy(body)
+  })
+
+  apiHandlers.set('taxonomies.delete', async (body) => {
+    const { deleteCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+    return deleteCategoryTaxonomy(body.id)
+  })
+
+  apiHandlers.set('taxonomies.terms.list', async (body) => {
+    const { listCategoryTerms } = await import('../repositories/categoryTaxonomies')
+    return { terms: listCategoryTerms(body) }
+  })
+
+  apiHandlers.set('taxonomies.terms.create', async (body) => {
+    const { createCategoryTerm } = await import('../repositories/categoryTaxonomies')
+    return createCategoryTerm(body)
+  })
+
+  apiHandlers.set('taxonomies.terms.update', async (body) => {
+    const { updateCategoryTerm } = await import('../repositories/categoryTaxonomies')
+    return updateCategoryTerm(body)
+  })
+
+  apiHandlers.set('taxonomies.terms.delete', async (body) => {
+    const { deleteCategoryTerm } = await import('../repositories/categoryTaxonomies')
+    return deleteCategoryTerm(body.id)
   })
   
   // Annual Budgets

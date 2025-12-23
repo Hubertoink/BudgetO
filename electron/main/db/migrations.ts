@@ -907,6 +907,54 @@ export const MIGRATIONS: Mig[] = [
       }
     }
   }
+  ,
+  {
+    version: 35,
+    up(db: DB) {
+      // Dynamic category taxonomies (additional metadata alongside existing custom_categories)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS category_taxonomies (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS category_terms (
+          id INTEGER PRIMARY KEY,
+          taxonomy_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          color TEXT,
+          description TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT,
+          FOREIGN KEY(taxonomy_id) REFERENCES category_taxonomies(id) ON DELETE CASCADE,
+          UNIQUE(taxonomy_id, name COLLATE NOCASE)
+        );
+
+        CREATE TABLE IF NOT EXISTS voucher_taxonomy_terms (
+          voucher_id INTEGER NOT NULL,
+          taxonomy_id INTEGER NOT NULL,
+          term_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT,
+          PRIMARY KEY (voucher_id, taxonomy_id),
+          FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE,
+          FOREIGN KEY(taxonomy_id) REFERENCES category_taxonomies(id) ON DELETE CASCADE,
+          FOREIGN KEY(term_id) REFERENCES category_terms(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_category_terms_taxonomy ON category_terms(taxonomy_id);
+        CREATE INDEX IF NOT EXISTS idx_voucher_taxonomy_terms_taxonomy ON voucher_taxonomy_terms(taxonomy_id);
+        CREATE INDEX IF NOT EXISTS idx_voucher_taxonomy_terms_term ON voucher_taxonomy_terms(term_id);
+      `)
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

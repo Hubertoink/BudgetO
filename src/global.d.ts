@@ -31,7 +31,7 @@ declare global {
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string; taxonomyTermId?: number }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
@@ -56,6 +56,13 @@ declare global {
                         budgetLabel?: string | null
                         budgetColor?: string | null
                         tags?: string[]
+                        taxonomyTerms?: Array<{
+                            taxonomyId: number
+                            taxonomyName: string
+                            termId: number
+                            termName: string
+                            termColor?: string | null
+                        }>
                     }>
                     total: number
                 }>
@@ -65,6 +72,10 @@ declare global {
                 batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
                 batchAssignBudget: (payload: { budgetId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
                 batchAssignTags: (payload: { tags: string[]; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string }) => Promise<{ updated: number }>
+                taxonomyAssignments?: {
+                    list: (payload: { voucherId: number }) => Promise<{ assignments: Array<{ taxonomyId: number; termId: number }> }>
+                    set: (payload: { voucherId: number; taxonomyId: number; termId: number | null }) => Promise<{ ok: boolean }>
+                }
                 clearAll: () => Promise<{ deleted: number }>
             }
             tags: {

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA, BudgetAssignment, EarmarkAssignment } from '../../hooks/useQuickAdd'
 
@@ -47,6 +47,61 @@ export default function QuickAddModal({
     customCategories = [],
     useCategoriesModule = false
 }: QuickAddModalProps) {
+    const [taxonomiesForCreate, setTaxonomiesForCreate] = useState<Array<{ id: number; name: string }>>([])
+    const [taxonomyTermsById, setTaxonomyTermsById] = useState<Record<number, Array<{ id: number; name: string }>>>({})
+    const [loadingTaxonomiesForCreate, setLoadingTaxonomiesForCreate] = useState(false)
+
+    // Load active taxonomies + active terms on open; only show taxonomies that have at least one term.
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            setLoadingTaxonomiesForCreate(true)
+            try {
+                const resTx = await (window as any).api?.taxonomies?.list?.({ includeInactive: false })
+                const txs = ((resTx?.taxonomies || []) as Array<{ id: number; name: string }>).map((t) => ({ id: Number(t.id), name: t.name }))
+                if (cancelled) return
+                if (!txs.length) {
+                    setTaxonomiesForCreate([])
+                    setTaxonomyTermsById({})
+                    return
+                }
+
+                const termsBy: Record<number, Array<{ id: number; name: string }>> = {}
+                for (const tx of txs) {
+                    const resTerms = await (window as any).api?.taxonomies?.terms?.list?.({ taxonomyId: tx.id, includeInactive: false })
+                    const terms = (resTerms?.terms || []) as Array<{ id: number; name: string }>
+                    termsBy[tx.id] = terms.map((t) => ({ id: Number(t.id), name: t.name }))
+                }
+                if (cancelled) return
+
+                const txsWithTerms = txs.filter((tx) => (termsBy[tx.id] || []).length > 0)
+                setTaxonomiesForCreate(txsWithTerms)
+                setTaxonomyTermsById(termsBy)
+
+                // Ensure selection map exists
+                const existing = ((qa as any).taxonomySelectionById || {}) as Record<number, number | ''>
+                const nextSel: Record<number, number | ''> = { ...existing }
+                for (const tx of txsWithTerms) {
+                    if (!(tx.id in nextSel)) nextSel[tx.id] = ''
+                }
+                if (Object.keys(nextSel).length !== Object.keys(existing).length) {
+                    setQa({ ...(qa as any), taxonomySelectionById: nextSel } as any)
+                }
+            } catch {
+                if (cancelled) return
+                setTaxonomiesForCreate([])
+                setTaxonomyTermsById({})
+            } finally {
+                if (!cancelled) setLoadingTaxonomiesForCreate(false)
+            }
+        })()
+        return () => {
+            cancelled = true
+        }
+        // Intentionally run only on mount/open
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     return (
         <div className="modal-overlay">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
@@ -428,6 +483,57 @@ export default function QuickAddModal({
                                     onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
                                     tagDefs={tagDefs}
                                 />
+
+                                {taxonomiesForCreate.length > 0 && (
+                                    <div className="field field-full-width" style={{ marginTop: 8 }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span>🏷️</span> Klassifizierung
+                                        </label>
+                                        {loadingTaxonomiesForCreate ? (
+                                            <div className="helper">Lade Taxonomien…</div>
+                                        ) : (
+                                            <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: `repeat(auto-fit, minmax(${taxonomiesForCreate.length === 1 ? '200px' : '140px'}, 1fr))`,
+                                                gap: 12,
+                                                padding: '10px 12px',
+                                                background: 'color-mix(in oklab, var(--accent) 5%, transparent)',
+                                                borderRadius: 8,
+                                                border: '1px solid color-mix(in oklab, var(--accent) 20%, transparent)'
+                                            }}>
+                                                {taxonomiesForCreate.map((tx) => {
+                                                    const terms = taxonomyTermsById[tx.id] || []
+                                                    const sel = (((qa as any).taxonomySelectionById || {}) as Record<number, number | ''>)[tx.id] ?? ''
+                                                    return (
+                                                        <div key={tx.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)' }}>{tx.name}</label>
+                                                            <select
+                                                                className="input"
+                                                                style={{ fontSize: 13, padding: '6px 8px' }}
+                                                                value={sel as any}
+                                                                onChange={(e) => {
+                                                                    const next = e.target.value ? Number(e.target.value) : ''
+                                                                    const prev = (((qa as any).taxonomySelectionById || {}) as Record<number, number | ''>)
+                                                                    setQa({
+                                                                        ...(qa as any),
+                                                                        taxonomySelectionById: { ...prev, [tx.id]: next }
+                                                                    } as any)
+                                                                }}
+                                                            >
+                                                                <option value="">— keine —</option>
+                                                                {terms.map((t) => (
+                                                                    <option key={t.id} value={t.id}>
+                                                                        {t.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

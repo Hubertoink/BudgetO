@@ -57,6 +57,7 @@ interface JournalTableProps {
         budgetLabel?: string | null
         budgetColor?: string | null
         tags?: string[]
+        taxonomyTerms?: Array<{ taxonomyId: number; taxonomyName: string; termId: number; termName: string; termColor?: string | null }>
     }>
     order: string[]
     cols: Record<string, boolean>
@@ -89,6 +90,7 @@ interface JournalTableProps {
     sortDir: 'ASC' | 'DESC'
     sortBy: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere'
     onTagClick?: (name: string) => void
+    onTaxonomyTermClick?: (p: { termId: number; termName: string; taxonomyName: string }) => void
     onCategoryClick?: (p: { categoryId?: number | null; categoryName?: string | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) => void
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
@@ -115,6 +117,7 @@ export default function JournalTable({
     sortDir,
     sortBy,
     onTagClick,
+    onTaxonomyTermClick,
     onCategoryClick,
     onEarmarkClick,
     onBudgetClick,
@@ -363,6 +366,31 @@ export default function JournalTable({
                                 onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
                             >
                                 {t}
+                            </button>
+                        )
+                    })}
+
+                    {(r.taxonomyTerms || []).map((tt) => {
+                        const bg = tt.termColor || undefined
+                        const fg = contrastText(bg)
+                        const title = `Nach ${tt.taxonomyName}: ${tt.termName} filtern`
+                        return (
+                            <button
+                                key={`${tt.taxonomyId}:${tt.termId}`}
+                                className="chip"
+                                style={{
+                                    background: bg,
+                                    color: bg ? fg : undefined,
+                                    border: bg ? `1px solid ${bg}` : '1px solid var(--border)',
+                                    cursor: 'pointer'
+                                }}
+                                title={title}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onTaxonomyTermClick?.({ termId: tt.termId, termName: tt.termName, taxonomyName: tt.taxonomyName })
+                                }}
+                            >
+                                {tt.termName}
                             </button>
                         )
                     })}

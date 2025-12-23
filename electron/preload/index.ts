@@ -43,12 +43,29 @@ contextBridge.exposeInMainWorld('api', {
         batchAssignEarmark: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignEarmark', payload),
         batchAssignBudget: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignBudget', payload),
         batchAssignTags: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignTags', payload),
+        batchAssignTaxonomyTerm: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignTaxonomyTerm', payload),
+        taxonomyAssignments: {
+            list: (payload: any) => ipcRenderer.invoke('vouchers.taxonomyAssignments.list', payload),
+            set: (payload: any) => ipcRenderer.invoke('vouchers.taxonomyAssignments.set', payload)
+        },
         clearAll: () => ipcRenderer.invoke('vouchers.clearAll', { confirm: true })
     },
     tags: {
         list: (payload?: any) => ipcRenderer.invoke('tags.list', payload),
         upsert: (payload: any) => ipcRenderer.invoke('tags.upsert', payload),
         delete: (payload: any) => ipcRenderer.invoke('tags.delete', payload)
+    },
+    taxonomies: {
+        list: (payload?: any) => ipcRenderer.invoke('taxonomies.list', payload),
+        create: (payload: any) => ipcRenderer.invoke('taxonomies.create', payload),
+        update: (payload: any) => ipcRenderer.invoke('taxonomies.update', payload),
+        delete: (payload: any) => ipcRenderer.invoke('taxonomies.delete', payload),
+        terms: {
+            list: (payload: any) => ipcRenderer.invoke('taxonomies.terms.list', payload),
+            create: (payload: any) => ipcRenderer.invoke('taxonomies.terms.create', payload),
+            update: (payload: any) => ipcRenderer.invoke('taxonomies.terms.update', payload),
+            delete: (payload: any) => ipcRenderer.invoke('taxonomies.terms.delete', payload)
+        }
     },
     audit: {
         recent: (payload?: any) => ipcRenderer.invoke('audit.recent', payload)
@@ -220,7 +237,12 @@ contextBridge.exposeInMainWorld('api', {
     },
     // Organizations (Kostenstellen)
     organizations: {
+        batchAssignCategory: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignCategory', payload),
         list: () => ipcRenderer.invoke('organizations.list'),
+        taxonomyAssignments: {
+            list: (payload: any) => ipcRenderer.invoke('vouchers.taxonomyAssignments.list', payload),
+            set: (payload: any) => ipcRenderer.invoke('vouchers.taxonomyAssignments.set', payload)
+        },
         active: () => ipcRenderer.invoke('organizations.active'),
         resetCurrentData: () => ipcRenderer.invoke('organizations.resetCurrentData'),
         create: (payload: { name: string }) => ipcRenderer.invoke('organizations.create', payload),

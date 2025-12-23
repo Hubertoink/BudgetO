@@ -843,13 +843,18 @@ export function registerIpcHandlers() {
             earmarkId: parsed.earmarkId,
             budgetId: (parsed as any).budgetId,
             q: parsed.q,
-            tag: (parsed as any).tag
+            tag: (parsed as any).tag,
+            taxonomyTermId: (parsed as any).taxonomyTermId
         })
         // Enrich with budget/earmark assignments from junction tables
+        const { getVoucherTaxonomyTermsForVouchers } = await import('../repositories/vouchers')
+        const txByVoucher = getVoucherTaxonomyTermsForVouchers(rows.map((r: any) => Number(r.id)))
+
         const enrichedRows = rows.map((r: any) => ({
             ...r,
             budgets: getVoucherBudgets(r.id),
-            earmarksAssigned: getVoucherEarmarks(r.id)
+            earmarksAssigned: getVoucherEarmarks(r.id),
+            taxonomyTerms: txByVoucher[Number(r.id)] || []
         }))
         return VouchersListOutput.parse({ rows: enrichedRows, total })
     })
@@ -976,6 +981,111 @@ export function registerIpcHandlers() {
         const res = batchAssignTags(parsed as any)
         bumpChangeSeq()
         return VouchersBatchAssignTagsOutput.parse(res)
+    })
+
+    ipcMain.handle('vouchers.batchAssignCategory', async (_e, payload) => {
+        const { VouchersBatchAssignCategoryInput, VouchersBatchAssignCategoryOutput } = await import('./schemas')
+        const parsed = VouchersBatchAssignCategoryInput.parse(payload)
+
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersBatchAssignCategoryOutput.parse(
+                await remoteCall(cfg.serverAddress, 'vouchers.batchAssignCategory', parsed)
+            )
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
+        const { batchAssignCategory } = await import('../repositories/vouchers')
+        const res = batchAssignCategory(parsed as any)
+        bumpChangeSeq()
+        return VouchersBatchAssignCategoryOutput.parse(res)
+    })
+
+    ipcMain.handle('vouchers.batchAssignTaxonomyTerm', async (_e, payload) => {
+        const { VouchersBatchAssignTaxonomyTermInput, VouchersBatchAssignTaxonomyTermOutput } = await import('./schemas')
+        const parsed = VouchersBatchAssignTaxonomyTermInput.parse(payload)
+
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersBatchAssignTaxonomyTermOutput.parse(
+                await remoteCall(cfg.serverAddress, 'vouchers.batchAssignTaxonomyTerm', parsed)
+            )
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
+        const { batchAssignCategoryTaxonomyTerm } = await import('../repositories/categoryTaxonomies')
+        const res = batchAssignCategoryTaxonomyTerm(parsed as any)
+        bumpChangeSeq()
+        return VouchersBatchAssignTaxonomyTermOutput.parse(res)
+    })
+
+    ipcMain.handle('vouchers.taxonomyAssignments.list', async (_e, payload) => {
+        const { VouchersTaxonomyAssignmentsListInput, VouchersTaxonomyAssignmentsListOutput } = await import('./schemas')
+        const parsed = VouchersTaxonomyAssignmentsListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersTaxonomyAssignmentsListOutput.parse(
+                await remoteCall(cfg.serverAddress, 'vouchers.taxonomyAssignments.list', parsed)
+            )
+        }
+
+        const { listVoucherTaxonomyAssignments } = await import('../repositories/categoryTaxonomies')
+        return VouchersTaxonomyAssignmentsListOutput.parse({ assignments: listVoucherTaxonomyAssignments(parsed.voucherId) })
+    })
+
+    ipcMain.handle('vouchers.taxonomyAssignments.set', async (_e, payload) => {
+        const { VouchersTaxonomyAssignmentSetInput, VouchersTaxonomyAssignmentSetOutput } = await import('./schemas')
+        const parsed = VouchersTaxonomyAssignmentSetInput.parse(payload)
+
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return VouchersTaxonomyAssignmentSetOutput.parse(
+                await remoteCall(cfg.serverAddress, 'vouchers.taxonomyAssignments.set', parsed)
+            )
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
+        const { setVoucherTaxonomyAssignment } = await import('../repositories/categoryTaxonomies')
+        const res = setVoucherTaxonomyAssignment({
+            voucherId: parsed.voucherId,
+            taxonomyId: parsed.taxonomyId,
+            termId: parsed.termId
+        })
+        bumpChangeSeq()
+        return VouchersTaxonomyAssignmentSetOutput.parse(res)
     })
     // Recent vouchers (simple list)
     ipcMain.handle('vouchers.recent', async (_e, payload) => {
@@ -2693,6 +2803,132 @@ export function registerIpcHandlers() {
         const { reorderCustomCategories } = await import('../repositories/customCategories')
         const res = reorderCustomCategories(orderedIds)
         return res
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Dynamic Category Taxonomies (Kategorietaxonomien)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    ipcMain.handle('taxonomies.list', async (_e, payload) => {
+        const { CategoryTaxonomiesListInput, CategoryTaxonomiesListOutput } = await import('./schemas')
+        const parsed = CategoryTaxonomiesListInput.parse(payload || {})
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTaxonomiesListOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.list', parsed))
+        }
+
+        const { listCategoryTaxonomies } = await import('../repositories/categoryTaxonomies')
+        const taxonomies = listCategoryTaxonomies(parsed || {})
+        return CategoryTaxonomiesListOutput.parse({ taxonomies })
+    })
+
+    ipcMain.handle('taxonomies.create', async (_e, payload) => {
+        const { CategoryTaxonomyCreateInput, CategoryTaxonomyCreateOutput } = await import('./schemas')
+        const parsed = CategoryTaxonomyCreateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTaxonomyCreateOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.create', parsed))
+        }
+
+        const { createCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+        return CategoryTaxonomyCreateOutput.parse(createCategoryTaxonomy(parsed))
+    })
+
+    ipcMain.handle('taxonomies.update', async (_e, payload) => {
+        const { CategoryTaxonomyUpdateInput, CategoryTaxonomyUpdateOutput } = await import('./schemas')
+        const parsed = CategoryTaxonomyUpdateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTaxonomyUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.update', parsed))
+        }
+
+        const { updateCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+        return CategoryTaxonomyUpdateOutput.parse(updateCategoryTaxonomy(parsed))
+    })
+
+    ipcMain.handle('taxonomies.delete', async (_e, payload) => {
+        const { CategoryTaxonomyDeleteInput, CategoryTaxonomyDeleteOutput } = await import('./schemas')
+        const parsed = CategoryTaxonomyDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTaxonomyDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.delete', parsed))
+        }
+
+        const { deleteCategoryTaxonomy } = await import('../repositories/categoryTaxonomies')
+        return CategoryTaxonomyDeleteOutput.parse(deleteCategoryTaxonomy(parsed.id))
+    })
+
+    ipcMain.handle('taxonomies.terms.list', async (_e, payload) => {
+        const { CategoryTermsListInput, CategoryTermsListOutput } = await import('./schemas')
+        const parsed = CategoryTermsListInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTermsListOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.terms.list', parsed))
+        }
+
+        const { listCategoryTerms } = await import('../repositories/categoryTaxonomies')
+        const terms = listCategoryTerms(parsed)
+        return CategoryTermsListOutput.parse({ terms })
+    })
+
+    ipcMain.handle('taxonomies.terms.create', async (_e, payload) => {
+        const { CategoryTermCreateInput, CategoryTermCreateOutput } = await import('./schemas')
+        const parsed = CategoryTermCreateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTermCreateOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.terms.create', parsed))
+        }
+
+        const { createCategoryTerm } = await import('../repositories/categoryTaxonomies')
+        return CategoryTermCreateOutput.parse(createCategoryTerm(parsed))
+    })
+
+    ipcMain.handle('taxonomies.terms.update', async (_e, payload) => {
+        const { CategoryTermUpdateInput, CategoryTermUpdateOutput } = await import('./schemas')
+        const parsed = CategoryTermUpdateInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTermUpdateOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.terms.update', parsed))
+        }
+
+        const { updateCategoryTerm } = await import('../repositories/categoryTaxonomies')
+        return CategoryTermUpdateOutput.parse(updateCategoryTerm(parsed))
+    })
+
+    ipcMain.handle('taxonomies.terms.delete', async (_e, payload) => {
+        const { CategoryTermDeleteInput, CategoryTermDeleteOutput } = await import('./schemas')
+        const parsed = CategoryTermDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CategoryTermDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'taxonomies.terms.delete', parsed))
+        }
+
+        const { deleteCategoryTerm } = await import('../repositories/categoryTaxonomies')
+        return CategoryTermDeleteOutput.parse(deleteCategoryTerm(parsed.id))
     })
 
     // ─────────────────────────────────────────────────────────────────────────

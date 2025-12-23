@@ -52,7 +52,8 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
 
-  const categoryDisplay = voucher.categoryName || (typeof voucher.categoryId === 'number' ? `#${voucher.categoryId}` : sphereLabel)
+  // Kategorie = Custom Category (optional). If not set, show empty.
+  const categoryDisplay = voucher.categoryName || (typeof voucher.categoryId === 'number' ? `#${voucher.categoryId}` : '-')
   const categoryColor = voucher.categoryColor || null
   
   // Find earmark with color
@@ -221,7 +222,7 @@ Tags: ${tagsDisplay}`
                     {categoryDisplay}
                   </span>
                 ) : (
-                  <span>{sphereLabel}</span>
+                  <span>-</span>
                 )}
               </div>
             </div>

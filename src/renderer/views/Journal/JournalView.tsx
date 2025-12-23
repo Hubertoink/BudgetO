@@ -41,6 +41,9 @@ type VoucherRow = {
     // Multiple assignments
     budgets?: BudgetAssignment[]
     earmarksAssigned?: EarmarkAssignment[]
+
+    // Taxonomy term badges (for table display)
+    taxonomyTerms?: Array<{ taxonomyId: number; taxonomyName: string; termId: number; termName: string; termColor?: string | null }>
 }
 
 type BudgetUsageInfo = {
@@ -191,6 +194,7 @@ export default function JournalView({
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
+    const [filterTaxonomyTerm, setFilterTaxonomyTerm] = useState<null | { termId: number; taxonomyName?: string; termName?: string }>(null)
     const [q, setQ] = useState<string>('')
     
     // Use props if provided, otherwise use local state
@@ -203,6 +207,7 @@ export default function JournalView({
     const activeFilterEarmark = filterEarmarkProp !== undefined ? filterEarmarkProp : filterEarmark
     const activeFilterBudgetId = filterBudgetIdProp !== undefined ? filterBudgetIdProp : filterBudgetId
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
+    const activeFilterTaxonomyTerm = filterTaxonomyTerm
     const activeQ = qProp !== undefined ? qProp : q
     const activePage = pageProp !== undefined ? pageProp : page
     
@@ -229,6 +234,12 @@ export default function JournalView({
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
+
+    // ==================== TAXONOMIES (Voucher Edit Modal) ====================
+    const [taxonomiesForEdit, setTaxonomiesForEdit] = useState<Array<{ id: number; name: string }>>([])
+    const [taxonomyTermsById, setTaxonomyTermsById] = useState<Record<number, Array<{ id: number; name: string }>>>({})
+    const [taxonomySelectionById, setTaxonomySelectionById] = useState<Record<number, number | ''>>({})
+    const [loadingTaxonomiesForEdit, setLoadingTaxonomiesForEdit] = useState<boolean>(false)
 
     // Readonly UX: never keep edit modal open
     useEffect(() => {
@@ -351,9 +362,15 @@ export default function JournalView({
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null) })
         }
         if (activeFilterTag) list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null) })
+        if (activeFilterTaxonomyTerm?.termId) {
+            const label = activeFilterTaxonomyTerm.taxonomyName && activeFilterTaxonomyTerm.termName
+                ? `Klassifizierung: ${activeFilterTaxonomyTerm.taxonomyName} = ${activeFilterTaxonomyTerm.termName}`
+                : `Klassifizierung: #${activeFilterTaxonomyTerm.termId}`
+            list.push({ key: 'taxonomyTerm', label, clear: () => setFilterTaxonomyTerm(null) })
+        }
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, activeQ, activeSetFilterCategoryId])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, activeFilterTaxonomyTerm, earmarks, budgetNames, activeQ, activeSetFilterCategoryId, activeSetFilterTag, activeSetQ])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -374,7 +391,8 @@ export default function JournalView({
                 earmarkId: activeFilterEarmark || undefined,
                 budgetId: activeFilterBudgetId || undefined,
                 q: activeQ.trim() || undefined,
-                tag: activeFilterTag || undefined
+                tag: activeFilterTag || undefined,
+                taxonomyTermId: activeFilterTaxonomyTerm?.termId || undefined
             })
             if (res) {
                 setRows(res.rows || [])
@@ -384,7 +402,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -436,6 +454,72 @@ export default function JournalView({
             })()
         } else {
             setEditRowFiles([])
+        }
+    }, [editRow?.id, allowData])
+
+    // Load taxonomies + terms + current voucher assignments when opening edit modal
+    useEffect(() => {
+        if (!allowData || !editRow?.id) {
+            setTaxonomiesForEdit([])
+            setTaxonomyTermsById({})
+            setTaxonomySelectionById({})
+            return
+        }
+
+        let cancelled = false
+        ;(async () => {
+            setLoadingTaxonomiesForEdit(true)
+            try {
+                const resTx = await (window as any).api?.taxonomies?.list?.({ includeInactive: false })
+                const txs = ((resTx?.taxonomies || []) as Array<{ id: number; name: string }>).map((t) => ({ id: t.id, name: t.name }))
+                if (cancelled) return
+
+                if (!txs.length) {
+                    setTaxonomyTermsById({})
+                    setTaxonomySelectionById({})
+                    setTaxonomiesForEdit([])
+                    return
+                }
+
+                const listFn = (window as any).api?.vouchers?.taxonomyAssignments?.list
+                if (typeof listFn !== 'function') throw new Error('Taxonomie-API nicht verfügbar (Preload/Server nicht aktuell)')
+                const resAssign = await listFn({ voucherId: editRow.id })
+                const assignments = (resAssign?.assignments || []) as Array<{ taxonomyId: number; termId: number }>
+                const assignmentMap = new Map<number, number>(assignments.map((a) => [Number(a.taxonomyId), Number(a.termId)]))
+
+                const termsBy: Record<number, Array<{ id: number; name: string }>> = {}
+                for (const tx of txs) {
+                    // Include inactive terms so a previously assigned inactive term can still be shown.
+                    const resTerms = await (window as any).api?.taxonomies?.terms?.list?.({ taxonomyId: tx.id, includeInactive: true })
+                    const terms = (resTerms?.terms || []) as Array<{ id: number; name: string }>
+                    termsBy[tx.id] = terms.map((t) => ({ id: Number(t.id), name: t.name }))
+                }
+                if (cancelled) return
+
+                // Show taxonomies that have at least one term OR already have an assignment.
+                const txsWithTerms = txs.filter((tx) => (termsBy[tx.id] || []).length > 0 || assignmentMap.has(tx.id))
+
+                const sel: Record<number, number | ''> = {}
+                for (const tx of txsWithTerms) {
+                    const termId = assignmentMap.get(tx.id)
+                    sel[tx.id] = typeof termId === 'number' ? termId : ''
+                }
+                setTaxonomiesForEdit(txsWithTerms)
+                setTaxonomyTermsById(termsBy)
+                setTaxonomySelectionById(sel)
+            } catch (e: any) {
+                if (cancelled) return
+                notify('error', 'Taxonomien konnten nicht geladen werden: ' + friendlyError(e))
+                setTaxonomiesForEdit([])
+                setTaxonomyTermsById({})
+                setTaxonomySelectionById({})
+            } finally {
+                if (!cancelled) setLoadingTaxonomiesForEdit(false)
+            }
+        })()
+
+        return () => {
+            cancelled = true
         }
     }, [editRow?.id, allowData])
 
@@ -534,8 +618,8 @@ export default function JournalView({
 
                 <button
                     className="btn ghost"
-                    title="Batch zuweisen (Zweckbindung/Tags/Budget) auf aktuelle Filter anwenden"
-                    aria-label="Batch zuweisen (Zweckbindung/Tags/Budget)"
+                    title="Batch zuweisen (Kategorie/Zweckbindung/Tags/Budget/Taxonomien) auf aktuelle Filter anwenden"
+                    aria-label="Batch zuweisen (Kategorie/Zweckbindung/Tags/Budget/Taxonomien)"
                     onClick={() => setShowBatchEarmark(true)}
                     style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
@@ -648,6 +732,12 @@ export default function JournalView({
                             activeSetPage(1)
                             await loadRecent()
                         }}
+                        onTaxonomyTermClick={async ({ termId, termName, taxonomyName }) => {
+                            setFilterTaxonomyTerm({ termId, termName, taxonomyName })
+                            setActivePage('Buchungen')
+                            activeSetPage(1)
+                            await loadRecent()
+                        }}
                         onCategoryClick={async ({ categoryId, sphere }) => {
                             if (typeof categoryId === 'number') {
                                 activeSetFilterCategoryId(categoryId)
@@ -684,9 +774,11 @@ export default function JournalView({
                         earmarks={earmarks}
                         tagDefs={tagDefs}
                         budgets={budgetsForEdit}
+                        useCategoriesModule={useCategoriesModule}
                         currentFilters={{
                             paymentMethod: activeFilterPM || undefined,
                             sphere: activeFilterSphere || undefined,
+                            categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
                             type: activeFilterType || undefined,
                             from: activeFrom || undefined,
                             to: activeTo || undefined,
@@ -800,7 +892,31 @@ export default function JournalView({
                                         payload.netAmount = Number((editRow as any).netAmount)
                                         if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
                                     }
+                                    const vid = editRow.id
                                     const res = await window.api?.vouchers.update?.(payload)
+
+                                    // Persist taxonomy assignments (best-effort; keep modal open on failure)
+                                    if (taxonomiesForEdit.length) {
+                                        try {
+                                            const setFn = (window as any).api?.vouchers?.taxonomyAssignments?.set
+                                            if (typeof setFn !== 'function') throw new Error('Taxonomie-API nicht verfügbar (Preload/Server nicht aktuell)')
+                                            await Promise.all(
+                                                taxonomiesForEdit.map(async (tx) => {
+                                                    const v = taxonomySelectionById[tx.id]
+                                                    const termId = typeof v === 'number' ? v : null
+                                                    await setFn({
+                                                        voucherId: vid,
+                                                        taxonomyId: tx.id,
+                                                        termId
+                                                    })
+                                                })
+                                            )
+                                        } catch (e: any) {
+                                            notify('error', 'Taxonomie-Zuordnung konnte nicht gespeichert werden: ' + friendlyError(e))
+                                            return
+                                        }
+                                    }
+
                                     notify('success', 'Buchung gespeichert')
                                     const w = (res as any)?.warnings as string[] | undefined
                                     if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
@@ -1147,6 +1263,53 @@ export default function JournalView({
                                                 onChange={(tags) => setEditRow({ ...editRow, tags })}
                                                 tagDefs={tagDefs}
                                             />
+
+                                            {taxonomiesForEdit.length > 0 && (
+                                                <div className="field" style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <span>🏷️</span> Klassifizierung
+                                                    </label>
+                                                    {loadingTaxonomiesForEdit ? (
+                                                        <div className="helper">Lade Taxonomien…</div>
+                                                    ) : (
+                                                        <div style={{ 
+                                                            display: 'grid', 
+                                                            gridTemplateColumns: `repeat(auto-fit, minmax(${taxonomiesForEdit.length === 1 ? '200px' : '140px'}, 1fr))`,
+                                                            gap: 12,
+                                                            padding: '10px 12px',
+                                                            background: 'color-mix(in oklab, var(--accent) 5%, transparent)',
+                                                            borderRadius: 8,
+                                                            border: '1px solid color-mix(in oklab, var(--accent) 20%, transparent)'
+                                                        }}>
+                                                            {taxonomiesForEdit.map((tx) => {
+                                                                const terms = taxonomyTermsById[tx.id] || []
+                                                                const value = taxonomySelectionById[tx.id] ?? ''
+                                                                return (
+                                                                    <div key={tx.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                                        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)' }}>{tx.name}</label>
+                                                                        <select
+                                                                            className="input"
+                                                                            style={{ fontSize: 13, padding: '6px 8px' }}
+                                                                            value={value as any}
+                                                                            onChange={(e) => {
+                                                                                const next = e.target.value ? Number(e.target.value) : ''
+                                                                                setTaxonomySelectionById((prev) => ({ ...prev, [tx.id]: next }))
+                                                                            }}
+                                                                        >
+                                                                            <option value="">— keine —</option>
+                                                                            {terms.map((t) => (
+                                                                                <option key={t.id} value={t.id}>
+                                                                                    {t.name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

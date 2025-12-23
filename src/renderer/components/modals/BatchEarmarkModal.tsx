@@ -6,24 +6,34 @@ export interface BatchEarmarkModalProps {
   earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
   tagDefs: Array<{ id: number; name: string; color?: string | null }>
   budgets: Array<{ id: number; label: string }>
-  currentFilters: { paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; earmarkId?: number; budgetId?: number; tag?: string }
+  currentFilters: { paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; earmarkId?: number; budgetId?: number; tag?: string }
+  useCategoriesModule?: boolean
   onApplied: (updated: number) => void
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }
 
-const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks, tagDefs, budgets, currentFilters, onApplied, notify }) => {
-  const [mode, setMode] = useState<'EARMARK' | 'TAGS' | 'BUDGET'>('EARMARK')
+const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks, tagDefs, budgets, currentFilters, useCategoriesModule, onApplied, notify }) => {
+  const [mode, setMode] = useState<'EARMARK' | 'TAGS' | 'BUDGET' | 'CATEGORY' | 'TAXONOMY'>('EARMARK')
   const [earmarkId, setEarmarkId] = useState<number | ''>('')
   const [onlyWithout, setOnlyWithout] = useState<boolean>(false)
   const [tagInput, setTagInput] = useState<string>('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [budgetId, setBudgetId] = useState<number | ''>('')
+  const [categoryIdToAssign, setCategoryIdToAssign] = useState<number | ''>('')
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([])
+  const [taxonomies, setTaxonomies] = useState<Array<{ id: number; name: string }>>([])
+  const [taxonomyId, setTaxonomyId] = useState<number | null>(null)
+  const [taxonomyTerms, setTaxonomyTerms] = useState<Array<{ id: number; name: string }>>([])
+  const [taxonomyTermId, setTaxonomyTermId] = useState<number | ''>('')
   const [busy, setBusy] = useState(false)
   const [affectedCount, setAffectedCount] = useState<number | null>(null)
   const [loadingCount, setLoadingCount] = useState<boolean>(false)
   const [showConfirm, setShowConfirm] = useState<boolean>(false)
 
   const selectedEarmark = earmarks.find(e => e.id === (typeof earmarkId === 'number' ? earmarkId : -1))
+  const selectedCategory = categories.find(c => c.id === (typeof categoryIdToAssign === 'number' ? categoryIdToAssign : -1))
+  const selectedTaxonomy = taxonomies.find(t => t.id === taxonomyId) || null
+  const selectedTaxonomyTerm = taxonomyTerms.find(t => t.id === (typeof taxonomyTermId === 'number' ? taxonomyTermId : -1)) || null
   const addTag = (t: string) => {
     const v = (t || '').trim()
     if (!v) return
@@ -50,6 +60,52 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
     })()
   }, [currentFilters])
 
+  // Load categories (only when categories module is enabled)
+  React.useEffect(() => {
+    if (!useCategoriesModule) {
+      setCategories([])
+      return
+    }
+    ;(async () => {
+      try {
+        const res = await (window as any).api?.customCategories?.list?.({ includeInactive: false })
+        const rows = (res?.categories || []) as Array<{ id: number; name: string }>
+        setCategories(rows)
+      } catch {
+        setCategories([])
+      }
+    })()
+  }, [useCategoriesModule])
+
+  // Load taxonomies for dynamic batch assignment
+  React.useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await (window as any).api?.taxonomies?.list?.({ includeInactive: false })
+        const rows = (res?.taxonomies || []) as Array<{ id: number; name: string }>
+        setTaxonomies(rows)
+      } catch {
+        setTaxonomies([])
+      }
+    })()
+  }, [])
+
+  React.useEffect(() => {
+    if (taxonomyId == null) {
+      setTaxonomyTerms([])
+      return
+    }
+    ;(async () => {
+      try {
+        const res = await (window as any).api?.taxonomies?.terms?.list?.({ taxonomyId, includeInactive: false })
+        const rows = (res?.terms || []) as Array<{ id: number; name: string }>
+        setTaxonomyTerms(rows)
+      } catch {
+        setTaxonomyTerms([])
+      }
+    })()
+  }, [taxonomyId])
+
   async function run() {
     try {
       setBusy(true)
@@ -73,6 +129,21 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
         const res = await (window as any).api?.vouchers.batchAssignBudget?.(payload)
         const n = res?.updated ?? 0
         onApplied(n); onClose()
+      } else if (mode === 'CATEGORY') {
+        if (!categoryIdToAssign) { notify?.('error', 'Bitte eine Kategorie wählen'); return }
+        const payload: any = { ...currentFilters, categoryIdToAssign: Number(categoryIdToAssign) }
+        if (onlyWithout) payload.onlyWithout = true
+        const res = await (window as any).api?.vouchers.batchAssignCategory?.(payload)
+        const n = res?.updated ?? 0
+        onApplied(n); onClose()
+      } else if (mode === 'TAXONOMY') {
+        if (!taxonomyId) { notify?.('error', 'Bitte eine Taxonomie wählen'); return }
+        if (!taxonomyTermId) { notify?.('error', 'Bitte einen Begriff wählen'); return }
+        const payload: any = { ...currentFilters, taxonomyId: Number(taxonomyId), termId: Number(taxonomyTermId) }
+        if (onlyWithout) payload.onlyWithout = true
+        const res = await (window as any).api?.vouchers.batchAssignTaxonomyTerm?.(payload)
+        const n = res?.updated ?? 0
+        onApplied(n); onClose()
       }
     } catch (e: any) {
       notify?.('error', e?.message || String(e))
@@ -83,6 +154,11 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
     // Validate before showing confirmation
     if (mode === 'EARMARK' && !earmarkId) { notify?.('error', 'Bitte eine Zweckbindung wählen'); return }
     if (mode === 'BUDGET' && !budgetId) { notify?.('error', 'Bitte ein Budget wählen'); return }
+    if (mode === 'CATEGORY' && !categoryIdToAssign) { notify?.('error', 'Bitte eine Kategorie wählen'); return }
+    if (mode === 'TAXONOMY') {
+      if (!taxonomyId) { notify?.('error', 'Bitte eine Taxonomie wählen'); return }
+      if (!taxonomyTermId) { notify?.('error', 'Bitte einen Begriff wählen'); return }
+    }
     if (mode === 'TAGS') {
       const tags = selectedTags.length ? selectedTags : (tagInput || '').split(',').map(s => s.trim()).filter(Boolean)
       if (!tags.length) { notify?.('error', 'Bitte mindestens einen Tag angeben'); return }
@@ -101,9 +177,26 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Was soll zugewiesen werden?</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className={`btn ${mode === 'EARMARK' ? 'primary' : ''}`} onClick={() => setMode('EARMARK')}>Zweckbindung</button>
-              <button className={`btn ${mode === 'TAGS' ? 'primary' : ''}`} onClick={() => setMode('TAGS')}>Tags</button>
-              <button className={`btn ${mode === 'BUDGET' ? 'primary' : ''}`} onClick={() => setMode('BUDGET')}>Budget</button>
+              <button className={`btn ${mode === 'EARMARK' ? 'primary' : ''}`} onClick={() => { setMode('EARMARK'); setOnlyWithout(false) }}>Zweckbindung</button>
+              <button className={`btn ${mode === 'TAGS' ? 'primary' : ''}`} onClick={() => { setMode('TAGS'); setOnlyWithout(false) }}>Tags</button>
+              <button className={`btn ${mode === 'BUDGET' ? 'primary' : ''}`} onClick={() => { setMode('BUDGET'); setOnlyWithout(false) }}>Budget</button>
+              {useCategoriesModule ? (
+                <button className={`btn ${mode === 'CATEGORY' ? 'primary' : ''}`} onClick={() => { setMode('CATEGORY'); setOnlyWithout(false) }}>Kategorie</button>
+              ) : null}
+              {taxonomies.map(tx => (
+                <button
+                  key={tx.id}
+                  className={`btn ${mode === 'TAXONOMY' && taxonomyId === tx.id ? 'primary' : ''}`}
+                  onClick={() => {
+                    setMode('TAXONOMY')
+                    setOnlyWithout(false)
+                    setTaxonomyId(tx.id)
+                    setTaxonomyTermId('')
+                  }}
+                >
+                  {tx.name}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -189,6 +282,53 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
             </>
           )}
 
+          {mode === 'CATEGORY' && (
+            <>
+              <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                <label>Kategorie</label>
+                <select className="input" value={categoryIdToAssign as any} onChange={(e) => setCategoryIdToAssign(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">— bitte wählen —</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {!categories.length ? (
+                  <div className="helper" style={{ marginTop: 6 }}>
+                    Keine Kategorien verfügbar. Lege Kategorien in den Einstellungen unter „Kategorien“ an.
+                  </div>
+                ) : null}
+              </div>
+              <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                <label><input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} /> Nur Buchungen ohne Kategorie aktualisieren</label>
+              </div>
+            </>
+          )}
+
+          {mode === 'TAXONOMY' && (
+            <>
+              <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                <label>{selectedTaxonomy?.name || 'Taxonomie'}</label>
+                <select className="input" value={taxonomyTermId as any} onChange={(e) => setTaxonomyTermId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">— bitte wählen —</option>
+                  {taxonomyTerms.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                {!taxonomyTerms.length ? (
+                  <div className="helper" style={{ marginTop: 6 }}>
+                    Keine Begriffe verfügbar. Lege Begriffe in den Einstellungen unter „Kategorien → Kategorietaxonomien“ an.
+                  </div>
+                ) : null}
+              </div>
+              <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                <label>
+                  <input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} />{' '}
+                  Nur Buchungen ohne {selectedTaxonomy?.name || 'Wert'} aktualisieren
+                </label>
+              </div>
+            </>
+          )}
+
           <div className="card" style={{ gridColumn: '1 / span 2', padding: 10 }}>
             <div className="helper">
               {loadingCount ? 'Lade Anzahl …' : affectedCount !== null ? `${affectedCount} Buchung(en) werden von der aktuellen Filterung erfasst` : 'Anzahl konnte nicht geladen werden'}
@@ -205,12 +345,27 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
               {currentFilters.tag && <li>Tag-Filter: {currentFilters.tag}</li>}
               {onlyWithout && mode === 'EARMARK' && <li>Nur ohne bestehende Zweckbindung</li>}
               {onlyWithout && mode === 'BUDGET' && <li>Nur ohne bestehendes Budget</li>}
+              {onlyWithout && mode === 'CATEGORY' && <li>Nur ohne bestehende Kategorie</li>}
+              {onlyWithout && mode === 'TAXONOMY' && <li>Nur ohne bestehende Zuordnung: {selectedTaxonomy?.name || 'Taxonomie'}</li>}
             </ul>
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           <button className="btn" onClick={onClose}>Abbrechen</button>
-          <button className="btn primary" disabled={busy || loadingCount || (mode === 'EARMARK' && !earmarkId) || (mode === 'BUDGET' && !budgetId)} onClick={prepareConfirm}>Übernehmen</button>
+          <button
+            className="btn primary"
+            disabled={
+              busy ||
+              loadingCount ||
+              (mode === 'EARMARK' && !earmarkId) ||
+              (mode === 'BUDGET' && !budgetId) ||
+              (mode === 'CATEGORY' && !categoryIdToAssign) ||
+              (mode === 'TAXONOMY' && (!taxonomyId || !taxonomyTermId))
+            }
+            onClick={prepareConfirm}
+          >
+            Übernehmen
+          </button>
         </div>
       </div>
 
@@ -242,6 +397,16 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
                     {mode === 'BUDGET' && budgetId && (
                       <li>
                         <strong>Budget:</strong> {budgets.find(b => b.id === budgetId)?.label}
+                      </li>
+                    )}
+                    {mode === 'CATEGORY' && categoryIdToAssign && (
+                      <li>
+                        <strong>Kategorie:</strong> {selectedCategory?.name || ''}
+                      </li>
+                    )}
+                    {mode === 'TAXONOMY' && taxonomyId && taxonomyTermId && (
+                      <li>
+                        <strong>{selectedTaxonomy?.name || 'Taxonomie'}:</strong> {selectedTaxonomyTerm?.name || ''}
                       </li>
                     )}
                   </ul>

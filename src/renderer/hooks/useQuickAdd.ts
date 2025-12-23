@@ -22,6 +22,8 @@ type QA = {
     // Extended: multiple budgets/earmarks with amounts
     budgets?: BudgetAssignment[]
     earmarksAssigned?: EarmarkAssignment[]
+    // Taxonomy term selections (taxonomyId -> termId)
+    taxonomySelectionById?: Record<number, number | ''>
 }
 
 const initialQa = (today: string): QA => ({
@@ -34,7 +36,8 @@ const initialQa = (today: string): QA => ({
     description: '', 
     paymentMethod: 'BAR',
     budgets: [],
-    earmarksAssigned: []
+    earmarksAssigned: [],
+    taxonomySelectionById: {}
 })
 
 /**
@@ -143,6 +146,20 @@ export function useQuickAdd(
 
         const res = await create(payload)
         if (res) {
+            // Persist taxonomy assignments after creation (non-blocking best-effort)
+            try {
+                const voucherId = Number((res as any)?.id)
+                const sel = (qa as any)?.taxonomySelectionById as Record<number, number | ''> | undefined
+                if (voucherId && sel && typeof (window as any)?.api?.vouchers?.taxonomyAssignments?.set === 'function') {
+                    const ops = Object.entries(sel)
+                        .map(([taxonomyIdStr, termId]) => ({ taxonomyId: Number(taxonomyIdStr), termId }))
+                        .filter((x) => x.taxonomyId && typeof x.termId === 'number')
+                        .map((x) => (window as any).api.vouchers.taxonomyAssignments.set({ voucherId, taxonomyId: x.taxonomyId, termId: x.termId }))
+                    await Promise.allSettled(ops)
+                }
+            } catch {
+                // ignore
+            }
             closeModal()
         }
     }

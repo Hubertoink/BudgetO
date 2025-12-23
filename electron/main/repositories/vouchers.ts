@@ -400,9 +400,10 @@ export function listVouchersAdvancedPaged(filters: {
     budgetId?: number
     q?: string
     tag?: string
+    taxonomyTermId?: number
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag, taxonomyTermId } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
@@ -417,6 +418,11 @@ export function listVouchersAdvancedPaged(filters: {
         const like = `%${q.trim()}%`
         wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
         params.push(like, like, like, like)
+    }
+
+    if (typeof taxonomyTermId === 'number') {
+        wh.push('EXISTS (SELECT 1 FROM voucher_taxonomy_terms vtt WHERE vtt.voucher_id = v.id AND vtt.term_id = ?)')
+        params.push(taxonomyTermId)
     }
     let joinSql = ''
     if (tag) {
@@ -474,11 +480,58 @@ export function listVouchersAdvancedPaged(filters: {
     return { rows: mapped, total }
 }
 
+export type VoucherTaxonomyTermBadge = {
+    taxonomyId: number
+    taxonomyName: string
+    termId: number
+    termName: string
+    termColor?: string | null
+}
+
+export function getVoucherTaxonomyTermsForVouchers(voucherIds: number[]): Record<number, VoucherTaxonomyTermBadge[]> {
+    const d = getDb()
+    const ids = (voucherIds || []).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+    if (!ids.length) return {}
+
+    const placeholders = ids.map(() => '?').join(',')
+    const rows = d.prepare(
+        `
+        SELECT
+          vtt.voucher_id as voucherId,
+          tx.id as taxonomyId,
+          tx.name as taxonomyName,
+          t.id as termId,
+          t.name as termName,
+          t.color as termColor
+        FROM voucher_taxonomy_terms vtt
+        JOIN category_taxonomies tx ON tx.id = vtt.taxonomy_id
+        JOIN category_terms t ON t.id = vtt.term_id
+        WHERE vtt.voucher_id IN (${placeholders})
+        ORDER BY tx.sort_order ASC, tx.name COLLATE NOCASE ASC, t.sort_order ASC, t.name COLLATE NOCASE ASC
+        `
+    ).all(...ids) as any[]
+
+    const byVoucher: Record<number, VoucherTaxonomyTermBadge[]> = {}
+    for (const r of rows) {
+        const vid = Number(r.voucherId)
+        if (!byVoucher[vid]) byVoucher[vid] = []
+        byVoucher[vid].push({
+            taxonomyId: Number(r.taxonomyId),
+            taxonomyName: String(r.taxonomyName),
+            termId: Number(r.termId),
+            termName: String(r.termName),
+            termColor: r.termColor ?? null
+        })
+    }
+    return byVoucher
+}
+
 // Batch-assign an earmarkId to vouchers matching filters
 export function batchAssignEarmark(params: {
     earmarkId: number
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -490,6 +543,7 @@ export function batchAssignEarmark(params: {
     const args: any[] = []
     if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
+    if (typeof params.categoryId === 'number') { wh.push('category_id = ?'); args.push(params.categoryId) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
@@ -530,6 +584,7 @@ export function batchAssignBudget(params: {
     budgetId: number
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -541,6 +596,7 @@ export function batchAssignBudget(params: {
     const args: any[] = []
     if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
+    if (typeof params.categoryId === 'number') { wh.push('category_id = ?'); args.push(params.categoryId) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
@@ -579,6 +635,7 @@ export function batchAssignTags(params: {
     tags: string[]
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
@@ -589,6 +646,7 @@ export function batchAssignTags(params: {
     const args: any[] = []
     if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
+    if (typeof params.categoryId === 'number') { wh.push('category_id = ?'); args.push(params.categoryId) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
@@ -641,6 +699,58 @@ export function batchAssignTags(params: {
         )
     }
     
+    return { updated }
+}
+
+// Batch-assign a custom categoryId to vouchers matching filters
+export function batchAssignCategory(params: {
+    categoryIdToAssign: number
+    paymentMethod?: 'BAR' | 'BANK'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
+    type?: 'IN' | 'OUT' | 'TRANSFER'
+    from?: string
+    to?: string
+    q?: string
+    onlyWithout?: boolean
+}) {
+    const d = getDb()
+    const wh: string[] = []
+    const args: any[] = []
+    if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
+    if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
+    if (typeof params.categoryId === 'number') { wh.push('category_id = ?'); args.push(params.categoryId) }
+    if (params.type) { wh.push('type = ?'); args.push(params.type) }
+    if (params.from) { wh.push('date >= ?'); args.push(params.from) }
+    if (params.to) { wh.push('date <= ?'); args.push(params.to) }
+    if (params.q && params.q.trim()) {
+        const like = `%${params.q.trim()}%`
+        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+        args.push(like, like, like, like)
+    }
+    if (params.onlyWithout) wh.push('category_id IS NULL')
+    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+
+    // Validate category exists and active
+    const cat = d.prepare('SELECT id, is_active as isActive FROM custom_categories WHERE id=?').get(params.categoryIdToAssign) as any
+    if (!cat) throw new Error('Kategorie nicht gefunden')
+    if (!cat.isActive) throw new Error('Kategorie ist inaktiv und kann nicht verwendet werden')
+
+    const res = d.prepare(`UPDATE vouchers SET category_id = ?${whereSql}`).run(params.categoryIdToAssign, ...args)
+    const updated = Number(res.changes || 0)
+
+    if (updated > 0) {
+        const info = d.prepare('SELECT name FROM custom_categories WHERE id=?').get(params.categoryIdToAssign) as any
+        writeAudit(
+            d,
+            null,
+            'VOUCHER',
+            0,
+            'BATCH_ASSIGN_CATEGORY',
+            { categoryId: params.categoryIdToAssign, categoryName: info?.name, count: updated, filters: params }
+        )
+    }
+
     return { updated }
 }
 
