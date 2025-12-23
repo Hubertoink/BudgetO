@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react'
-import { useAuth, UserRole } from '../../context/AuthContext'
+import { useAuth } from '../../context/authHooks'
+import type { UserRole } from '../../context/authTypes'
 import { NetworkStatus } from './NetworkStatus'
 
 const ROLE_COLORS: Record<UserRole, string> = {

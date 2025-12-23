@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useAuth, UserRole } from '../../../context/AuthContext'
+import { useAuth } from '../../../context/authHooks'
+import type { UserRole } from '../../../context/authTypes'
 
 interface User {
   id: number

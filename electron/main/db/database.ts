@@ -7,7 +7,6 @@ import { applyMigrations } from './migrations'
 const require = createRequire(import.meta.url)
 let BetterSqlite3: any
 try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     BetterSqlite3 = require('better-sqlite3')
 } catch (e) {
     BetterSqlite3 = null

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authHooks'
 
 type Binding = {
   id: number

@@ -4,8 +4,8 @@ import JournalTable from './components/JournalTable'
 import BatchEarmarkModal from '../../components/modals/BatchEarmarkModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
-import { useModules } from '../../context/ModuleContext'
-import { useAuth } from '../../context/AuthContext'
+import { useModules } from '../../context/moduleHooks'
+import { useAuth } from '../../context/authHooks'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }

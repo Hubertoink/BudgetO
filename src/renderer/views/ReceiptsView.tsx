@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/authHooks'
 
 export default function ReceiptsView() {
     const { authEnforced, isAuthenticated } = useAuth()

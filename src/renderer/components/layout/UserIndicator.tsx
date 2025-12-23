@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useAuth, UserRole } from '../../context/AuthContext'
+import { useAuth } from '../../context/authHooks'
+import type { UserRole } from '../../context/authTypes'
 
 const ROLE_COLORS: Record<UserRole, string> = {
   ADMIN: '#dc2626',

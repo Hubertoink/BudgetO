@@ -2,8 +2,8 @@ import React, { useMemo } from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
 import type { NavKey } from '../../utils/navItems'
-import { useModules } from '../../context/ModuleContext'
-import { useAuth } from '../../context/AuthContext'
+import { useModules } from '../../context/moduleHooks'
+import { useAuth } from '../../context/authHooks'
 
 interface SideNavProps {
   activePage: NavKey

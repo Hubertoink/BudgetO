@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useIsModuleEnabled } from '../../context/ModuleContext'
+import { useIsModuleEnabled } from '../../context/moduleHooks'
 import BudgetOverviewWidget from './widgets/BudgetOverviewWidget'
 import HonorariaWidget from './widgets/HonorariaWidget'
 import CashAdvancesWidget from './widgets/CashAdvancesWidget'

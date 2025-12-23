@@ -1,33 +1,5 @@
 import React from 'react'
-
-// Zentrale Icon-Definitionen für die gesamte App
-// Verhindert Encoding-Probleme und macht Icons wartbar
-
-// String-Icons (für Text-Kontext)
-export const ICONS = {
-    // Platzhalter & Symbole
-    EMPTY: '−',  // Minus-Zeichen für leere Werte
-    DASH: '–',   // En-dash
-    ARROW_RIGHT: '→',
-    ARROW_UP: '↑',
-    ARROW_DOWN: '↓',
-    ARROW_BOTH: '↕',
-    ELLIPSIS: '…',
-    BULLET: '·',  // Middle dot für Trennung
-    
-    // Bearbeitung & Aktionen
-    EDIT: '✎',
-    DELETE: '🗑',
-    ADD: '+',
-    SAVE: '💾',
-    CANCEL: '✖',
-    
-    // Status
-    CHECK: '✓',
-    CROSS: '✗',
-    WARNING: '⚠',
-    INFO: 'ℹ',
-} as const
+import { ICONS } from './icons.constants'
 
 // React Icon-Komponenten
 export const IconBank = ({ size = 14 }: { size?: number }) => (
@@ -55,14 +27,6 @@ export const IconArrow = ({ size = 14 }: { size?: number }) => (
     </svg>
 )
 
-// Helper-Funktion für Platzhalter-Text
-export function emptyValue(value: any): string {
-    if (value === null || value === undefined || value === '') {
-        return ICONS.EMPTY
-    }
-    return String(value)
-}
-
 // Helper für Zahlweg-Icons (React)
 export function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     if (method === 'BANK') return <IconBank size={size} />
@@ -79,11 +43,4 @@ export function TransferDisplay({ from, to, size = 14 }: { from: 'BAR' | 'BANK' 
             {to === 'BAR' ? <IconCash size={size} /> : to === 'BANK' ? <IconBank size={size} /> : ICONS.EMPTY}
         </span>
     )
-}
-
-// Helper für Transfer-Anzeige als String (für Zusammenfassung)
-export function transferDisplayString(from: 'BAR' | 'BANK' | null | undefined, to: 'BAR' | 'BANK' | null | undefined): string {
-    const fromStr = from || ICONS.EMPTY
-    const toStr = to || ICONS.EMPTY
-    return `${fromStr} ${ICONS.ARROW_RIGHT} ${toStr}`
 }

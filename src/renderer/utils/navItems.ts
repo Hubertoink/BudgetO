@@ -1,4 +1,4 @@
-import type { ModuleKey } from '../context/ModuleContext'
+import type { ModuleKey } from '../context/moduleTypes'
 
 export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Übungsleiter' | 'Barvorschüsse' | 'Belege' | 'Reports' | 'Einstellungen'
 

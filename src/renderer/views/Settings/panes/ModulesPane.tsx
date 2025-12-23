@@ -1,5 +1,6 @@
-import { useModules, ModuleInfo } from '../../../context/ModuleContext'
-import { useAuth } from '../../../context/AuthContext'
+import { useModules } from '../../../context/moduleHooks'
+import type { ModuleInfo } from '../../../context/moduleTypes'
+import { useAuth } from '../../../context/authHooks'
 
 /**
  * ModulesPane - Settings pane for enabling/disabling BudgetO modules

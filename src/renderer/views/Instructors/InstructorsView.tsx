@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
-import { useToast } from '../../context/ToastContext'
-import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/toastHooks'
+import { useAuth } from '../../context/authHooks'
 
 type InstructorStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'
 

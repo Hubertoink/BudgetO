@@ -12,8 +12,8 @@ import { ModulesPane } from './panes/ModulesPane'
 import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
-import { useAuth } from '../../context/AuthContext'
-import { useModules } from '../../context/ModuleContext'
+import { useAuth } from '../../context/authHooks'
+import { useModules } from '../../context/moduleHooks'
 
 /**
  * SettingsView - Main Settings Container

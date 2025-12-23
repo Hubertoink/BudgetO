@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
-
-type ToastType = 'info' | 'success' | 'warn' | 'error'
+import React, { useState, useCallback, useRef } from 'react'
+import { ToastContext } from './toastContextStore'
+import type { ToastAction, ToastType } from './toastTypes'
 
 interface Toast {
   id: number
@@ -10,12 +10,6 @@ interface Toast {
   leaving?: boolean
 }
 
-interface ToastContextValue {
-  notify: (type: ToastType, text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null)
-
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(0)
@@ -23,7 +17,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const EXIT_MS = 220
 
   const notify = useCallback(
-    (type: ToastType, text: string, ms = 4000, action?: { label: string; onClick: () => void }) => {
+    (type: ToastType, text: string, ms = 4000, action?: ToastAction) => {
       const now = Date.now()
       const last = lastToastRef.current
       if (last && last.type === type && last.text === text && now - last.at < 800) {
@@ -67,10 +61,4 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       </div>
     </ToastContext.Provider>
   )
-}
-
-export const useToast = () => {
-  const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
 }

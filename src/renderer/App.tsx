@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ICONS } from './utils/icons'
+import { ICONS } from './utils/icons.constants'
 import ReportsView from './views/Reports/ReportsView'
 import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
@@ -28,10 +28,14 @@ import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
 import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
 import { useQuickAdd } from './hooks/useQuickAdd'
-import { ToastProvider, useToast } from './context/ToastContext'
-import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences'
-import { ModuleProvider, useModules } from './context/ModuleContext'
-import { AuthProvider, useAuth, useRequireAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
+import { useToast } from './context/toastHooks'
+import { UIPreferencesProvider } from './context/UIPreferences'
+import { useUIPreferences } from './context/uiPreferencesHooks'
+import { ModuleProvider } from './context/ModuleContext'
+import { useModules } from './context/moduleHooks'
+import { AuthProvider } from './context/AuthContext'
+import { useAuth, useRequireAuth } from './context/authHooks'
 import LoginModal from './components/auth/LoginModal'
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
@@ -836,7 +840,6 @@ function AppInner() {
     useEffect(() => {
         // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
         if (activePage === 'Buchungen') { loadBindings(); loadBudgets() }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activePage])
 
     // (earmarks loaded above)

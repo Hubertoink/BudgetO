@@ -1,6 +1,6 @@
 ﻿ 
 import React, { useEffect, useMemo, useState } from 'react'
-import type { ModuleInfo, ModuleKey } from '../../context/ModuleContext'
+import type { ModuleInfo, ModuleKey } from '../../context/moduleTypes'
 
 type NavLayout = 'left' | 'top'
 type NavIconColorMode = 'color' | 'mono'
@@ -155,7 +155,6 @@ export default function SetupWizardModal({
         const init: Record<string, boolean> = {}
         for (const c of suggestedCategories) init[c.name] = !existingCategorySet.has(c.name.toLowerCase())
         setSelectedCategories(init)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [suggestedCategories, existingCategorySet.size])
 
     const [customTag, setCustomTag] = useState<string>('')

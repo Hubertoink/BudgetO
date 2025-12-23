@@ -1,42 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { useState, useEffect, useCallback, ReactNode } from 'react'
+import type { ModuleInfo, ModuleKey } from './moduleTypes'
+import { ModuleContext } from './moduleContextStore'
+import type { ModuleContextValue } from './moduleContextStore'
 
 /**
  * BudgetO Module System - React Context
  * Provides module state management across the application
  */
-
-export type ModuleKey = 
-  | 'budgets' 
-  | 'instructors' 
-  | 'cash-advance' 
-  | 'excel-import' 
-  | 'members' 
-  | 'earmarks' 
-  | 'invoices'
-  | 'custom-categories'
-
-export interface ModuleInfo {
-  key: ModuleKey
-  name: string
-  description: string
-  icon: string
-  navKey?: string
-  enabled: boolean
-  displayOrder: number
-  configJson?: string | null
-}
-
-interface ModuleContextValue {
-  modules: ModuleInfo[]
-  enabledModules: ModuleKey[]
-  loading: boolean
-  error: string | null
-  isModuleEnabled: (key: ModuleKey) => boolean
-  setModuleEnabled: (key: ModuleKey, enabled: boolean) => Promise<void>
-  refreshModules: () => Promise<void>
-}
-
-const ModuleContext = createContext<ModuleContextValue | undefined>(undefined)
 
 export function ModuleProvider({ children }: { children: ReactNode }) {
   const [modules, setModules] = useState<ModuleInfo[]>([])
@@ -122,34 +92,4 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       {children}
     </ModuleContext.Provider>
   )
-}
-
-export function useModules(): ModuleContextValue {
-  const context = useContext(ModuleContext)
-  if (!context) {
-    throw new Error('useModules must be used within a ModuleProvider')
-  }
-  return context
-}
-
-/**
- * Hook to check if a specific module is enabled
- */
-export function useIsModuleEnabled(key: ModuleKey): boolean {
-  const { isModuleEnabled } = useModules()
-  return isModuleEnabled(key)
-}
-
-/**
- * Mapping from ModuleKey to NavKey for navigation
- */
-export const MODULE_NAV_MAP: Record<ModuleKey, string | undefined> = {
-  'budgets': 'Budgets',
-  'instructors': 'Übungsleiter',
-  'cash-advance': 'Barvorschüsse',
-  'excel-import': undefined,
-  'members': 'Mitglieder',
-  'earmarks': 'Zweckbindungen',
-  'invoices': 'Verbindlichkeiten',
-  'custom-categories': undefined
 }

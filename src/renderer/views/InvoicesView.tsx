@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useToast } from '../context/ToastContext'
+import { useToast } from '../context/toastHooks'
 import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/authHooks'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {

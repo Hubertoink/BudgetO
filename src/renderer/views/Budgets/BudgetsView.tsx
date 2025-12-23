@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import BudgetModal from '../../components/modals/BudgetModal'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authHooks'
 
 type Budget = {
   id: number

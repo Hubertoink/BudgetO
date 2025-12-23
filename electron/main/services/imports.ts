@@ -255,7 +255,7 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
     const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
     const track = (row: number, ok: boolean, message?: string) => { if (rowStatuses.length < 1000) rowStatuses.push({ row, ok, message }) }
     void mapping
-    const sphere: 'IDEELL' = 'IDEELL'
+    const sphere = 'IDEELL' as const
 
     let row = 2 // pretend header at 1
     for (const e of entries) {
@@ -493,7 +493,7 @@ export async function executeXlsx(
             const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
             // BudgetO: Sphäre is no longer a user-facing concept.
             // Keep a stable internal default to satisfy the vouchers schema.
-            const sphere: 'IDEELL' = 'IDEELL'
+            const sphere = 'IDEELL' as const
             const description = get('description') != null ? String(get('description')) : undefined
             const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
             let netAmount = parseNumber(get('netAmount'))

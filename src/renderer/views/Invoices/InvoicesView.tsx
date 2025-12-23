@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useToast } from '../../context/ToastContext'
+import { useToast } from '../../context/toastHooks'
 
 // Local copy of contrastText (could be centralized later)
 function contrastText(bg?: string | null) {

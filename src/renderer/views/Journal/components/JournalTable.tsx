@@ -1,5 +1,6 @@
 ﻿import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay } from '../../../utils/icons'
+import { IconBank, IconCash, IconArrow, TransferDisplay } from '../../../utils/icons'
+import { ICONS } from '../../../utils/icons.constants'
 
 // Helper function for contrast text color
 function contrastText(bg?: string | null) {

@@ -1,7 +1,7 @@
 import React from 'react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
-import { useAuth } from '../../../context/AuthContext'
+import { useAuth } from '../../../context/authHooks'
 
 /**
  * TagsPane - Tag Management

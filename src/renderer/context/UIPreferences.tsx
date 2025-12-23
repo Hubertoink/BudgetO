@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
-
-type NavLayout = 'top' | 'left'
-type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
-type NavIconColorMode = 'color' | 'mono'
-type DateFormat = 'de' | 'iso'
-type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
+import React, { useState, useEffect, useRef } from 'react'
+import { UIPreferencesContext } from './uiPreferencesContextStore'
+import type {
+  BackgroundImage,
+  ColorTheme,
+  DateFormat,
+  JournalRowDensity,
+  JournalRowStyle,
+  NavIconColorMode,
+  NavLayout,
+  UIPreferencesContextValue
+} from './uiPreferencesTypes'
 
 const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'mountain-clouds', 'snowy-landscape', 'snow-houses']
 
@@ -17,29 +20,6 @@ const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 
 function isValidTheme(theme: string | null | undefined): theme is ColorTheme {
   return !!theme && VALID_THEMES.includes(theme as ColorTheme)
 }
-
-interface UIPreferencesContextValue {
-  navLayout: NavLayout
-  setNavLayout: (val: NavLayout) => void
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (val: boolean) => void
-  colorTheme: ColorTheme
-  setColorTheme: (val: ColorTheme) => void
-  navIconColorMode: NavIconColorMode
-  setNavIconColorMode: (val: NavIconColorMode) => void
-  dateFormat: DateFormat
-  setDateFormat: (val: DateFormat) => void
-  journalRowStyle: JournalRowStyle
-  setJournalRowStyle: (val: JournalRowStyle) => void
-  journalRowDensity: JournalRowDensity
-  setJournalRowDensity: (val: JournalRowDensity) => void
-  backgroundImage: BackgroundImage
-  setBackgroundImage: (val: BackgroundImage) => void
-  glassModals: boolean
-  setGlassModals: (val: boolean) => void
-}
-
-const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(null)
 
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [navLayout, setNavLayout] = useState<NavLayout>(() => {
@@ -235,10 +215,4 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       {children}
     </UIPreferencesContext.Provider>
   )
-}
-
-export const useUIPreferences = () => {
-  const ctx = useContext(UIPreferencesContext)
-  if (!ctx) throw new Error('useUIPreferences must be used within UIPreferencesProvider')
-  return ctx
 }

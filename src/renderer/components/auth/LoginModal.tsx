@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/authHooks'
 import './LoginModal.css'
 
 // Resolve app icon and background image for the login screen

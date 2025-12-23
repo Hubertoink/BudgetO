@@ -1,8 +1,8 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../../components/ModalHeader'
-import { useAuth } from '../../../context/AuthContext'
-import { ICONS } from '../../../utils/icons'
+import { useAuth } from '../../../context/authHooks'
+import { ICONS } from '../../../utils/icons.constants'
 
 interface CustomCategory {
   id: number

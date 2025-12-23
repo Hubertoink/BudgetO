@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
-import { useToast } from '../../context/ToastContext'
-import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/toastHooks'
+import { useAuth } from '../../context/authHooks'
 
 type CashAdvanceStatus = 'OPEN' | 'RESOLVED' | 'OVERDUE'
 

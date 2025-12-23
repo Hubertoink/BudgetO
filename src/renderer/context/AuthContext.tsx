@@ -1,49 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import React, { useState, useEffect, useCallback, ReactNode } from 'react'
+import type { User } from './authTypes'
+import { AuthContext, TOKEN_STORAGE_KEY, USER_STORAGE_KEY } from './authContextStore'
+import type { AuthContextValue } from './authContextStore'
 
 /**
  * BudgetO Authentication Context
  * Provides user authentication state and authorization helpers
  */
-
-export type UserRole = 'ADMIN' | 'KASSE' | 'READONLY'
-
-export interface User {
-  id: number
-  name: string
-  username: string | null
-  email: string | null
-  role: UserRole
-  isActive: boolean
-  lastLogin: string | null
-}
-
-interface AuthContextValue {
-  // State
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  authRequired: boolean
-  authEnforced: boolean
-  
-  // Actions
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
-  refreshUser: () => Promise<void>
-  
-  // Authorization helpers
-  canWrite: boolean
-  canManageUsers: boolean
-  canAccessSettings: boolean
-  isAdmin: boolean
-  isKassier: boolean
-  isReadonly: boolean
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-
-// Storage key for persisting user session
-const USER_STORAGE_KEY = 'budgeto_current_user'
-const TOKEN_STORAGE_KEY = 'budgeto_auth_token'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -302,34 +265,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
-}
-
-/**
- * Hook to require authentication - redirects to login if not authenticated
- */
-export function useRequireAuth(): { isAuthenticated: boolean; isLoading: boolean } {
-  const { isAuthenticated, isLoading, authEnforced } = useAuth()
-  
-  // If auth is not required, always return authenticated
-  if (!authEnforced) {
-    return { isAuthenticated: true, isLoading }
-  }
-  
-  return { isAuthenticated, isLoading }
-}
-
-/**
- * Hook to check write permission - for use in components that modify data
- */
-export function useCanWrite(): boolean {
-  const { canWrite, isAuthenticated } = useAuth()
-  return isAuthenticated && canWrite
 }
