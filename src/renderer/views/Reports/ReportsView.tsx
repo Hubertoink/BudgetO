@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { VoucherType, PaymentMethod } from '../../components/reports/types'
+import ReportsAnnualBudget from '../../components/reports/ReportsAnnualBudget'
 import ReportsSummary from '../../components/reports/ReportsSummary'
 import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsCategoryDonut from '../../components/reports/ReportsCategoryDonut'
@@ -25,6 +26,17 @@ export default function ReportsView(props: {
 
   const hasActiveFilters = filterType || filterPM || from || to
 
+  // Derive selected year from date filters (only when full year is selected)
+  const selectedYear = useMemo(() => {
+    if (!from || !to) return null
+    const fy = from.slice(0, 4)
+    const ty = to.slice(0, 4)
+    if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) {
+      return Number(fy)
+    }
+    return null
+  }, [from, to])
+
   return (
     <>
       <div className="card" style={{ padding: 12 }}>
@@ -33,13 +45,7 @@ export default function ReportsView(props: {
           <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 140 }} />
           <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 140 }} />
           <span style={{ color: 'var(--text-dim)' }}>Jahr:</span>
-          <select className="input" value={(() => {
-            if (!from || !to) return ''
-            const fy = from.slice(0, 4)
-            const ty = to.slice(0, 4)
-            if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) return fy
-            return ''
-          })()} onChange={(e) => {
+          <select className="input" value={selectedYear?.toString() ?? ''} onChange={(e) => {
             const y = e.target.value
             if (!y) return
             const yr = Number(y)
@@ -74,6 +80,9 @@ export default function ReportsView(props: {
           </button>
         </div>
       </div>
+
+      {/* Annual Budget Overview - only when a full year is selected */}
+      <ReportsAnnualBudget year={selectedYear} refreshKey={refreshKey} />
 
       {/* KPIs and charts */}
       <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />

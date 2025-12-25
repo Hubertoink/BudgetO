@@ -612,8 +612,15 @@ function AppInner() {
     const [filterTag, setFilterTag] = useState<string | null>(null)
     const [q, setQ] = useState<string>('')
     // Reports filter states (separate to avoid interference with Buchungen)
-    const [reportsFrom, setReportsFrom] = useState<string>('')
-    const [reportsTo, setReportsTo] = useState<string>('')
+    // Default to current year
+    const [reportsFrom, setReportsFrom] = useState<string>(() => {
+        const y = new Date().getFullYear()
+        return `${y}-01-01`
+    })
+    const [reportsTo, setReportsTo] = useState<string>(() => {
+        const y = new Date().getFullYear()
+        return `${y}-12-31`
+    })
     const [reportsFilterSphere, setReportsFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
     const [reportsFilterType, setReportsFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [reportsFilterPM, setReportsFilterPM] = useState<'BAR' | 'BANK' | null>(null)
