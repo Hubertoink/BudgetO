@@ -1385,3 +1385,10 @@ export function getVoucherEarmarkTotal(voucherId: number): number {
         .get(voucherId) as { total: number }
     return row.total
 }
+
+/** Get list of category IDs that are used in at least one voucher */
+export function getUsedCategoryIds(): number[] {
+    const d = getDb()
+    const rows = d.prepare('SELECT DISTINCT category_id FROM vouchers WHERE category_id IS NOT NULL').all() as { category_id: number }[]
+    return rows.map(r => r.category_id)
+}

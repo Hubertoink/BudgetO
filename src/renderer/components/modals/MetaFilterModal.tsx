@@ -2,20 +2,21 @@ import React, { useEffect, useState } from 'react'
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 
-export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, earmarkId, budgetId, onApply }: {
+export default function MetaFilterModal({ open, onClose, budgets, earmarks, categories, categoryId, earmarkId, budgetId, onApply }: {
   open: boolean
   onClose: () => void
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
   earmarks: Array<{ id: number; code: string; name?: string | null }>
-  sphere: Sphere
+  categories: Array<{ id: number; name: string; color?: string | null }>
+  categoryId: number | null
   earmarkId: number | null
   budgetId: number | null
-  onApply: (v: { sphere: Sphere; earmarkId: number | null; budgetId: number | null }) => void
+  onApply: (v: { categoryId: number | null; earmarkId: number | null; budgetId: number | null }) => void
 }) {
-  const [s, setS] = useState<Sphere>(sphere)
+  const [c, setC] = useState<number | null>(categoryId)
   const [e, setE] = useState<number | null>(earmarkId)
   const [b, setB] = useState<number | null>(budgetId)
-  useEffect(() => { setS(sphere); setE(earmarkId); setB(budgetId) }, [sphere, earmarkId, budgetId, open])
+  useEffect(() => { setC(categoryId); setE(earmarkId); setB(budgetId) }, [categoryId, earmarkId, budgetId, open])
   const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
     (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
   if (!open) return null
@@ -28,13 +29,12 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
         </header>
         <div className="row">
           <div className="field">
-            <label>Sphäre</label>
-            <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
+            <label>Kategorie</label>
+            <select className="input" value={c ?? ''} onChange={(ev) => setC(ev.target.value ? Number(ev.target.value) : null)}>
               <option value="">Alle</option>
-              <option value="IDEELL">IDEELL</option>
-              <option value="ZWECK">ZWECK</option>
-              <option value="VERMOEGEN">VERMOEGEN</option>
-              <option value="WGB">WGB</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
             </select>
           </div>
           <div className="field">
@@ -57,10 +57,10 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-          <button className="btn" onClick={() => { setS(null); setE(null); setB(null) }}>Zurücksetzen</button>
+          <button className="btn" onClick={() => { setC(null); setE(null); setB(null) }}>Zurücksetzen</button>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={onClose}>Abbrechen</button>
-            <button className="btn primary" onClick={() => { onApply({ sphere: s, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
+            <button className="btn primary" onClick={() => { onApply({ categoryId: c, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
           </div>
         </div>
       </div>

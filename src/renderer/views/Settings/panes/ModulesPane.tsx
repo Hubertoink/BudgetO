@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useModules } from '../../../context/moduleHooks'
 import type { ModuleInfo, ModuleKey } from '../../../context/moduleTypes'
 import { useAuth } from '../../../context/authHooks'
@@ -10,6 +10,24 @@ import { navItems } from '../../../utils/navItems'
 export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
   const { canWrite } = useAuth()
   const { modules, loading, setModuleEnabled } = useModules()
+  const paneRef = useRef<HTMLDivElement | null>(null)
+
+  const captureAndRestoreScroll = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const scrollEl = (paneRef.current?.closest('.app-main') as HTMLElement | null) || (document.querySelector('.app-main') as HTMLElement | null)
+    const before = scrollEl?.scrollTop ?? 0
+    try {
+      return await fn()
+    } finally {
+      if (!scrollEl) return
+      // Restore after React has a chance to commit layout changes.
+      requestAnimationFrame(() => {
+        scrollEl.scrollTop = before
+        requestAnimationFrame(() => {
+          scrollEl.scrollTop = before
+        })
+      })
+    }
+  }
 
   const moduleOrder = useMemo(() => {
     const order = new Map<ModuleKey, number>()
@@ -41,7 +59,7 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
   const handleToggle = async (mod: ModuleInfo) => {
     if (!canWrite) return
     try {
-      await setModuleEnabled(mod.key, !mod.enabled)
+      await captureAndRestoreScroll(() => setModuleEnabled(mod.key, !mod.enabled))
       notify('success', `${mod.name} ${!mod.enabled ? 'aktiviert' : 'deaktiviert'}`, 2000)
     } catch (e: any) {
       notify('error', e?.message || 'Fehler beim Ändern des Moduls')
@@ -58,7 +76,7 @@ export function ModulesPane({ notify }: { notify: (type: 'success' | 'error' | '
   }
 
   return (
-    <div className="pane-section">
+    <div className="pane-section" ref={paneRef}>
       <h2>Module</h2>
       <p className="helper" style={{ marginBottom: 16 }}>
         Aktiviere oder deaktiviere Funktionsmodule nach Bedarf. 

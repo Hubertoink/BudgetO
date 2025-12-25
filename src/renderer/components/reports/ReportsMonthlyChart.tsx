@@ -82,32 +82,51 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return () => { cancelled = true }
   }, [props.from, props.to, props.paymentMethod, props.refreshKey])
 
-  // Budgetstart: annual budget amount for the selected year (if set).
+  const chartYear = useMemo(() => {
+    const fy = props.from?.slice(0, 4)
+    const ty = props.to?.slice(0, 4)
+    if (fy && ty && fy === ty) {
+      const y = Number(fy)
+      return Number.isFinite(y) ? y : null
+    }
+
+    // No (single-year) range selected: infer year from available bucket data
+    const yearSet = new Set<string>()
+    for (const b of inBuckets) yearSet.add(String(b.month).slice(0, 4))
+    for (const b of outBuckets) yearSet.add(String(b.month).slice(0, 4))
+    if (yearSet.size === 1) {
+      const y = Number(Array.from(yearSet)[0])
+      return Number.isFinite(y) ? y : null
+    }
+
+    return null
+  }, [props.from, props.to, inBuckets, outBuckets])
+
+  // Budgetstart: annual budget amount for the chart year (if determinable).
   useEffect(() => {
     let cancelled = false
-    const from = props.from
-    if (!from) {
+
+    const year = chartYear
+    if (!year || year < 1900) {
       setOpeningBalance(0)
-      return
+      return () => { cancelled = true }
     }
-    const year = Number(String(from).slice(0, 4))
-    if (!Number.isFinite(year) || year < 1900) {
-      setOpeningBalance(0)
-      return
-    }
+
     const p = (window as any).api?.annualBudgets?.get?.({ year, costCenterId: null })
     if (!p || typeof p.then !== 'function') {
       setOpeningBalance(0)
-      return
+      return () => { cancelled = true }
     }
+
     p.then((budget: any) => {
       if (cancelled) return
       setOpeningBalance(Number(budget?.amount) || 0)
     }).catch(() => {
       if (!cancelled) setOpeningBalance(0)
     })
+
     return () => { cancelled = true }
-  }, [props.from, props.refreshKey])
+  }, [chartYear, props.refreshKey])
 
   // Build the X-axis months based on filters
   // - With explicit from/to: show full continuous range (all months)
@@ -257,12 +276,13 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             if (idx == null || !series[idx]) return null
             const s = series[idx]
             const net = s.inGross + s.outGross
+            const monthStart = idx === 0 ? openingBalance : (saldo[idx - 1] || 0)
             const gx = xFor(idx) + barW
             const tooltipX = (gx / width) * 100
             return (
               <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)} {s.month.slice(0, 4)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--text-dim)' }}>Budgetstart</span> <strong style={{ color: 'var(--text-dim)' }}>{eurFmt.format(openingBalance || 0)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--text-dim)' }}>Budgetstart</span> <strong style={{ color: 'var(--text-dim)' }}>{eurFmt.format(monthStart)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>

@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
         reverse: (payload: any) => cleanInvoke('vouchers.reverse', payload),
         list: (payload?: any) => ipcRenderer.invoke('vouchers.list', payload),
         recent: (payload?: any) => ipcRenderer.invoke('vouchers.recent', payload),
+        usedCategoryIds: () => ipcRenderer.invoke('vouchers.usedCategoryIds'),
         update: (payload: any) => cleanInvoke('vouchers.update', payload),
         delete: (payload: any) => ipcRenderer.invoke('vouchers.delete', payload),
         batchAssignEarmark: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignEarmark', payload),

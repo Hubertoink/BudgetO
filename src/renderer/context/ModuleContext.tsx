@@ -66,11 +66,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         return
       }
       await (window as any).api?.modules?.setEnabled?.({ moduleKey: key, enabled })
-      // Optimistic update
+      // Optimistic update – no need to dispatch modules-changed here since the
+      // context state already reflects the change and consumers re-render via context.
+      // Dispatching the event triggers loadModules() which sets loading=true and
+      // causes the ModulesPane list to unmount briefly, losing scroll position.
       setModules(prev => prev.map(m => 
         m.key === key ? { ...m, enabled } : m
       ))
-      window.dispatchEvent(new Event('modules-changed'))
     } catch (e: any) {
       console.error('Failed to update module:', e)
       throw e

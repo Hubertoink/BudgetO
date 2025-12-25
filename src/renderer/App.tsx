@@ -171,6 +171,32 @@ function AppInner() {
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [useCategoriesModule])
+
+    // Categories that are actually used in vouchers (for filter dropdown)
+    const [usedCategoryIds, setUsedCategoryIds] = useState<number[]>([])
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await (window as any).api?.vouchers?.usedCategoryIds?.()
+                if (!cancelled) setUsedCategoryIds(Array.isArray(res?.ids) ? res.ids : [])
+            } catch { if (!cancelled) setUsedCategoryIds([]) }
+        })()
+        const onChanged = async () => {
+            try {
+                const res = await (window as any).api?.vouchers?.usedCategoryIds?.()
+                setUsedCategoryIds(Array.isArray(res?.ids) ? res.ids : [])
+            } catch { setUsedCategoryIds([]) }
+        }
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+
+    // Categories filtered to only those used in vouchers
+    const usedCategories = useMemo(() => {
+        if (usedCategoryIds.length === 0) return []
+        return customCategories.filter(c => usedCategoryIds.includes(c.id))
+    }, [customCategories, usedCategoryIds])
     
     // Use UI preferences context
     const {
@@ -1167,16 +1193,17 @@ function AppInner() {
                 to={to}
                 onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt) }}
             />
-            {/* Meta Filter Modal (Sphäre, Zweckbindung, Budget) */}
+            {/* Meta Filter Modal (Kategorie, Zweckbindung, Budget) */}
             <MetaFilterModal
                 open={activePage === 'Buchungen' && showMetaFilter}
                 onClose={() => setShowMetaFilter(false)}
                 earmarks={earmarks}
                 budgets={budgets}
-                sphere={filterSphere}
+                categories={usedCategories}
+                categoryId={filterCategoryId}
                 earmarkId={filterEarmark}
                 budgetId={filterBudgetId}
-                onApply={({ sphere, earmarkId, budgetId }) => { setFilterSphere(sphere); setFilterEarmark(earmarkId); setFilterBudgetId(budgetId) }}
+                onApply={({ categoryId, earmarkId, budgetId }) => { setFilterCategoryId(categoryId); setFilterEarmark(earmarkId); setFilterBudgetId(budgetId) }}
             />
             {/* Global DOM debugger overlay */}
             {/* DomDebugger removed for release */}

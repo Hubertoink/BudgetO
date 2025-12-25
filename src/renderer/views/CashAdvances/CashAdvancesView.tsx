@@ -602,10 +602,9 @@ export default function CashAdvancesView() {
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 8 }}>
-              {canWrite && (
+              {canWrite && detail.status !== 'RESOLVED' && (
                 <button
                   className="btn primary"
-                  disabled={detail.status === 'RESOLVED'}
                   onClick={() => {
                     const today = new Date().toISOString().slice(0, 10)
                     setPartialModal({ cashAdvanceId: detail.id, recipientName: '', amount: '', issuedAt: today, description: '' })
