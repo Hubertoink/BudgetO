@@ -53,7 +53,7 @@ export function SettingsView(props: SettingsProps) {
     ]
     const withModuleGates = modulesLoading ? all : all.filter(t => t.key !== 'import' || importEnabled)
     if (!isReadonly) return withModuleGates
-    const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import'])
+    const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import', 'yearEnd'])
     return withModuleGates.filter(t => !hidden.has(t.key))
   }, [importEnabled, isReadonly, modulesLoading])
 

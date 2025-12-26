@@ -186,3 +186,114 @@ export function status(): { closedUntil: string | null } {
     }
     return { closedUntil: null }
 }
+
+export type YearEndPreCloseCheck = {
+    year: number
+    to: string
+    openCashAdvances: Array<{
+        id: number
+        orderNumber: string
+        employeeName: string
+        status: 'OPEN' | 'RESOLVED' | 'OVERDUE'
+        createdAt: string
+        dueDate: string | null
+        totalAmount: number
+        totalPlanned: number
+        totalSettled: number
+        plannedRemaining: number
+        actualRemaining: number
+        coverage: number
+    }>
+    unpaidInstructorInvoices: Array<{
+        invoiceId: number
+        instructorId: number
+        instructorName: string
+        date: string
+        description: string | null
+        amount: number
+    }>
+}
+
+export async function preCloseCheck(year: number): Promise<YearEndPreCloseCheck> {
+    const d = getDb()
+    const to = `${year}-12-31`
+
+    const openCashAdvances = d.prepare(`
+        SELECT
+          ca.id,
+          ca.order_number as orderNumber,
+          ca.employee_name as employeeName,
+          ca.status,
+          ca.created_at as createdAt,
+          ca.due_date as dueDate,
+          ca.total_amount as totalAmount,
+          COALESCE(SUM(p.amount), 0) as totalPlanned,
+          COALESCE(SUM(CASE WHEN p.is_settled = 1 THEN COALESCE(p.settled_amount, 0) ELSE 0 END), 0) as totalSettled
+        FROM cash_advances ca
+        LEFT JOIN partial_cash_advances p ON p.cash_advance_id = ca.id
+        WHERE ca.status != 'RESOLVED'
+          AND date(ca.created_at) <= date(?)
+        GROUP BY ca.id
+        ORDER BY ca.created_at DESC
+    `).all(to) as Array<{
+        id: number
+        orderNumber: string
+        employeeName: string
+        status: 'OPEN' | 'RESOLVED' | 'OVERDUE'
+        createdAt: string
+        dueDate: string | null
+        totalAmount: number
+        totalPlanned: number
+        totalSettled: number
+    }>
+
+    const openCashAdvancesEnriched = openCashAdvances.map((r) => {
+        const totalAmount = Number(r.totalAmount || 0) || 0
+        const totalPlanned = Number(r.totalPlanned || 0) || 0
+        const totalSettled = Number(r.totalSettled || 0) || 0
+        const plannedRemaining = totalAmount - totalPlanned
+        const actualRemaining = totalAmount - totalSettled
+        const coverage = totalSettled - totalPlanned
+        return {
+            ...r,
+            totalAmount,
+            totalPlanned,
+            totalSettled,
+            plannedRemaining,
+            actualRemaining,
+            coverage
+        }
+    })
+
+    const unpaidInstructorInvoices = d.prepare(`
+        SELECT
+          ii.id as invoiceId,
+          ii.instructor_id as instructorId,
+          i.name as instructorName,
+          ii.date,
+          ii.description,
+          ii.amount
+        FROM instructor_invoices ii
+        JOIN instructors i ON i.id = ii.instructor_id
+        WHERE ii.voucher_id IS NULL
+          AND ii.date <= ?
+        ORDER BY ii.date DESC, ii.id DESC
+    `).all(to) as Array<{
+        invoiceId: number
+        instructorId: number
+        instructorName: string
+        date: string
+        description: string | null
+        amount: number
+    }>
+
+    return {
+        year,
+        to,
+        openCashAdvances: openCashAdvancesEnriched,
+        unpaidInstructorInvoices: unpaidInstructorInvoices.map((r) => ({
+            ...r,
+            amount: Number(r.amount || 0) || 0
+        }))
+    }
+}

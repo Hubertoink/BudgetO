@@ -140,6 +140,36 @@ export type TYearEndReopenOutput = z.infer<typeof YearEndReopenOutput>
 export const YearEndStatusOutput = z.object({ closedUntil: z.string().nullable() })
 export type TYearEndStatusOutput = z.infer<typeof YearEndStatusOutput>
 
+export const YearEndPreCloseCheckInput = z.object({ year: z.number() })
+export const YearEndPreCloseCheckOutput = z.object({
+    year: z.number(),
+    to: z.string(),
+    openCashAdvances: z.array(z.object({
+        id: z.number(),
+        orderNumber: z.string(),
+        employeeName: z.string(),
+        status: z.enum(['OPEN', 'RESOLVED', 'OVERDUE']),
+        createdAt: z.string(),
+        dueDate: z.string().nullable(),
+        totalAmount: z.number(),
+        totalPlanned: z.number(),
+        totalSettled: z.number(),
+        plannedRemaining: z.number(),
+        actualRemaining: z.number(),
+        coverage: z.number()
+    })),
+    unpaidInstructorInvoices: z.array(z.object({
+        invoiceId: z.number(),
+        instructorId: z.number(),
+        instructorName: z.string(),
+        date: z.string(),
+        description: z.string().nullable(),
+        amount: z.number()
+    }))
+})
+export type TYearEndPreCloseCheckInput = z.infer<typeof YearEndPreCloseCheckInput>
+export type TYearEndPreCloseCheckOutput = z.infer<typeof YearEndPreCloseCheckOutput>
+
 // Reports summary
 export const ReportsSummaryInput = z.object({
     from: z.string().optional(),
@@ -256,6 +286,9 @@ export const VouchersListInput = z
         q: z.string().optional()
         , tag: z.string().optional()
         , taxonomyTermId: z.number().optional()
+        // Archive mode: server-side filtering by work year
+        , workYear: z.number().int().optional()
+        , showArchived: z.boolean().optional()
     })
     .optional()
 export const VouchersListOutput = z.object({
@@ -1413,6 +1446,8 @@ export const CashAdvanceWithDetailsSchema = CashAdvanceSchema.extend({
 export const CashAdvancesListInput = z.object({
   status: z.union([CashAdvanceStatus, z.literal('ALL')]).optional(),
   search: z.string().optional(),
+    workYear: z.number().int().optional(),
+    showArchived: z.boolean().optional(),
   limit: z.number().optional(),
   offset: z.number().optional()
 })

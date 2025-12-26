@@ -4320,3 +4320,94 @@ html[data-glass-modals="true"] .flyout-arrow {
     opacity: 1 !important;
     pointer-events: auto !important;
 }
+
+/* ========================================
+   Toggle Switch
+======================================== */
+.toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px 6px 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.toggle-switch:hover {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+}
+
+.toggle-switch .toggle-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: var(--muted);
+    border-radius: 999px;
+    transition: background 0.2s;
+}
+
+.toggle-switch.active .toggle-track {
+    background: var(--accent);
+}
+
+.toggle-switch .toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch.active .toggle-thumb {
+    transform: translateX(16px);
+}
+
+/* ========================================
+   Work Year Indicator (global header badge)
+======================================== */
+.work-year-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 6px;
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+    border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--accent);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.work-year-indicator:hover {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+    border-color: var(--accent);
+}
+
+.work-year-indicator .work-year-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 18px;
+    padding: 0 4px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 10px;
+}
+
+.work-year-indicator .work-year-label {
+    font-weight: 500;
+    opacity: 0.9;
+}

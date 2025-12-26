@@ -401,9 +401,12 @@ export function listVouchersAdvancedPaged(filters: {
     q?: string
     tag?: string
     taxonomyTermId?: number
+    // Archive mode: server-side filtering by work year
+    workYear?: number
+    showArchived?: boolean
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag, taxonomyTermId } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag, taxonomyTermId, workYear, showArchived } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
@@ -418,6 +421,12 @@ export function listVouchersAdvancedPaged(filters: {
         const like = `%${q.trim()}%`
         wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
         params.push(like, like, like, like)
+    }
+
+    // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
+    if (showArchived === false && typeof workYear === 'number' && !from && !to) {
+        wh.push('v.date >= ? AND v.date <= ?')
+        params.push(`${workYear}-01-01`, `${workYear}-12-31`)
     }
 
     if (typeof taxonomyTermId === 'number') {

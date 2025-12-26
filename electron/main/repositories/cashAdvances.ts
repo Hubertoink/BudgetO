@@ -76,11 +76,13 @@ export interface CashAdvanceWithDetails extends CashAdvance {
 export function listCashAdvances(opts?: {
   status?: CashAdvanceStatus | 'ALL'
   search?: string
+  workYear?: number
+  showArchived?: boolean
   limit?: number
   offset?: number
 }): { items: (CashAdvance & { recipientCount: number; totalPlanned: number; totalSettled: number })[]; total: number } {
   const db = getDb()
-  const { status = 'ALL', search = '', limit = 50, offset = 0 } = opts || {}
+  const { status = 'ALL', search = '', workYear, showArchived, limit = 50, offset = 0 } = opts || {}
 
   let where = '1=1'
   const params: any[] = []
@@ -88,6 +90,21 @@ export function listCashAdvances(opts?: {
   if (status !== 'ALL') {
     where += ' AND status = ?'
     params.push(status)
+  }
+
+  // Archive mode: hide resolved cash advances from past years, but keep OPEN/OVERDUE visible across years.
+  // If a user explicitly filters for RESOLVED, only show RESOLVED in the work year.
+  if (showArchived === false && workYear != null) {
+    const start = `${workYear}-01-01`
+    const end = `${workYear}-12-31`
+
+    if (status === 'ALL') {
+      where += " AND (status != 'RESOLVED' OR (created_at >= ? AND created_at <= ?))"
+      params.push(start, end)
+    } else if (status === 'RESOLVED') {
+      where += ' AND (created_at >= ? AND created_at <= ?)'
+      params.push(start, end)
+    }
   }
 
   if (search.trim()) {

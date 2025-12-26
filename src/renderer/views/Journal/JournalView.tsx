@@ -110,6 +110,10 @@ interface JournalViewProps {
     setQ?: (v: string) => void
     page?: number
     setPage?: (v: number) => void
+    // Archive mode (server-side filtering)
+    workYear?: number
+    showArchived?: boolean
+    archiveSettingsReady?: boolean
 }
 
 export default function JournalView({
@@ -160,7 +164,11 @@ export default function JournalView({
     setFilterTag: setFilterTagProp,
     setQ: setQProp,
     page: pageProp,
-    setPage: setPageProp
+    setPage: setPageProp,
+    // Archive mode
+    workYear,
+    showArchived,
+    archiveSettingsReady
 }: JournalViewProps) {
     const { authEnforced, isAuthenticated, canWrite } = useAuth()
     const allowData = !authEnforced || isAuthenticated
@@ -375,6 +383,8 @@ export default function JournalView({
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
         if (!allowData) return
+        // Wait for archive settings to be ready before loading
+        if (archiveSettingsReady === false) return
         try {
             const offset = (activePage - 1) * journalLimit
             const res = await window.api?.vouchers?.list?.({
@@ -392,7 +402,10 @@ export default function JournalView({
                 budgetId: activeFilterBudgetId || undefined,
                 q: activeQ.trim() || undefined,
                 tag: activeFilterTag || undefined,
-                taxonomyTermId: activeFilterTaxonomyTerm?.termId || undefined
+                taxonomyTermId: activeFilterTaxonomyTerm?.termId || undefined,
+                // Archive mode: server-side filtering
+                workYear: showArchived === false ? workYear : undefined,
+                showArchived
             })
             if (res) {
                 setRows(res.rows || [])
@@ -402,7 +415,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady])
 
     // Load on mount and filter changes
     useEffect(() => {

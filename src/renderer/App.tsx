@@ -28,6 +28,7 @@ import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
 import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
 import { useQuickAdd } from './hooks/useQuickAdd'
+import { useArchiveSettings } from './hooks/useArchiveSettings'
 import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/toastHooks'
 import { UIPreferencesProvider } from './context/UIPreferences'
@@ -38,6 +39,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth, useRequireAuth } from './context/authHooks'
 import LoginModal from './components/auth/LoginModal'
 import { AppLayout } from './components/layout/AppLayout'
+import { WorkYearIndicator } from './components/layout/WorkYearIndicator'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import { NetworkStatus } from './components/layout/NetworkStatus'
@@ -611,6 +613,9 @@ function AppInner() {
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
     const [q, setQ] = useState<string>('')
+
+    // Global: Arbeitsjahr + Archivmodus (Blank-Slate) – used for server-side filtering
+    const { workYear: uiWorkYear, showArchived: uiShowArchived, ready: archiveSettingsReady } = useArchiveSettings()
     // Reports filter states (separate to avoid interference with Buchungen)
     // Default to current year
     const [reportsFrom, setReportsFrom] = useState<string>(() => {
@@ -911,6 +916,17 @@ function AppInner() {
             >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
                     <TopHeaderOrg notify={notify} />
+                    <WorkYearIndicator
+                        disabled={serverMode === 'client'}
+                        onNavigateToSettings={() => {
+                            try {
+                                sessionStorage.setItem('settingsActiveTile', 'yearEnd')
+                            } catch {
+                                // ignore
+                            }
+                            setActivePage('Einstellungen')
+                        }}
+                    />
                 </div>
                 {isTopNav ? (
                     <div style={{ display: 'inline-flex', WebkitAppRegion: 'no-drag' } as any}>
@@ -1025,6 +1041,9 @@ function AppInner() {
                             setQ={setQ}
                             page={page}
                             setPage={setPage}
+                            workYear={uiWorkYear}
+                            showArchived={uiShowArchived}
+                            archiveSettingsReady={archiveSettingsReady}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}

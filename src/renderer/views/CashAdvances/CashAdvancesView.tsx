@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import { useToast } from '../../context/toastHooks'
 import { useAuth } from '../../context/authHooks'
+import { useArchiveSettings } from '../../hooks/useArchiveSettings'
 
 type CashAdvanceStatus = 'OPEN' | 'RESOLVED' | 'OVERDUE'
 
@@ -51,6 +52,7 @@ type CashAdvanceWithDetails = CashAdvance & {
 export default function CashAdvancesView() {
   const { notify } = useToast()
   const { canWrite } = useAuth()
+  const { workYear, showArchived, ready: archiveSettingsReady } = useArchiveSettings()
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [loading, setLoading] = useState(false)
@@ -104,11 +106,15 @@ export default function CashAdvancesView() {
   }>(null)
 
   const load = useCallback(async () => {
+    // Wait for archive settings to be ready before loading
+    if (!archiveSettingsReady) return
     setLoading(true)
     try {
       const res = await (window as any).api?.cashAdvances?.list?.({
         status: statusFilter,
         search: q,
+        workYear: showArchived ? undefined : workYear,
+        showArchived,
         limit,
         offset
       })
@@ -124,7 +130,7 @@ export default function CashAdvancesView() {
     } finally {
       setLoading(false)
     }
-  }, [limit, notify, offset, q, selectedId, statusFilter])
+  }, [limit, notify, offset, q, selectedId, statusFilter, showArchived, workYear, archiveSettingsReady])
 
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true)

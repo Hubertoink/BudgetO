@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('api', {
         yearEnd: {
             preview: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.preview', payload),
             export: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.export', payload),
+            preCloseCheck: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.preCloseCheck', payload),
             close: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.close', payload),
             reopen: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.reopen', payload),
             status: () => ipcRenderer.invoke('yearEnd.status')
@@ -286,7 +287,7 @@ contextBridge.exposeInMainWorld('api', {
     },
     // BudgetO Phase 4: Barvorschüsse (Cash Advances)
     cashAdvances: {
-        list: (payload?: { status?: string; search?: string; limit?: number; offset?: number }) => 
+        list: (payload?: { status?: string; search?: string; workYear?: number; showArchived?: boolean; limit?: number; offset?: number }) => 
             ipcRenderer.invoke('cashAdvances.list', payload),
         getById: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.getById', payload),
         create: (payload: { orderNumber: string; employeeName: string; purpose?: string | null; totalAmount: number; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 

@@ -4,6 +4,7 @@ import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import { useToast } from '../../context/toastHooks'
 import { useAuth } from '../../context/authHooks'
+import { useArchiveSettings } from '../../hooks/useArchiveSettings'
 
 type InstructorStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'
 
@@ -58,6 +59,7 @@ const STATUS_COLORS: Record<InstructorStatus, string> = {
 export default function InstructorsView() {
   const { notify } = useToast()
   const { canWrite } = useAuth()
+  const { workYear, showArchived, ready: archiveSettingsReady } = useArchiveSettings()
   
   const [rows, setRows] = useState<Instructor[]>([])
   const [total, setTotal] = useState(0)
@@ -86,7 +88,12 @@ export default function InstructorsView() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const currentYear = useMemo(() => new Date().getFullYear(), [])
+
+  const getYear = useCallback((iso: string | null | undefined): number | null => {
+    if (!iso) return null
+    const y = Number(String(iso).slice(0, 4))
+    return Number.isFinite(y) ? y : null
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -347,7 +354,11 @@ export default function InstructorsView() {
   // Calculate yearly cap status
   const getCapStatus = (instructor: typeof detail) => {
     if (!instructor || instructor.yearlyCap === null) return null
-    const used = instructor.totalInvoiced
+    const used = (instructor.invoices || []).reduce((sum, inv) => {
+      const y = getYear(inv.date)
+      if (y === workYear) return sum + (inv.amount || 0)
+      return sum
+    }, 0)
     const cap = instructor.yearlyCap
     const remaining = cap - used
     const percentage = (used / cap) * 100
@@ -363,6 +374,21 @@ export default function InstructorsView() {
   }
 
   const capStatus = detail ? getCapStatus(detail) : null
+
+  const visibleInvoices = useMemo(() => {
+    if (!detail) return [] as InstructorInvoice[]
+    const list = Array.isArray(detail.invoices) ? detail.invoices : ([] as InstructorInvoice[])
+    if (showArchived) return list
+    return list.filter((inv) => {
+      // Keep open items visible even if they belong to a previous year
+      if (!inv.voucherId) return true
+      return getYear(inv.date) === workYear
+    })
+  }, [detail, showArchived, workYear, getYear])
+
+  const visibleTotalInvoiced = useMemo(() => {
+    return visibleInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  }, [visibleInvoices])
 
   return (
     <div className="instructors-view" style={{ display: 'grid', gap: 16 }}>
@@ -573,7 +599,7 @@ export default function InstructorsView() {
                 {capStatus && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span className="helper">Jahresauslastung {currentYear}</span>
+                      <span className="helper">Jahresauslastung {workYear}</span>
                       <span className={capStatus.isOverCap ? 'text-danger' : capStatus.isNearCap ? 'text-warning' : ''}>
                         {eurFmt.format(capStatus.used)} / {eurFmt.format(capStatus.cap)}
                       </span>
@@ -696,11 +722,11 @@ export default function InstructorsView() {
                     )}
                   </div>
                   
-                  {detail.invoices.length === 0 ? (
+                  {visibleInvoices.length === 0 ? (
                     <div className="helper" style={{ fontStyle: 'italic' }}>Keine Rechnungen erfasst</div>
                   ) : (
                     <div style={{ display: 'grid', gap: 6 }}>
-                      {detail.invoices.map((inv) => (
+                      {visibleInvoices.map((inv) => (
                         <div 
                           key={inv.id} 
                           style={{ 
@@ -762,7 +788,7 @@ export default function InstructorsView() {
                   )}
                   
                   {/* Total */}
-                  {detail.invoices.length > 0 && (
+                  {visibleInvoices.length > 0 && (
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
@@ -771,7 +797,7 @@ export default function InstructorsView() {
                       borderTop: '1px solid var(--border)'
                     }}>
                       <span style={{ fontWeight: 500 }}>Gesamt</span>
-                      <span style={{ fontWeight: 600 }}>{eurFmt.format(detail.totalInvoiced)}</span>
+                      <span style={{ fontWeight: 600 }}>{eurFmt.format(visibleTotalInvoiced)}</span>
                     </div>
                   )}
                 </div>
