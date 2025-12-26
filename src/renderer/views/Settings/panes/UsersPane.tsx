@@ -584,7 +584,7 @@ export function UsersPane({ notify }: UsersPaneProps) {
           </div>
           
           <div className="card" style={{ padding: 20 }}>
-          <div className="settings-row-2col" style={{ alignItems: 'end' }}>
+          <div className="settings-row-2col" style={{ alignItems: 'start' }}>
             <div className="field">
               <label>Name *</label>
               <input

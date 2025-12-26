@@ -3396,7 +3396,12 @@ label .req-asterisk {
 .chart-tooltip-follow {
     left: 0;
     top: 0;
-    transform: translate(-50%, calc(-100% - 12px));
+    transform: translate(0, calc(-100% - 12px));
+    max-width: 320px;
+}
+
+.chart-tooltip-follow .chart-tooltip-header {
+    overflow-wrap: anywhere;
 }
 
 .legend-container {

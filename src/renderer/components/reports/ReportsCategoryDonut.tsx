@@ -119,9 +119,13 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
                 const rect = wrap.getBoundingClientRect()
                 const x = ev.clientX - rect.left
                 const y = ev.clientY - rect.top
-                // Clamp so the tooltip doesn't go too far off-screen.
-                const pad = 70
-                const left = Math.min(Math.max(x, pad), rect.width - pad)
+                // Place tooltip next to cursor and clamp within container.
+                // (Tooltip is not centered anymore, so long labels won't clip on the left edge.)
+                const pad = 12
+                const tooltipW = 320
+                const leftWanted = x + 12
+                const maxLeft = Math.max(pad, rect.width - pad - tooltipW)
+                const left = Math.min(Math.max(leftWanted, pad), maxLeft)
                 const top = Math.min(Math.max(y, pad), rect.height - pad)
                 setTooltipPos({ left, top })
               }
