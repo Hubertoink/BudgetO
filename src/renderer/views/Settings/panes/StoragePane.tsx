@@ -4,6 +4,7 @@ import DbMigrateModal from '../../../DbMigrateModal'
 
 import { useStorageLocation, useBackupSettings } from '../hooks'
 import { LocationInfoDisplay, BackupList } from '../components'
+import { BackupInfo } from '../types'
 
 /**
  * StoragePane - DB Location + Backups (auto + manual)
@@ -13,6 +14,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
   const { autoMode, intervalDays, backups, busy: backupBusy, refreshBackups, makeBackup, updateAutoMode, updateInterval, chooseBackupDir, backupDir, openBackupFolder } = useBackupSettings()
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  const [restorePick, setRestorePick] = React.useState<BackupInfo | null>(null)
+  const [busyRestore, setBusyRestore] = React.useState(false)
   // Data management & security (moved from GeneralPane)
   const [importPick, setImportPick] = React.useState<null | { filePath: string; size?: number; mtime?: number; counts?: Record<string, number>; currentCounts?: Record<string, number> }>(null)
   const [busyImport, setBusyImport] = React.useState(false)
@@ -48,6 +51,17 @@ export function StoragePane({ notify }: StoragePaneProps) {
       else notify('error', res?.error || 'Wiederherstellung fehlgeschlagen')
     } catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
     finally { setBusy(false) }
+  }
+
+  async function confirmRestore() {
+    if (!restorePick) return
+    setBusyRestore(true)
+    try {
+      await doRestore(restorePick.filePath)
+      setRestorePick(null)
+    } finally {
+      setBusyRestore(false)
+    }
   }
 
   // Helper: load counts for current + selected DB (silently fall back to simple modal if inspection fails)
@@ -205,105 +219,164 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
   React.useEffect(() => { refreshBackups(); refreshLoc() }, [])
 
-  return (
-    <div className="storage-pane">
-      <div>
-        <strong>Speicher & Sicherungen</strong>
-        <div className="helper">Verwalte Speicherort und Sicherungen der Datenbank.</div>
-      </div>
+  // Helper: shorten backup dir path for display
+  function shortBackupDir(dir: string): string {
+    if (!dir) return 'Standard'
+    const parts = dir.replace(/\\/g, '/').split('/')
+    return '…/' + parts.slice(-2).join('/')
+  }
 
-      <section className="card storage-section">
-        <div className="helper">Aktueller Speicherort</div>
+  return (
+    <div className="storage-pane-v2">
+      {/* ═══════════════════════════════════════════════════════════════════
+          ZONE 1: Speicherort
+          ═══════════════════════════════════════════════════════════════════ */}
+      <section className="storage-zone">
+        <div className="storage-zone-header">
+          <span className="storage-zone-icon">📁</span>
+          <h3 className="storage-zone-title">Speicherort</h3>
+        </div>
         <LocationInfoDisplay info={info} />
-        <div className="storage-actions">
-          <button className="btn" disabled={busy || locBusy} onClick={handlePickFolder}>📁 Ordner wählen…</button>
-          <button className="btn" disabled={busy || locBusy} onClick={handleResetToDefault}>↩️ Standard vergleichen…</button>
+        <div className="helper storage-zone-hint">
+          Beim Wechsel wählst du: bestehende DB nutzen oder aktuelle kopieren.
+        </div>
+        <div className="storage-zone-actions">
+          <button
+            className="btn"
+            disabled={busy || locBusy}
+            onClick={handlePickFolder}
+            title="Wähle einen Ordner. Bei vorhandener DB kannst du wechseln oder dorthin migrieren."
+          >
+            Speicherort ändern…
+          </button>
+          <button
+            className="btn"
+            disabled={busy || locBusy}
+            onClick={handleResetToDefault}
+            title="Vergleiche mit dem Standard-App-Ordner."
+          >
+            Auf Standard zurücksetzen…
+          </button>
         </div>
         {locError && <div className="error-text">{locError}</div>}
       </section>
 
-      <section className="card storage-section">
-        <div className="helper">Automatische Sicherungen</div>
-        <div className="storage-auto-settings">
-          <div className="field">
-            <label htmlFor="auto-backup-mode">Modus</label>
-            <select id="auto-backup-mode" className="input" value={autoMode} onChange={(e) => updateAutoMode(e.target.value as any)}>
-              <option value="OFF">Aus</option>
-              <option value="PROMPT">Nachfragen</option>
-              <option value="SILENT">Still</option>
-            </select>
-          </div>
-          <div className="field storage-field-min-160">
-            <label htmlFor="auto-backup-interval">Intervall (Tage)</label>
-            <input id="auto-backup-interval" title="Intervall (Tage)" className="input" type="number" min={1} value={intervalDays} onChange={(e) => updateInterval(Number(e.target.value) || 1)} />
-          </div>
-          <div className="field storage-field-min-240">
-            <label>Backup-Verzeichnis</label>
-            <div className="storage-backup-dir">
-              <code className="storage-backup-code">{backupDir || 'Standard'}</code>
-              <button className="btn" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis gesetzt') }}>Ändern…</button>
-              <button className="btn" disabled={backupBusy} onClick={openBackupFolder}>Öffnen…</button>
+      {/* ═══════════════════════════════════════════════════════════════════
+          ZONE 2: Sicherungen (Automatisch + Manuell + Liste)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <section className="storage-zone">
+        <div className="storage-zone-header">
+          <span className="storage-zone-icon">💾</span>
+          <h3 className="storage-zone-title">Sicherungen</h3>
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={doMakeBackup}
+            title="Erstellt sofort eine Sicherung der aktuellen Datenbank."
+          >
+            Jetzt sichern
+          </button>
+        </div>
+
+        {/* Auto-Backup Settings */}
+        <div className="storage-subsection">
+          <div className="storage-subsection-label">Automatisch</div>
+          <div className="storage-auto-row">
+            <div className="field field-compact">
+              <label htmlFor="auto-backup-mode" title="Aus = keine; Nachfragen = du wirst gefragt; Still = automatisch im Hintergrund">Modus</label>
+              <select id="auto-backup-mode" className="input" value={autoMode} onChange={(e) => updateAutoMode(e.target.value as any)}>
+                <option value="OFF">Aus</option>
+                <option value="PROMPT">Nachfragen</option>
+                <option value="SILENT">Still</option>
+              </select>
+            </div>
+            <div className="field field-compact field-narrow">
+              <label htmlFor="auto-backup-interval" title="Intervall in Tagen">Tage</label>
+              <input id="auto-backup-interval" className="input" type="number" min={1} value={intervalDays} onChange={(e) => updateInterval(Number(e.target.value) || 1)} />
+            </div>
+            <div className="field field-compact field-grow">
+              <label title="Ordner für automatische und manuelle Sicherungen">Verzeichnis</label>
+              <div className="storage-dir-row">
+                <code className="storage-dir-code" title={backupDir || 'Standard'}>{shortBackupDir(backupDir)}</code>
+                <button className="btn btn-sm" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis geändert') }}>Ändern</button>
+                <button className="btn btn-sm" disabled={backupBusy} onClick={openBackupFolder} title="Im Explorer öffnen">📂</button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="card storage-section">
-        <div className="storage-actions">
-          <button className="btn" disabled={busy} onClick={doMakeBackup}>Jetzt sichern</button>
-        </div>
-        <BackupList backups={backups} onRestore={doRestore} />
-      </section>
-
-      {/* Datenverwaltung & Sicherheit */}
-      <section className="card storage-section">
-        <div className="settings-title">
-          <span aria-hidden="true">🗄️</span> <strong>Datenverwaltung & Sicherheit</strong>
-        </div>
-        <div className="settings-sub">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
-        <div className="storage-actions">
-          <button
-            className="btn"
-            onClick={async () => {
-              try {
-                const res = await window.api?.db.export?.()
-                if (res?.filePath) {
-                  // Ignore empty string (cancel)
-                  if (String(res.filePath).trim().length > 0) notify('success', `Datenbank exportiert: ${res.filePath}`)
-                }
-              } catch (e: any) {
-                const msg = e?.message || String(e)
-                if (/Abbruch/i.test(msg)) return
-                notify('error', msg)
-              }
-            }}
-          >
-            Exportieren
-          </button>
-          <button className="btn danger" onClick={async () => {
-            try {
-              const api = window.api?.db?.import as any
-              const picked = await api?.pick?.()
-              if (picked?.ok && picked.filePath) {
-                const cur = await loadCurrentCounts()
-                setImportPick({ filePath: picked.filePath, size: picked.size, mtime: picked.mtime, counts: picked.counts, currentCounts: cur })
-              }
-            } catch (e: any) {
-              const msg = e?.message || String(e)
-              if (/Abbruch/i.test(msg)) return
-              notify('error', msg)
-            }
-          }}>
-            Importieren…
-          </button>
-        </div>
-        <div className="muted-sep" />
-        <div className="storage-data-management">
-          <div>
-            <strong>Gefährliche Aktion</strong>
-            <div className="helper">Setzt dieses Sachgebiet vollständig zurück (Datenbank + Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
+          <div className="helper storage-retention-hint">
+            Aufbewahrung: max. 5 Sicherungen. Ältere werden automatisch gelöscht.
           </div>
-          <div>
+        </div>
+
+        {/* Backup List */}
+        <div className="storage-subsection">
+          <div className="storage-subsection-label">Verfügbare Sicherungen</div>
+          <BackupList backups={backups} onRestore={(b) => setRestorePick(b)} />
+          <div className="helper storage-restore-hint">
+            Wiederherstellen ersetzt die aktuelle DB. Anhänge werden nicht automatisch wiederhergestellt.
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          ZONE 3: Datenverwaltung (Export/Import + Gefahrenzone)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <section className="storage-zone">
+        <div className="storage-zone-header">
+          <span className="storage-zone-icon">🗄️</span>
+          <h3 className="storage-zone-title">Datenverwaltung</h3>
+        </div>
+
+        {/* Export / Import */}
+        <div className="storage-subsection">
+          <div className="storage-subsection-label">Export / Import</div>
+          <div className="storage-zone-actions">
+            <button
+              className="btn"
+              onClick={async () => {
+                try {
+                  const res = await window.api?.db.export?.()
+                  if (res?.filePath && String(res.filePath).trim().length > 0) {
+                    notify('success', `Exportiert: ${res.filePath}`)
+                  }
+                } catch (e: any) {
+                  const msg = e?.message || String(e)
+                  if (!/Abbruch/i.test(msg)) notify('error', msg)
+                }
+              }}
+              title="Speichert eine Kopie der aktuellen DB an einem Ort deiner Wahl."
+            >
+              Exportieren
+            </button>
+            <button
+              className="btn danger"
+              onClick={async () => {
+                try {
+                  const api = window.api?.db?.import as any
+                  const picked = await api?.pick?.()
+                  if (picked?.ok && picked.filePath) {
+                    const cur = await loadCurrentCounts()
+                    setImportPick({ filePath: picked.filePath, size: picked.size, mtime: picked.mtime, counts: picked.counts, currentCounts: cur })
+                  }
+                } catch (e: any) {
+                  const msg = e?.message || String(e)
+                  if (!/Abbruch/i.test(msg)) notify('error', msg)
+                }
+              }}
+            >
+              Importieren…
+            </button>
+          </div>
+          <div className="helper">Import überschreibt die aktuelle Datenbank vollständig.</div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="storage-subsection storage-danger-zone">
+          <div className="storage-subsection-label storage-danger-label">⚠️ Gefahrenzone</div>
+          <div className="helper">
+            Setzt dieses Sachgebiet zurück oder löscht es vollständig. Diese Aktionen sind nicht rückgängig zu machen.
+          </div>
+          <div className="storage-zone-actions">
             <button
               className="btn danger"
               onClick={async () => {
@@ -312,18 +385,17 @@ export function StoragePane({ notify }: StoragePaneProps) {
                 setShowResetOrg(true)
               }}
             >
-              Sachgebiet zurücksetzen…
+              Zurücksetzen…
             </button>
             <button
               className="btn danger"
-              style={{ marginLeft: 8 }}
               onClick={async () => {
                 setDeleteOrgConfirmText('')
                 await ensureActiveOrgLoaded()
                 setShowDeleteOrg(true)
               }}
             >
-              Sachgebiet löschen…
+              Löschen…
             </button>
           </div>
         </div>
@@ -624,6 +696,33 @@ export function StoragePane({ notify }: StoragePaneProps) {
                   <button className="btn primary" onClick={migrateToDefaultDb} disabled={busy}>Aktuelle migrieren</button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restorePick && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyRestore && setRestorePick(null)}>
+          <div className="modal modal-grid" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Backup wiederherstellen</h2>
+              <button className="btn ghost" onClick={() => setRestorePick(null)} aria-label="Schließen" disabled={busyRestore}>✕</button>
+            </div>
+            <div className="card" style={{ padding: 12, display: 'grid', gap: 6 }}>
+              <div className="helper">Ausgewähltes Backup</div>
+              <div style={{ wordBreak: 'break-all' }}><code>{restorePick.filePath}</code></div>
+              <div className="helper">Datum</div>
+              <div>{new Date(restorePick.mtime).toLocaleString('de-DE')}</div>
+              <div className="helper">Größe</div>
+              <div>{(restorePick.size / 1024 / 1024).toFixed(2)} MB</div>
+            </div>
+            <div className="helper helper-danger">
+              Achtung: Diese Aktion ersetzt die aktuell verwendete Datenbankdatei. Das kann nicht rückgängig gemacht werden.
+              Anhänge werden dabei nicht automatisch wiederhergestellt.
+            </div>
+            <div className="modal-actions-end">
+              <button className="btn" onClick={() => setRestorePick(null)} disabled={busyRestore}>Abbrechen</button>
+              <button className="btn danger" onClick={confirmRestore} disabled={busyRestore}>Ja, wiederherstellen</button>
             </div>
           </div>
         </div>

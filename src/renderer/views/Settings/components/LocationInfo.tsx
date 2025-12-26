@@ -6,38 +6,48 @@ interface LocationInfoDisplayProps {
 }
 
 /**
- * LocationInfoDisplay - Shows current database location
+ * Extracts last 2 path segments for compact display
+ */
+function shortPath(fullPath: string): string {
+  const parts = fullPath.replace(/\\/g, '/').split('/')
+  return parts.slice(-2).join('/')
+}
+
+/**
+ * LocationInfoDisplay - Compact database location info
  * 
- * Displays root folder, database file path, and attachments folder
+ * Shows location in a compact grid with tooltips for full paths
  */
 export function LocationInfoDisplay({ info }: LocationInfoDisplayProps) {
   if (!info) {
     return (
-      <div className="card" style={{ padding: 12 }}>
-        <div className="helper">Lade Informationen …</div>
+      <div className="storage-location-grid">
+        <span className="helper">Lade …</span>
       </div>
     )
   }
 
+  const isCustom = !!info.configuredRoot
+
   return (
-    <div className="card" style={{ padding: 12 }}>
-      <div style={{ display: 'grid', gap: 6 }}>
-        <div>
-          <span className="helper">Aktueller Ordner</span>
-          <div style={{ wordBreak: 'break-all' }}>{info.root}</div>
-        </div>
-        <div>
-          <span className="helper">Datenbank-Datei</span>
-          <div style={{ wordBreak: 'break-all' }}>{info.dbPath}</div>
-        </div>
-        <div>
-          <span className="helper">Anhänge-Ordner</span>
-          <div style={{ wordBreak: 'break-all' }}>{info.filesDir}</div>
-        </div>
-        <div>
-          <span className="helper">Benutzerdefiniert</span>
-          <div>{info.configuredRoot ? 'Ja' : 'Nein (Standard)'}</div>
-        </div>
+    <div className="storage-location-grid">
+      <div className="storage-location-row">
+        <span className="storage-location-label">Datenbank</span>
+        <code className="storage-location-value" title={info.dbPath}>
+          {shortPath(info.dbPath)}
+        </code>
+      </div>
+      <div className="storage-location-row">
+        <span className="storage-location-label">Anhänge</span>
+        <code className="storage-location-value" title={info.filesDir}>
+          {shortPath(info.filesDir)}
+        </code>
+      </div>
+      <div className="storage-location-row">
+        <span className="storage-location-label">Modus</span>
+        <span className={`storage-location-badge ${isCustom ? 'storage-location-badge-custom' : ''}`}>
+          {isCustom ? 'Benutzerdefiniert' : 'Standard'}
+        </span>
       </div>
     </div>
   )

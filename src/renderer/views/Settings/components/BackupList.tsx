@@ -3,66 +3,81 @@ import { BackupInfo } from '../types'
 
 interface BackupListProps {
   backups: BackupInfo[]
-  onRestore: (filePath: string) => void
+  onRestore: (backup: BackupInfo) => void
 }
 
 /**
- * BackupList - Table of Available Backups
+ * Extracts just the filename from a full path
+ */
+function fileName(fullPath: string): string {
+  const parts = fullPath.replace(/\\/g, '/').split('/')
+  return parts[parts.length - 1] || fullPath
+}
+
+/**
+ * Formats date as relative time (e.g., "vor 2 Tagen")
+ */
+function relativeTime(mtime: number): string {
+  const now = Date.now()
+  const diff = now - mtime
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return 'gerade eben'
+  if (minutes < 60) return `vor ${minutes} Min.`
+  if (hours < 24) return `vor ${hours} Std.`
+  if (days === 1) return 'gestern'
+  if (days < 7) return `vor ${days} Tagen`
+  if (days < 30) return `vor ${Math.floor(days / 7)} Wo.`
+  return `vor ${Math.floor(days / 30)} Mon.`
+}
+
+/**
+ * BackupList - Compact table of available backups
  * 
- * Shows backup files with timestamp, size, and restore action
+ * Shows backup files with relative time, size, and restore action
  */
 export function BackupList({ backups, onRestore }: BackupListProps) {
   if (backups.length === 0) {
     return (
-      <div className="helper" style={{ marginTop: 8 }}>
-        Noch keine Backups vorhanden.
+      <div className="helper" style={{ marginTop: 8, textAlign: 'center' }}>
+        Noch keine Sicherungen vorhanden.
       </div>
     )
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: 260, border: '1px solid var(--border)', borderRadius: 8 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div className="backup-list-container">
+      <table className="backup-list-table">
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
-              Datei
-            </th>
-            <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
-              Datum
-            </th>
-            <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
-              Größe
-            </th>
-            <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
-              Aktion
-            </th>
+            <th>Datei</th>
+            <th>Erstellt</th>
+            <th style={{ textAlign: 'right' }}>Größe</th>
+            <th style={{ textAlign: 'center', width: 44 }}></th>
           </tr>
         </thead>
         <tbody>
           {backups.map((b, i) => (
             <tr key={i}>
-              <td 
-                style={{ 
-                  padding: '6px 8px', 
-                  wordBreak: 'break-all', 
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' 
-                }}
-              >
-                {b.filePath}
+              <td className="backup-list-file" title={b.filePath}>
+                {fileName(b.filePath)}
               </td>
-              <td style={{ padding: '6px 8px' }}>
-                {new Date(b.mtime).toLocaleString('de-DE')}
+              <td className="backup-list-date" title={new Date(b.mtime).toLocaleString('de-DE')}>
+                {relativeTime(b.mtime)}
               </td>
-              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                {(b.size / 1024 / 1024).toFixed(2)} MB
+              <td className="backup-list-size">
+                {(b.size / 1024 / 1024).toFixed(1)} MB
               </td>
-              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+              <td className="backup-list-action">
                 <button 
-                  className="btn danger" 
-                  onClick={() => onRestore(b.filePath)}
+                  className="btn btn-icon"
+                  onClick={() => onRestore(b)}
+                  title="Wiederherstellen…"
+                  aria-label="Wiederherstellen"
                 >
-                  Wiederherstellen…
+                  ↺
                 </button>
               </td>
             </tr>

@@ -490,7 +490,267 @@
     color: var(--danger);
 }
 
-/* Storage pane specific */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Storage Pane v2 - Elegant 3-Zone Layout
+   ═══════════════════════════════════════════════════════════════════════════ */
+.storage-pane-v2 {
+    display: grid;
+    gap: 16px;
+}
+
+.storage-zone {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.storage-zone-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.storage-zone-icon {
+    font-size: 1.2rem;
+}
+
+.storage-zone-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    flex: 1;
+}
+
+.storage-zone-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.storage-zone-hint {
+    font-size: 0.8rem;
+    margin-top: -4px;
+}
+
+/* Location info grid */
+.storage-location-grid {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.storage-location-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.storage-location-label {
+    min-width: 80px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.storage-location-value {
+    font-size: 0.85rem;
+    word-break: break-all;
+    background: transparent;
+    cursor: help;
+}
+
+.storage-location-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+    color: var(--accent);
+}
+
+.storage-location-badge-custom {
+    background: color-mix(in oklab, var(--warning, #f59e0b) 15%, transparent);
+    color: var(--warning, #f59e0b);
+}
+
+/* Subsections */
+.storage-subsection {
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: grid;
+    gap: 8px;
+}
+
+.storage-subsection-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+}
+
+/* Auto-backup row */
+.storage-auto-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.field-compact {
+    display: grid;
+    gap: 4px;
+}
+
+.field-compact label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.field-compact .input {
+    min-width: 80px;
+}
+
+.field-narrow .input {
+    width: 60px;
+}
+
+.field-grow {
+    flex: 1;
+    min-width: 200px;
+}
+
+.storage-dir-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.storage-dir-code {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: help;
+}
+
+.storage-retention-hint,
+.storage-restore-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Backup list compact */
+.backup-list-container {
+    overflow: auto;
+    max-height: 220px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.backup-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.backup-list-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+}
+
+.backup-list-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.backup-list-table tr:last-child td {
+    border-bottom: none;
+}
+
+.backup-list-table tr:hover {
+    background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+.backup-list-file {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.backup-list-date {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.backup-list-size {
+    text-align: right;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+.backup-list-action {
+    text-align: center;
+}
+
+/* Icon button for restore */
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1.1rem;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+    color: var(--accent);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn-icon:hover {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+/* Danger Zone */
+.storage-danger-zone {
+    border-color: color-mix(in oklab, var(--danger) 30%, var(--border));
+    border-left: 3px solid var(--danger);
+}
+
+.storage-danger-label {
+    color: var(--danger);
+}
+
+/* Legacy storage pane (keep for backwards compat) */
 .storage-pane { display: grid; gap: 12px; }
 .storage-section { padding: 12px; display: grid; gap: 8px; }
 .storage-actions { display: flex; gap: 8px; flex-wrap: wrap; }
