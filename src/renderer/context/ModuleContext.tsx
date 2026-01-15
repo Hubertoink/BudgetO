@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react'
+import { useState, useEffect, useCallback, ReactNode, useRef } from 'react'
 import type { ModuleInfo, ModuleKey } from './moduleTypes'
 import { ModuleContext } from './moduleContextStore'
 import type { ModuleContextValue } from './moduleContextStore'
@@ -12,21 +12,28 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const [modules, setModules] = useState<ModuleInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedOnceRef = useRef(false)
 
   const loadModules = useCallback(async () => {
+    // Only show the loading state for the initial load.
+    // Refreshes (e.g., after toggling a module) should not flip `loading` to true,
+    // otherwise consumers like the Settings Modules pane unmount briefly and
+    // lose scroll position.
+    const isInitialLoad = !hasLoadedOnceRef.current
     try {
-      setLoading(true)
+      if (isInitialLoad) setLoading(true)
       setError(null)
       const result = await (window as any).api?.modules?.list?.()
       if (result?.modules) {
         setModules(result.modules)
+        hasLoadedOnceRef.current = true
       }
     } catch (e: any) {
       console.error('Failed to load modules:', e)
       setError(e?.message || 'Failed to load modules')
       setModules([])
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false)
     }
   }, [])
 
