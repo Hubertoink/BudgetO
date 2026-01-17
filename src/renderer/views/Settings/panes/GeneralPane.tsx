@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { GeneralPaneProps, BackgroundImage } from '../types'
 
 // Hintergrundbilder - Vorschau für die Auswahl
@@ -6,7 +6,134 @@ import mountainCloudsImg from '../../../assets/a_mountain_with_snow_and_clouds.j
 import snowyLandscapeImg from '../../../assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg'
 import snowHousesImg from '../../../assets/a_snow_covered_houses_and_a_street_light.png'
 
-const BG_IMAGES: Record<BackgroundImage, { label: string; emoji: string; thumb?: string }> = {
+type CompressedImageResult = {
+  dataUrl: string
+  approxBytes: number
+  originalWidth: number
+  originalHeight: number
+  finalWidth: number
+  finalHeight: number
+}
+
+function approxBytesFromDataUrl(dataUrl: string): number {
+  const commaIndex = dataUrl.indexOf(',')
+  if (commaIndex < 0) return dataUrl.length
+  const base64 = dataUrl.slice(commaIndex + 1)
+  // base64 payload size ≈ 3/4 of length minus padding
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - padding
+}
+
+async function canvasToDataUrl(canvas: HTMLCanvasElement, mimeType: string, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Failed to encode image'))
+          return
+        }
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error ?? new Error('Failed to read encoded image'))
+        reader.readAsDataURL(blob)
+      },
+      mimeType,
+      quality
+    )
+  })
+}
+
+async function compressImageFile(file: File, opts: { maxDimension: number; targetBytes: number }): Promise<CompressedImageResult> {
+  const mimeType = 'image/jpeg'
+
+  const bitmap = await createImageBitmap(file)
+  const originalWidth = bitmap.width
+  const originalHeight = bitmap.height
+  const scale = Math.min(1, opts.maxDimension / Math.max(bitmap.width, bitmap.height))
+  let width = Math.max(1, Math.round(bitmap.width * scale))
+  let height = Math.max(1, Math.round(bitmap.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d', { alpha: false })
+  if (!ctx) throw new Error('Canvas 2D context unavailable')
+
+  // Fill background (JPEG has no alpha)
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
+
+  // Try qualities from high to lower until we hit targetBytes
+  const qualities = [0.92, 0.88, 0.84, 0.8, 0.76, 0.72, 0.68, 0.64]
+  let bestDataUrl: string | null = null
+  let bestBytes = Number.POSITIVE_INFINITY
+  let finalWidth = width
+  let finalHeight = height
+
+  for (const quality of qualities) {
+    const dataUrl = await canvasToDataUrl(canvas, mimeType, quality)
+    const approxBytes = approxBytesFromDataUrl(dataUrl)
+    if (approxBytes < bestBytes) {
+      bestDataUrl = dataUrl
+      bestBytes = approxBytes
+      finalWidth = width
+      finalHeight = height
+    }
+    if (approxBytes <= opts.targetBytes) {
+      return { dataUrl, approxBytes, originalWidth, originalHeight, finalWidth: width, finalHeight: height }
+    }
+  }
+
+  // If still too big, progressively scale down a bit more and retry
+  let currentScale = 0.9
+  while (bestBytes > opts.targetBytes && currentScale >= 0.5) {
+    const newWidth = Math.max(1, Math.round(width * currentScale))
+    const newHeight = Math.max(1, Math.round(height * currentScale))
+    canvas.width = newWidth
+    canvas.height = newHeight
+
+    const ctx2 = canvas.getContext('2d', { alpha: false })
+    if (!ctx2) break
+    ctx2.fillStyle = '#000'
+    ctx2.fillRect(0, 0, newWidth, newHeight)
+    ctx2.imageSmoothingEnabled = true
+    ctx2.imageSmoothingQuality = 'high'
+    // Recreate bitmap to avoid quality loss from re-scaling a scaled bitmap
+    const bitmap2 = await createImageBitmap(file)
+    ctx2.drawImage(bitmap2, 0, 0, newWidth, newHeight)
+    bitmap2.close()
+
+    for (const quality of qualities.slice(2)) {
+      const dataUrl = await canvasToDataUrl(canvas, mimeType, quality)
+      const approxBytes = approxBytesFromDataUrl(dataUrl)
+      if (approxBytes < bestBytes) {
+        bestDataUrl = dataUrl
+        bestBytes = approxBytes
+        finalWidth = newWidth
+        finalHeight = newHeight
+      }
+      if (approxBytes <= opts.targetBytes) {
+        return { dataUrl, approxBytes, originalWidth, originalHeight, finalWidth: newWidth, finalHeight: newHeight }
+      }
+    }
+
+    currentScale -= 0.1
+  }
+
+  if (!bestDataUrl) {
+    throw new Error('Failed to compress image')
+  }
+  return { dataUrl: bestDataUrl, approxBytes: bestBytes, originalWidth, originalHeight, finalWidth, finalHeight }
+}
+
+// Nur die vordefinierten Bilder (ohne 'custom' - das wird separat gehandhabt)
+const BG_IMAGES: Record<Exclude<BackgroundImage, 'custom'>, { label: string; emoji: string; thumb?: string }> = {
   none: { label: 'Kein Hintergrundbild', emoji: '🚫' },
   'mountain-clouds': { label: 'Berglandschaft', emoji: '🏔️', thumb: mountainCloudsImg },
   'snowy-landscape': { label: 'Schneelandschaft', emoji: '❄️', thumb: snowyLandscapeImg },
@@ -38,6 +165,8 @@ export function GeneralPane({
   setColorTheme,
   backgroundImage,
   setBackgroundImage,
+  customBackgroundImage,
+  setCustomBackgroundImage,
   journalLimit,
   setJournalLimit,
   dateFmt,
@@ -51,8 +180,171 @@ export function GeneralPane({
   const pretty = '15. Jan 2025'
   const short = '15.01.25'
 
+  // Ref für den versteckten File-Input
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // State für Bild-Verarbeitung
+  const [isProcessingImage, setIsProcessingImage] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState<string>('')
+  const [compressionResult, setCompressionResult] = useState<{
+    originalSize: string
+    finalSize: string
+    originalDimensions: string
+    finalDimensions: string
+  } | null>(null)
+
+  // Helper: Format bytes to human readable
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
+
+  // Handler für Custom-Bild-Upload
+  const handleCustomImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Nur Bilder erlauben
+    if (!file.type.startsWith('image/')) {
+      return
+    }
+
+    // Sehr große Dateien erst mal abweisen (UX + RAM) – wir komprimieren zwar,
+    // aber ab einem gewissen Punkt wird es unnötig schwergewichtig.
+    if (file.size > 25 * 1024 * 1024) {
+      alert('Das Bild ist sehr groß (max. 25MB). Bitte wähle eine kleinere Datei.')
+      return
+    }
+
+    setIsProcessingImage(true)
+    setProcessingStatus('Bild wird geladen…')
+    setCompressionResult(null)
+
+    // Input zurücksetzen für erneutes Hochladen derselben Datei
+    e.target.value = ''
+
+    try {
+      setProcessingStatus('Bild wird optimiert…')
+      
+      // Ziel: unter ~2MB binär (entspricht grob < 3MB base64, damit localStorage stabil bleibt)
+      const result = await compressImageFile(file, { maxDimension: 3000, targetBytes: 2 * 1024 * 1024 })
+      
+      if (result.approxBytes > 2 * 1024 * 1024) {
+        setIsProcessingImage(false)
+        alert('Das Bild konnte nicht klein genug komprimiert werden. Bitte wähle ein kleineres Bild.')
+        return
+      }
+
+      // Zeige Ergebnis
+      setCompressionResult({
+        originalSize: formatBytes(file.size),
+        finalSize: formatBytes(result.approxBytes),
+        originalDimensions: `${result.originalWidth} × ${result.originalHeight}`,
+        finalDimensions: `${result.finalWidth} × ${result.finalHeight}`,
+      })
+      setProcessingStatus('Fertig!')
+
+      // Anwenden
+      setCustomBackgroundImage(result.dataUrl)
+      setBackgroundImage('custom')
+
+      // Modal nach kurzer Verzögerung schließen
+      setTimeout(() => {
+        setIsProcessingImage(false)
+        setCompressionResult(null)
+      }, 2000)
+
+    } catch (err) {
+      console.error('Image compression failed:', err)
+      setIsProcessingImage(false)
+      alert('Bild konnte nicht verarbeitet werden. Bitte versuche ein anderes Bild.')
+    }
+  }
+
+  // Handler zum Entfernen des Custom-Bildes
+  const handleRemoveCustomImage = () => {
+    setCustomBackgroundImage(null)
+    if (backgroundImage === 'custom') {
+      setBackgroundImage('none')
+    }
+  }
+
   return (
     <div className="settings-pane">
+      {/* Image Processing Modal */}
+      {isProcessingImage && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div 
+            className="card"
+            style={{
+              padding: 24,
+              minWidth: 300,
+              maxWidth: 400,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🖼️</div>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>{processingStatus}</div>
+            
+            {compressionResult ? (
+              <div style={{ 
+                marginTop: 16, 
+                padding: 12, 
+                background: 'var(--surface-alt, var(--muted))', 
+                borderRadius: 8,
+                textAlign: 'left',
+                fontSize: 13,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Original:</span>
+                  <span>{compressionResult.originalDimensions} • {compressionResult.originalSize}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Optimiert:</span>
+                  <span style={{ color: 'var(--success)' }}>{compressionResult.finalDimensions} • {compressionResult.finalSize}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ 
+                marginTop: 12,
+                height: 4,
+                background: 'var(--border)',
+                borderRadius: 2,
+                overflow: 'hidden',
+              }}>
+                <div 
+                  style={{
+                    height: '100%',
+                    width: '30%',
+                    background: 'var(--accent)',
+                    borderRadius: 2,
+                    animation: 'processingBar 1.5s ease-in-out infinite',
+                  }}
+                />
+              </div>
+            )}
+            
+            <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+              {compressionResult 
+                ? '✓ Hintergrundbild wurde gesetzt'
+                : 'Große Bilder werden automatisch verkleinert…'
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Setup (Erststart) – Reopen wizard */}
       <div className="card settings-pane-card">
         <div className="settings-title">
@@ -113,7 +405,7 @@ export function GeneralPane({
         <div className="field" style={{ marginTop: 16 }}>
           <label>Hintergrundbild</label>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-            {(Object.keys(BG_IMAGES) as BackgroundImage[]).map((key) => {
+            {(Object.keys(BG_IMAGES) as Exclude<BackgroundImage, 'custom'>[]).map((key) => {
               const img = BG_IMAGES[key]
               const isSelected = backgroundImage === key
               return (
@@ -165,8 +457,119 @@ export function GeneralPane({
                 </button>
               )
             })}
+
+            {/* Custom Image Tile */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (customBackgroundImage) {
+                    setBackgroundImage('custom')
+                  } else {
+                    fileInputRef.current?.click()
+                  }
+                }}
+                style={{
+                  width: 110,
+                  height: 75,
+                  borderRadius: 8,
+                  border: backgroundImage === 'custom' ? '3px solid var(--primary)' : '2px solid var(--border)',
+                  background: customBackgroundImage 
+                    ? `url("${customBackgroundImage}") center/cover` 
+                    : 'var(--surface-alt)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'border-color 0.2s, transform 0.15s',
+                  transform: backgroundImage === 'custom' ? 'scale(1.05)' : 'scale(1)',
+                  boxShadow: backgroundImage === 'custom' ? '0 4px 12px rgba(0,0,0,0.3)' : 'none'
+                }}
+                title={customBackgroundImage ? 'Eigenes Bild' : 'Eigenes Bild hochladen'}
+              >
+                {!customBackgroundImage && (
+                  <span style={{ 
+                    position: 'absolute', 
+                    inset: 0, 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: 2,
+                    color: 'var(--text-dim)'
+                  }}>
+                    <span style={{ fontSize: 22 }}>📷</span>
+                    <span style={{ fontSize: 9, opacity: 0.8 }}>Hochladen</span>
+                  </span>
+                )}
+                <span style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'rgba(0,0,0,0.7)',
+                  color: 'white',
+                  fontSize: 10,
+                  padding: '3px 4px',
+                  textAlign: 'center',
+                }}>
+                  Eigenes Bild
+                </span>
+              </button>
+              
+              {/* Buttons für Ändern/Löschen wenn Custom-Bild vorhanden */}
+              {customBackgroundImage && (
+                <div style={{ 
+                  display: 'flex', 
+                  gap: 4, 
+                  marginTop: 4,
+                  justifyContent: 'center'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: 10,
+                      borderRadius: 4,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                    }}
+                    title="Anderes Bild wählen"
+                  >
+                    Ändern
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCustomImage}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: 10,
+                      borderRadius: 4,
+                      border: '1px solid var(--danger)',
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      cursor: 'pointer',
+                    }}
+                    title="Eigenes Bild entfernen"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCustomImageUpload}
+              style={{ display: 'none' }}
+            />
           </div>
-          <div className="helper" style={{ marginTop: 8 }}>Wähle ein Hintergrundbild für die App.</div>
+          <div className="helper" style={{ marginTop: 8 }}>Wähle ein Hintergrundbild für die App oder lade ein eigenes hoch.</div>
         </div>
       </div>
 

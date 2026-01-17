@@ -390,7 +390,7 @@ export default function MembersView() {
                 </div>
             </div>
 
-            {form && (
+            {form && createPortal(
                 <div className="modal-overlay" onClick={() => setForm(null)}>
                     <div className="modal member-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -595,7 +595,8 @@ export default function MembersView() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
             {showColumnsModal && (
                 <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>

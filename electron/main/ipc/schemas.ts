@@ -180,7 +180,10 @@ export const ReportsSummaryInput = z.object({
     type: VoucherType.optional(),
     earmarkId: z.number().optional(),
     q: z.string().optional(),
-    tag: z.string().optional()
+    tag: z.string().optional(),
+    // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
+    workYear: z.number().optional(),
+    showArchived: z.boolean().optional()
 })
 
 export const ReportsSummaryOutput = z.object({

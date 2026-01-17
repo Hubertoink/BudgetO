@@ -76,11 +76,93 @@ function contrastText(bg?: string | null) {
 }
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
+
+function AboutModal({ onClose }: { onClose: () => void }) {
+    const [appVersion, setAppVersion] = useState<string>('')
+    
+    useEffect(() => {
+        ;(window as any).api?.app?.getVersion?.()
+            .then((res: any) => setAppVersion(res?.version || ''))
+            .catch(() => setAppVersion(''))
+    }, [])
+    
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                onClose()
+            }
+        }
+        window.addEventListener('keydown', handleKey)
+        return () => window.removeEventListener('keydown', handleKey)
+    }, [onClose])
+    
+    return createPortal(
+        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, textAlign: 'center', padding: 24 }}>
+                <header style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                    <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ fontSize: 18 }}>✕</button>
+                </header>
+                
+                <img src={appLogo} alt="BudgetO Logo" width={96} height={96} style={{ borderRadius: 12, margin: '0 auto 16px', display: 'block' }} />
+                
+                <h2 style={{ margin: '0 0 4px', fontSize: 24 }}>BudgetO</h2>
+                <p style={{ margin: '0 0 16px', color: 'var(--text-dim)', fontSize: 14 }}>
+                    Budget- und Finanzmanagement für die Jugendförderung
+                </p>
+                
+                {appVersion && (
+                    <div style={{ marginBottom: 16 }}>
+                        <span className="badge" style={{ fontSize: 13, padding: '4px 12px' }}>Version {appVersion}</span>
+                    </div>
+                )}
+                
+                <div className="card" style={{ padding: 16, textAlign: 'left', marginBottom: 16 }}>
+                    <div style={{ marginBottom: 12 }}>
+                        <div className="helper" style={{ marginBottom: 4 }}>Entwickler</div>
+                        <div style={{ fontWeight: 600 }}>Hubertoink</div>
+                        <a href="mailto:Hubertoink@outlook.com" style={{ color: 'var(--accent)', fontSize: 13 }}>
+                            Hubertoink@outlook.com
+                        </a>
+                    </div>
+                    
+                    <div>
+                        <div className="helper" style={{ marginBottom: 4 }}>Download</div>
+                        <a 
+                            href="https://1drv.ms/u/c/783bd05049ea9e15/IQA3qpju3Mm6Tr0dGbiVWzkyAbAMNYuWRTbrdb-THUGvkuI?e=dwVEK6"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: 'var(--accent)', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        >
+                            📥 Setup.exe herunterladen
+                        </a>
+                    </div>
+                </div>
+                
+                <div className="helper" style={{ fontSize: 11 }}>
+                    © {new Date().getFullYear()} Hubertoink. Alle Rechte vorbehalten.
+                </div>
+            </div>
+        </div>,
+        document.body
+    )
+}
+
 function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
+    const [showAbout, setShowAbout] = useState(false)
+    
     return (
         <div className="inline-flex items-center gap-8">
-            <img src={appLogo} alt="BudgetO" width={24} height={24} style={{ borderRadius: 4, display: 'block' }} />
+            <button 
+                onClick={() => setShowAbout(true)} 
+                style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                aria-label="Über BudgetO"
+                title="Über BudgetO"
+            >
+                <img src={appLogo} alt="BudgetO" width={24} height={24} style={{ borderRadius: 4, display: 'block' }} />
+            </button>
             <OrgSwitcher notify={notify} />
+            {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
         </div>
     )
 }
@@ -218,6 +300,8 @@ function AppInner() {
         setJournalRowDensity,
         backgroundImage,
         setBackgroundImage,
+        customBackgroundImage,
+        setCustomBackgroundImage,
         glassModals,
         setGlassModals
     } = useUIPreferences()
@@ -262,14 +346,37 @@ function AppInner() {
         if (/UNIQUE constraint failed/i.test(msg)) return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
         return 'Fehler: ' + msg
     }
-    // Dynamic available years from vouchers
+    // Dynamic available years from vouchers + annual budgets
     const [yearsAvail, setYearsAvail] = useState<number[]>([])
+    const [preferredBudgetYear, setPreferredBudgetYear] = useState<number | null>(null)
     useEffect(() => {
         let cancelled = false
         async function loadYears() {
             try {
-                const res = await window.api?.reports?.years?.()
-                if (!cancelled && res?.years) setYearsAvail(res.years)
+                const [yearsRes, budgetsRes] = await Promise.all([
+                    window.api?.reports?.years?.(),
+                    (window as any).api?.annualBudgets?.list?.({})
+                ])
+
+                const voucherYears = (yearsRes?.years || []) as number[]
+                const annualBudgets = ((budgetsRes?.budgets || []) as Array<{ year: number; amount: number; costCenterId: number | null }>)
+                const annualBudgetYears = annualBudgets
+                    .filter((b) => b && typeof b.year === 'number')
+                    .map((b) => b.year)
+
+                const mergedYears = Array.from(new Set<number>([...voucherYears, ...annualBudgetYears]))
+                    .filter((y) => Number.isFinite(y) && y > 1900)
+                    .sort((a, b) => b - a)
+
+                if (!cancelled) setYearsAvail(mergedYears)
+
+                const preferred = annualBudgets
+                    .filter((b) => (b?.costCenterId ?? null) === null && Number(b?.amount || 0) > 0 && Number.isFinite(b?.year))
+                    .map((b) => Number(b.year))
+                    .filter((y) => y > 1900)
+                    .sort((a, b) => b - a)[0]
+
+                if (!cancelled) setPreferredBudgetYear(preferred ?? null)
             } catch { }
         }
         loadYears()
@@ -613,6 +720,83 @@ function AppInner() {
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
     const [q, setQ] = useState<string>('')
+
+    type JournalTimeFilterMode = 'ALL' | 'YEAR' | 'CUSTOM'
+    const journalTimeFilter = React.useMemo(() => {
+        const infer = (f: string, t: string): { mode: JournalTimeFilterMode; year?: number } => {
+            const hasF = !!f
+            const hasT = !!t
+            if (!hasF && !hasT) return { mode: 'ALL' }
+
+            const fy = hasF ? Number(String(f).slice(0, 4)) : NaN
+            const ty = hasT ? Number(String(t).slice(0, 4)) : NaN
+            if (Number.isFinite(fy) && Number.isFinite(ty) && fy === ty) {
+                if (f === `${fy}-01-01` && t === `${fy}-12-31`) return { mode: 'YEAR', year: fy }
+            }
+            return { mode: 'CUSTOM' }
+        }
+
+        const persist = (f: string, t: string) => {
+            try {
+                const inf = infer(f, t)
+                localStorage.setItem('journal.timeFilter.mode', inf.mode)
+                if (inf.mode === 'YEAR' && inf.year) localStorage.setItem('journal.timeFilter.year', String(inf.year))
+                else localStorage.removeItem('journal.timeFilter.year')
+            } catch {
+                // ignore
+            }
+        }
+
+        return { infer, persist }
+    }, [])
+
+    // Restore explicit user choice for time filter across sessions.
+    useEffect(() => {
+        try {
+            const mode = (localStorage.getItem('journal.timeFilter.mode') || '') as JournalTimeFilterMode
+            if (mode !== 'YEAR') return
+            const y = Number(localStorage.getItem('journal.timeFilter.year') || '')
+            if (!Number.isFinite(y) || y < 1900) return
+            if (from || to) return
+            setFrom(`${y}-01-01`)
+            setTo(`${y}-12-31`)
+        } catch {
+            // ignore
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Default: if an annual budget exists, default Buchungen to that budget year.
+    useEffect(() => {
+        if (!preferredBudgetYear) return
+        if (from || to) return
+        let mode: string | null = null
+        try { mode = localStorage.getItem('journal.timeFilter.mode') } catch { mode = null }
+        if (mode) return
+        const nf = `${preferredBudgetYear}-01-01`
+        const nt = `${preferredBudgetYear}-12-31`
+        setFrom(nf)
+        setTo(nt)
+        journalTimeFilter.persist(nf, nt)
+    }, [from, to, preferredBudgetYear, journalTimeFilter])
+
+    // If user previously chose YEAR mode, don't allow clearing back to empty implicitly.
+    // (Users can still intentionally switch to ALL via the time filter modal.)
+    useEffect(() => {
+        if (from || to) return
+        try {
+            const mode = (localStorage.getItem('journal.timeFilter.mode') || '') as JournalTimeFilterMode
+            if (mode !== 'YEAR') return
+            const y = Number(localStorage.getItem('journal.timeFilter.year') || '')
+            if (!Number.isFinite(y) || y < 1900) return
+            const nf = `${y}-01-01`
+            const nt = `${y}-12-31`
+            setFrom(nf)
+            setTo(nt)
+        } catch {
+            // ignore
+        }
+    }, [from, to])
 
     // Global: Arbeitsjahr + Archivmodus (Blank-Slate) – used for server-side filtering
     const { workYear: uiWorkYear, showArchived: uiShowArchived, ready: archiveSettingsReady } = useArchiveSettings()
@@ -1074,6 +1258,8 @@ function AppInner() {
                             setJournalRowDensity={setJournalRowDensity}
                             backgroundImage={backgroundImage}
                             setBackgroundImage={setBackgroundImage}
+                            customBackgroundImage={customBackgroundImage}
+                            setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
                             tagDefs={tagDefs}
@@ -1217,7 +1403,7 @@ function AppInner() {
                 yearsAvail={yearsAvail}
                 from={from}
                 to={to}
-                onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt) }}
+                onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt); journalTimeFilter.persist(nf, nt) }}
             />
             {/* Meta Filter Modal (Kategorie, Zweckbindung, Budget) */}
             <MetaFilterModal

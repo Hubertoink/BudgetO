@@ -115,7 +115,9 @@ export function registerIpcHandlers() {
                 to: parsed.to,
                 earmarkId: parsed.earmarkId,
                 q: (parsed as any).q,
-                tag: (parsed as any).tag
+                tag: (parsed as any).tag,
+                workYear: (parsed as any).workYear,
+                showArchived: (parsed as any).showArchived
             }))
         }
 
@@ -129,7 +131,9 @@ export function registerIpcHandlers() {
             // extend filters with optional earmarkId
             ...(parsed.earmarkId != null ? { earmarkId: parsed.earmarkId } as any : {}),
             q: (parsed as any).q,
-            tag: (parsed as any).tag
+            tag: (parsed as any).tag,
+            workYear: (parsed as any).workYear,
+            showArchived: (parsed as any).showArchived
         } as any)
         return ReportsSummaryOutput.parse(summary)
     })

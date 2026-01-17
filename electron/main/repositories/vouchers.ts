@@ -773,9 +773,12 @@ export function summarizeVouchers(filters: {
     earmarkId?: number
     q?: string
     tag?: string
+    // Archive mode: server-side filtering by work year (Blank Slate)
+    workYear?: number
+    showArchived?: boolean
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag } = filters
+    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
@@ -796,6 +799,13 @@ export function summarizeVouchers(filters: {
         wh.push('t.name = ?')
         paramsBase.push(tag)
     }
+
+    // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
+    if (showArchived === false && typeof workYear === 'number' && !from && !to) {
+        wh.push('v.date >= ? AND v.date <= ?')
+        paramsBase.push(`${workYear}-01-01`, `${workYear}-12-31`)
+    }
+
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
 
     const totals = d.prepare(`
@@ -1228,8 +1238,29 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
 // Distinct voucher years present in the database
 export function listVoucherYears(): number[] {
     const d = getDb()
-    const rows = d.prepare("SELECT DISTINCT CAST(strftime('%Y', date) AS INTEGER) as year FROM vouchers ORDER BY year DESC").all() as any[]
-    return rows.map(r => Number(r.year)).filter((y) => Number.isFinite(y))
+
+        // NOTE: Some installations store ISO dates with time (e.g. 2026-01-17T00:00:00.000Z).
+        // SQLite's strftime() may return NULL for some ISO variants, so we fall back to parsing the year
+        // from the string prefix (and keep a defensive legacy parser for dd.mm.yy).
+        const rows = d.prepare(`
+                SELECT DISTINCT year FROM (
+                    SELECT
+                        CASE
+                            WHEN date GLOB '____-__-__*' THEN CAST(substr(date, 1, 4) AS INTEGER)
+                            WHEN date GLOB '__.__.__' THEN
+                                (CASE
+                                    WHEN CAST(substr(date, 7, 2) AS INTEGER) < 70 THEN 2000 + CAST(substr(date, 7, 2) AS INTEGER)
+                                    ELSE 1900 + CAST(substr(date, 7, 2) AS INTEGER)
+                                END)
+                            ELSE CAST(strftime('%Y', date) AS INTEGER)
+                        END AS year
+                    FROM vouchers
+                )
+                WHERE year IS NOT NULL AND year BETWEEN 1900 AND 2100
+                ORDER BY year DESC
+        `).all() as any[]
+
+        return rows.map(r => Number(r.year)).filter((y) => Number.isFinite(y))
 }
 
 // Attachments

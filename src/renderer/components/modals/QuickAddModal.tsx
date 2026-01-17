@@ -105,36 +105,101 @@ export default function QuickAddModal({
     return (
         <div className="modal-overlay">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
-                <header className="modal-header-flex">
-                    <h2>+ Buchung</h2>
-                    <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
-                    </button>
-                </header>
-                
-                <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
-                    {/* Live Summary */}
-                    <div className="card summary-card">
-                        <div className="helper">Zusammenfassung</div>
-                        <div className="summary-text-bold">
-                            {(() => {
-                                const date = fmtDate(qa.date)
-                                const type = qa.type
-                                const pm = qa.type === 'TRANSFER' ? (((qa as any).transferFrom || '—') + ' → ' + ((qa as any).transferTo || '—')) : ((qa as any).paymentMethod || '—')
-                                const amount = (() => {
-                                    if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                    if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                    const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                    return eurFmt.format(g)
-                                })()
-                                const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span></>
-                            })()}
+                {/* Sticky Header with Summary + Actions */}
+                <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                    {/* Title row with action buttons */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <h2 style={{ margin: 0, flex: 1 }}>+ Buchung</h2>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span className="helper" style={{ fontSize: 11, opacity: 0.7 }}>Ctrl+S</span>
+                            <button type="submit" form="quick-add-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>Speichern</button>
+                            <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)" style={{ padding: 6 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
-
+                    {/* Compact Summary Line */}
+                    <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap', 
+                        gap: '6px 12px', 
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
+                        borderRadius: 8,
+                        borderLeft: `4px solid ${qa.type === 'IN' ? 'var(--success)' : qa.type === 'OUT' ? 'var(--danger)' : 'var(--accent)'}`,
+                        fontSize: 13
+                    }}>
+                        <span style={{ fontWeight: 600 }}>{fmtDate(qa.date)}</span>
+                        <span style={{ 
+                            padding: '2px 8px', 
+                            borderRadius: 4, 
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: qa.type === 'IN' ? 'var(--success)' : qa.type === 'OUT' ? 'var(--danger)' : 'var(--accent)',
+                            color: 'white'
+                        }}>
+                            {qa.type}
+                        </span>
+                        <span style={{ color: 'var(--text-dim)' }}>
+                            {qa.type === 'TRANSFER' 
+                                ? `${(qa as any).transferFrom || '—'} → ${(qa as any).transferTo || '—'}`
+                                : (qa as any).paymentMethod || '—'}
+                        </span>
+                        <span style={{ 
+                            color: qa.type === 'IN' ? 'var(--success)' : qa.type === 'OUT' ? 'var(--danger)' : 'inherit',
+                            fontWeight: 700
+                        }}>
+                            {(() => {
+                                if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                const n = Number(qa.netAmount || 0)
+                                const v = Number(qa.vatRate || 0)
+                                const g = Math.round((n * (1 + v / 100)) * 100) / 100
+                                return eurFmt.format(g)
+                            })()}
+                        </span>
+                        {/* Category badge */}
+                        {useCategoriesModule && (qa as any).categoryId && customCategories.length > 0 && (() => {
+                            const cat = customCategories.find(c => c.id === (qa as any).categoryId)
+                            return cat ? (
+                                <span style={{ 
+                                    padding: '2px 8px', 
+                                    borderRadius: 4, 
+                                    fontSize: 11,
+                                    background: cat.color ? `${cat.color}30` : 'var(--muted)',
+                                    border: `1px solid ${cat.color || 'var(--border)'}`,
+                                    color: cat.color || 'var(--text)'
+                                }}>
+                                    {cat.name}
+                                </span>
+                            ) : null
+                        })()}
+                        {/* Description snippet */}
+                        {qa.description && (
+                            <span style={{ color: 'var(--text)', opacity: 0.85 }}>
+                                📝 {qa.description.length > 40 ? qa.description.slice(0, 40) + '…' : qa.description}
+                            </span>
+                        )}
+                        {/* Tags count */}
+                        {qa.tags && qa.tags.length > 0 && (
+                            <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: 999, 
+                                fontSize: 10,
+                                fontWeight: 600,
+                                background: 'var(--muted)',
+                                border: '1px solid var(--border)'
+                            }}>
+                                🏷️ {qa.tags.length}
+                            </span>
+                        )}
+                    </div>
+                </header>
+                
+                <form id="quick-add-form" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
                     {/* Blocks A+B in a side-by-side grid on wide screens */}
                     <div className="block-grid block-grid-mb">
                         {/* Block A – Basisinfos */}
@@ -582,11 +647,6 @@ export default function QuickAddModal({
                                 </div>
                             )}
                         </div>
-                    </div>
-                    
-                    <div className="modal-footer-actions">
-                        <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
-                        <button type="submit" className="btn primary">Speichern</button>
                     </div>
                 </form>
             </div>

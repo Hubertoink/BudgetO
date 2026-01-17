@@ -1235,7 +1235,12 @@ html,
 body,
 #root {
     height: 100%;
-    min-width: 1264px; /* safety net: matches BrowserWindow minWidth incl. left sidebar */
+    min-width: 0;
+    width: 100%;
+}
+
+html {
+    background: var(--bg);
 }
 
 body {
@@ -1244,6 +1249,7 @@ body {
     color: var(--text);
     font-family: Inter, "Plus Jakarta Sans", Segoe UI, system-ui, -apple-system, sans-serif;
     line-height: 1.4;
+    overflow-x: hidden;
 }
 
 h1 {
@@ -1706,6 +1712,9 @@ svg text {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 24px 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     /* Ensure overlay sits above header (z-index: 1000), FAB (3000), and most overlays */
     z-index: 5000; /* below toasts (9999) */
     animation: modalFadeIn 0.2s ease-out;
@@ -1792,6 +1801,30 @@ svg text {
     width: min(1100px, 96vw);
     max-height: 90vh;
     animation: modalSlideUp 0.25s ease-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Sticky modal header for booking modal */
+.booking-modal > header,
+.booking-modal .modal-header-flex {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
+    padding: 12px 0 8px;
+    margin: -12px -16px 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+/* Scrollable form content */
+.booking-modal > form {
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 4px; /* space for scrollbar */
 }
 
 /* Wider Members modal similar to booking */
@@ -2017,12 +2050,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 999px;
-    background: var(--muted);
-    border: 1px solid var(--border);
+    background: color-mix(in oklab, var(--accent) 20%, var(--surface));
+    border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--border));
+    color: var(--text);
     font-size: 11px;
+    font-weight: 600;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Count badge variant for tabs/pills - more prominent */
+.chip.chip-count {
+    background: var(--accent);
+    color: var(--surface);
+    border-color: var(--accent);
+    min-width: 18px;
+    text-align: center;
+    justify-content: center;
 }
 
 .chip:hover {
@@ -2090,6 +2135,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @keyframes rowFlash {
     0% { background-color: color-mix(in oklab, var(--accent) 45%, transparent); }
     100% { background-color: transparent; }
+}
+
+/* Processing bar animation for image uploads */
+@keyframes processingBar {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(250%); }
+    100% { transform: translateX(-100%); }
 }
 
 tbody tr.row-flash {
@@ -2418,27 +2470,33 @@ textarea:focus {
     color: var(--accent);
     width: 48px;
     height: 48px;
-    padding: 0;
+    padding: 0 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fab-buchung-icon {
     font-size: 24px;
     font-weight: 300;
     line-height: 1;
-    transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fab-buchung-text {
     opacity: 0;
-    width: 0;
+    max-width: 0;
     overflow: hidden;
     white-space: nowrap;
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-left: 0;
 }
 
@@ -2448,18 +2506,17 @@ textarea:focus {
     backdrop-filter: blur(4px);
     /* Ensure label text stays readable across themes */
     color: var(--text);
-    width: auto;
-    padding-left: 16px;
-    padding-right: 16px;
+    width: 140px;
+    padding: 0 16px;
 }
 
 .fab-buchung:hover .fab-buchung-icon {
-    font-size: 20px;
+    transform: scale(0.85);
 }
 
 .fab-buchung:hover .fab-buchung-text {
     opacity: 1;
-    width: auto;
+    max-width: 100px;
     margin-left: 6px;
 }
 
@@ -3945,38 +4002,56 @@ label .req-asterisk {
    ======================================== */
 
 /* Base styles for background images */
-html[data-background-image]:not([data-background-image="none"])::before {
-    content: '';
+/*
+   NOTE: We use a real DOM element instead of a CSS custom property in a pseudo-element.
+   Some very large data-URLs can fail when routed through CSS variables.
+*/
+html[data-background-image]:not([data-background-image="none"]) #app-background {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 0;
+    z-index: -1;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    opacity: 0.25;
+    opacity: 0.35;
     pointer-events: none;
+}
+
+html[data-background-image="none"] #app-background {
+    display: none;
 }
 
 /* Ensure main content is above background */
 html[data-background-image]:not([data-background-image="none"]) body {
     position: relative;
-    z-index: 1;
+    z-index: 0;
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
 }
 
-html[data-background-image="mountain-clouds"]::before {
+html[data-background-image]:not([data-background-image="none"]) #root {
+    position: relative;
+    z-index: 1;
+    background: transparent !important;
+}
+
+html[data-background-image="mountain-clouds"] #app-background {
     background-image: url('./assets/a_mountain_with_snow_and_clouds.jpg');
 }
 
-html[data-background-image="snowy-landscape"]::before {
+html[data-background-image="snowy-landscape"] #app-background {
     background-image: url('./assets/a_snowy_landscape_with_trees_and_a_light_on_it.jpg');
 }
 
-html[data-background-image="snow-houses"]::before {
+html[data-background-image="snow-houses"] #app-background {
     background-image: url('./assets/a_snow_covered_houses_and_a_street_light.png');
 }
+
+/* Custom user-uploaded background image is applied inline via JS */
 
 /* ========================================
    Glassmorphism Modals

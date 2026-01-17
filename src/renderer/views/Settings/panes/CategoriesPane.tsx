@@ -380,7 +380,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
         >
           <span>📂</span>
           <span>Kategorien</span>
-          <span className="chip" style={{ fontSize: 10, marginLeft: 4 }}>{categories.length}</span>
+          <span className="chip chip-count" style={{ fontSize: 10, marginLeft: 4 }}>{categories.length}</span>
         </button>
 
         {/* Taxonomy Tabs */}
@@ -402,7 +402,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
           >
             <span>🏷️</span>
             <span>{tx.name}</span>
-            <span className="chip" style={{ fontSize: 10, marginLeft: 4 }}>{tx.termCount ?? 0}</span>
+            <span className="chip chip-count" style={{ fontSize: 10, marginLeft: 4 }}>{tx.termCount ?? 0}</span>
           </button>
         ))}
 

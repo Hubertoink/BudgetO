@@ -246,6 +246,40 @@ export function OrgPane({ notify }: OrgPaneProps) {
           </div>
         )}
 
+        {budgetLoaded && budgetUsage && budgetUsage.budgeted > 0 && (
+          <div
+            className="card"
+            style={{
+              marginTop: 12,
+              padding: 12,
+              border: '1px solid color-mix(in oklab, var(--accent) 25%, var(--border))',
+              background: 'color-mix(in oklab, var(--accent) 10%, transparent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ minWidth: 240 }}>
+              <div style={{ fontWeight: 600 }}>📊 Jahresabschluss</div>
+              <div className="helper">
+                Wenn das Jahresbudget für <strong>{budgetYear}</strong> festgelegt ist, kannst du das Jahr auch direkt hier über den Jahresabschluss abschließen.
+              </div>
+            </div>
+            <button
+              className="btn"
+              onClick={() => {
+                try { sessionStorage.setItem('yearEnd.prefillYear', String(budgetYear)) } catch { /* ignore */ }
+                window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'yearEnd', year: budgetYear } }))
+              }}
+              title="Zum Jahresabschluss wechseln"
+            >
+              Zum Jahresabschluss…
+            </button>
+          </div>
+        )}
+
         {budgetLoaded && (!budgetUsage || budgetUsage.budgeted === 0) && (
           <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>
             Noch kein Budget für {budgetYear} hinterlegt.

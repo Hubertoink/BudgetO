@@ -12,7 +12,7 @@ export type NavIconColorMode = 'color' | 'mono'
 export type DateFormat = 'de' | 'iso'
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 export type JournalRowDensity = 'normal' | 'compact'
-export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
+export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses' | 'custom'
 
 export interface UIPreferencesContextValue {
   navLayout: NavLayout
@@ -31,6 +31,8 @@ export interface UIPreferencesContextValue {
   setJournalRowDensity: (val: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean
   setGlassModals: (val: boolean) => void
 }

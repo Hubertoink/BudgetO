@@ -47,7 +47,31 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
 
   React.useEffect(() => {
     let cancelled = false
-    window.api?.reports?.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) })
+    ;(async () => {
+      try {
+        const prefill = Number(sessionStorage.getItem('yearEnd.prefillYear') || '')
+        if (!cancelled && Number.isFinite(prefill) && prefill > 1900) setYear(prefill)
+      } catch { /* ignore */ }
+
+      try {
+        const [y, budgetsRes] = await Promise.all([
+          window.api?.reports?.years?.(),
+          (window as any).api?.annualBudgets?.list?.({})
+        ])
+        const voucherYears = (y?.years || []) as number[]
+        const budgetYears = ((budgetsRes?.budgets || []) as Array<{ year: number }>).map(b => Number(b.year))
+        const merged = Array.from(new Set<number>([...voucherYears, ...budgetYears]))
+          .filter((n) => Number.isFinite(n) && n > 1900)
+          .sort((a, b) => b - a)
+        if (!cancelled) setYearsAvail(merged)
+      } catch {
+        // fallback to voucher years only
+        try {
+          const y = await window.api?.reports?.years?.()
+          if (!cancelled && y?.years) setYearsAvail(y.years)
+        } catch { /* ignore */ }
+      }
+    })()
     window.api?.yearEnd?.status?.().then(s => { if (!cancelled) setStatus(s as any) })
     ;(async () => {
       try {

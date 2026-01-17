@@ -269,7 +269,7 @@ export default function JournalView({
     useEffect(() => {
         if (!useCategoriesModule) return
         const loadCategories = () => {
-            window.api?.customCategories?.list?.()?.then((cats: any) => {
+            ;(window as any).api?.customCategories?.list?.()?.then((cats: any) => {
                 const fromCategories = Array.isArray(cats?.categories) ? cats.categories : null
                 const fromRows = Array.isArray(cats?.rows) ? cats.rows : null
                 const list = Array.isArray(cats) ? cats : fromCategories || fromRows || []
@@ -387,7 +387,7 @@ export default function JournalView({
         if (archiveSettingsReady === false) return
         try {
             const offset = (activePage - 1) * journalLimit
-            const res = await window.api?.vouchers?.list?.({
+            const res = await (window.api?.vouchers?.list as any)?.({
                 limit: journalLimit,
                 offset,
                 sort: sortDir,
@@ -406,7 +406,7 @@ export default function JournalView({
                 // Archive mode: server-side filtering
                 workYear: showArchived === false ? workYear : undefined,
                 showArchived
-            })
+            } as any)
             if (res) {
                 setRows(res.rows || [])
                 setTotalRows(res.total || 0)
@@ -694,6 +694,8 @@ export default function JournalView({
                 budgetId={activeFilterBudgetId ?? undefined} 
                 q={activeQ || undefined} 
                 tag={activeFilterTag || undefined} 
+                workYear={workYear}
+                showArchived={showArchived}
             />
 
             {/* Main Table Card */}
@@ -813,23 +815,101 @@ export default function JournalView({
                 {/* Edit Modal */}
                 {editRow && (
                     <div className="modal-overlay">
-                        <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <h2 style={{ margin: 0 }}>
-                                    {(() => {
-                                        const desc = (editRow.description || '').trim()
-                                        const label = desc ? `Buchung (${desc.length > 60 ? desc.slice(0,60) + '…' : desc}) bearbeiten` : `Buchung bearbeiten`
-                                        return label
-                                    })()}
-                                </h2>
-                                <button className="btn ghost" onClick={() => setEditRow(null)} title="Schließen (ESC)">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                    </svg>
-                                </button>
+                        <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {/* Sticky Header with Summary + Actions */}
+                            <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                                {/* Title row with action buttons */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                                    <h2 style={{ margin: 0, flex: 1 }}>Buchung bearbeiten</h2>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <button type="button" className="btn danger" style={{ padding: '6px 12px', fontSize: 13 }} title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑</button>
+                                        <button type="button" className="btn" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setEditRow(null)}>Abbrechen</button>
+                                        <button type="submit" form="edit-booking-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>Speichern</button>
+                                        <button className="btn ghost" onClick={() => setEditRow(null)} title="Schließen (ESC)" style={{ padding: 6 }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Compact Summary Line */}
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexWrap: 'wrap', 
+                                    gap: '6px 12px', 
+                                    alignItems: 'center',
+                                    padding: '8px 12px',
+                                    background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
+                                    borderRadius: 8,
+                                    borderLeft: `4px solid ${editRow.type === 'IN' ? 'var(--success)' : editRow.type === 'OUT' ? 'var(--danger)' : 'var(--accent)'}`,
+                                    fontSize: 13
+                                }}>
+                                    <span style={{ fontWeight: 600 }}>{fmtDate(editRow.date)}</span>
+                                    <span style={{ 
+                                        padding: '2px 8px', 
+                                        borderRadius: 4, 
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        background: editRow.type === 'IN' ? 'var(--success)' : editRow.type === 'OUT' ? 'var(--danger)' : 'var(--accent)',
+                                        color: 'white'
+                                    }}>
+                                        {editRow.type}
+                                    </span>
+                                    <span style={{ color: 'var(--text-dim)' }}>
+                                        {editRow.type === 'TRANSFER' 
+                                            ? `${(editRow as any).transferFrom || '—'} → ${(editRow as any).transferTo || '—'}`
+                                            : (editRow as any).paymentMethod || '—'}
+                                    </span>
+                                    <span style={{ 
+                                        color: editRow.type === 'IN' ? 'var(--success)' : editRow.type === 'OUT' ? 'var(--danger)' : 'inherit',
+                                        fontWeight: 700
+                                    }}>
+                                        {(() => {
+                                            if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
+                                            if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
+                                            const n = Number((editRow as any).netAmount || 0)
+                                            const v = Number((editRow as any).vatRate || 0)
+                                            const g = Math.round((n * (1 + v / 100)) * 100) / 100
+                                            return eurFmt.format(g)
+                                        })()}
+                                    </span>
+                                    {/* Category or Sphere badge */}
+                                    {(useCategoriesModule ? editRow.categoryId : editRow.sphere) && (
+                                        <span style={{ 
+                                            padding: '2px 8px', 
+                                            borderRadius: 4, 
+                                            fontSize: 11,
+                                            background: 'var(--muted)',
+                                            border: '1px solid var(--border)'
+                                        }}>
+                                            {useCategoriesModule 
+                                                ? (categoryMap.get(editRow.categoryId!)?.name || 'Kategorie')
+                                                : editRow.sphere}
+                                        </span>
+                                    )}
+                                    {/* Description snippet */}
+                                    {editRow.description && (
+                                        <span style={{ color: 'var(--text)', opacity: 0.85 }}>
+                                            📝 {editRow.description.length > 40 ? editRow.description.slice(0, 40) + '…' : editRow.description}
+                                        </span>
+                                    )}
+                                    {/* Tags count */}
+                                    {editRow.tags && editRow.tags.length > 0 && (
+                                        <span style={{ 
+                                            padding: '2px 8px', 
+                                            borderRadius: 999, 
+                                            fontSize: 10,
+                                            fontWeight: 600,
+                                            background: 'var(--muted)',
+                                            border: '1px solid var(--border)'
+                                        }}>
+                                            🏷️ {editRow.tags.length}
+                                        </span>
+                                    )}
+                                </div>
                             </header>
 
-                            <form onSubmit={async (e) => {
+                            <form id="edit-booking-form" onSubmit={async (e) => {
                                 e.preventDefault()
                                 try {
                                     // Validate transfer direction
@@ -939,29 +1019,6 @@ export default function JournalView({
                                     notify('error', friendlyError(e))
                                 }
                             }}>
-                                {/* Live Summary */}
-                                <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-                                    <div className="helper">Zusammenfassung</div>
-                                    <div style={{ fontWeight: 600 }}>
-                                        {(() => {
-                                            const date = fmtDate(editRow.date)
-                                            const type = editRow.type
-                                            const pm = editRow.type === 'TRANSFER' ? (((editRow as any).transferFrom || '—') + ' → ' + ((editRow as any).transferTo || '—')) : ((editRow as any).paymentMethod || '—')
-                                            const amount = (() => {
-                                                if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
-                                                if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
-                                                const n = Number((editRow as any).netAmount || 0); const v = Number((editRow as any).vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                                return eurFmt.format(g)
-                                            })()
-                                            const sphere = editRow.sphere
-                                            const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                            const categoryName = editRow.categoryId ? categoryMap.get(editRow.categoryId)?.name : null
-                                            const catOrSphere = useCategoriesModule ? (categoryName || 'Kategorie') : (sphere || '—')
-                                            return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {catOrSphere}</>
-                                        })()}
-                                    </div>
-                                </div>
-
                                 {/* Blocks A+B in a side-by-side grid on wide screens */}
                                 <div className="block-grid" style={{ marginBottom: 8 }}>
                                     {/* Block A – Basisinfos */}
@@ -1468,16 +1525,6 @@ export default function JournalView({
                                         </div>
                                     </div>
                                 )}
-
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                                    <div>
-                                        <button type="button" className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑 Löschen</button>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <button type="button" className="btn" onClick={() => setEditRow(null)}>Abbrechen</button>
-                                        <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
-                                    </div>
-                                </div>
                             </form>
                         </div>
                     </div>

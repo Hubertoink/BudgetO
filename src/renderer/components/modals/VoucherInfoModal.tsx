@@ -132,17 +132,6 @@ Tags: ${tagsDisplay}`
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        background: 'color-mix(in oklab, var(--surface) 65%, transparent)',
-        padding: '24px 16px',
-        zIndex: 9999,
-        overflowY: 'auto'
-      }}
     >
       <div
         className="modal"

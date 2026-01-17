@@ -37,7 +37,7 @@ export type ColorTheme =
   | 'monochrome-harmony' 
   | 'vintage-charm'
 
-export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses'
+export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses' | 'custom'
 
 // ============================================================================
 // Journal/Table Configuration Types
@@ -130,16 +130,14 @@ export interface SettingsProps {
   setColorTheme: (v: ColorTheme) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (v: string | null) => void
   journalRowStyle: JournalRowStyle
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (v: JournalRowDensity) => void
-  backgroundImage: BackgroundImage
-  setBackgroundImage: (v: BackgroundImage) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -167,12 +165,12 @@ export interface GeneralPaneProps {
   setColorTheme: (v: ColorTheme) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (v: string | null) => void
   journalRowStyle: JournalRowStyle
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (v: JournalRowDensity) => void
-  backgroundImage: BackgroundImage
-  setBackgroundImage: (v: BackgroundImage) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
   dateFmt: DateFmt
@@ -182,8 +180,6 @@ export interface GeneralPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (v: boolean) => void
 }
 
 export interface TablePaneProps {

@@ -74,6 +74,25 @@ export function SettingsView(props: SettingsProps) {
   }, [activeTile])
 
   useEffect(() => {
+    function onSelectTile(ev: Event) {
+      try {
+        const detail = (ev as CustomEvent<any>)?.detail || {}
+        const tile = detail?.tile as TileKey | undefined
+        if (tile) setActiveTile(tile)
+        const year = Number(detail?.year)
+        if (Number.isFinite(year) && year > 1900) {
+          try { sessionStorage.setItem('yearEnd.prefillYear', String(year)) } catch { /* ignore */ }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    window.addEventListener('settings:selectTile' as any, onSelectTile as any)
+    return () => window.removeEventListener('settings:selectTile' as any, onSelectTile as any)
+  }, [])
+
+  useEffect(() => {
     ;(window.api as any).app.version()
       .then((res: any) => setAppVersion(res?.version || ''))
       .catch(() => setAppVersion(''))
@@ -98,6 +117,8 @@ export function SettingsView(props: SettingsProps) {
             setColorTheme={props.setColorTheme}
             backgroundImage={props.backgroundImage}
             setBackgroundImage={props.setBackgroundImage}
+            customBackgroundImage={props.customBackgroundImage}
+            setCustomBackgroundImage={props.setCustomBackgroundImage}
             journalRowStyle={props.journalRowStyle}
             setJournalRowStyle={props.setJournalRowStyle}
             journalRowDensity={props.journalRowDensity}

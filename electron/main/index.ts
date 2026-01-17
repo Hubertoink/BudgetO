@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+const enableDevTools = isDev || process.env.BUDGETO_DEVTOOLS === '1'
 
 function getWindowsIconPath(): string {
     // Keep in sync with electron-builder.yml and ensure the file is packaged via `files: - assets/**`
@@ -27,7 +28,8 @@ async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
-    minWidth: 1264,
+        // Allow portrait/kiosk screens (e.g. 1080x1920) without forcing horizontal overflow.
+        minWidth: 900,
         minHeight: 640,
         show: false,
         autoHideMenuBar: true,
@@ -41,7 +43,7 @@ async function createWindow(): Promise<BrowserWindow> {
             sandbox: true,
             nodeIntegration: false,
             webSecurity: true,
-            devTools: isDev
+            devTools: enableDevTools
         }
     })
 
