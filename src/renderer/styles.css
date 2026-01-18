@@ -1235,7 +1235,7 @@ html,
 body,
 #root {
     height: 100%;
-    min-width: 0;
+    min-width: 0px;
     width: 100%;
 }
 
@@ -4485,4 +4485,190 @@ html[data-glass-modals="true"] .flyout-arrow {
 .work-year-indicator .work-year-label {
     font-weight: 500;
     opacity: 0.9;
+}
+
+/* ==================== Filter Dropdown ==================== */
+.filter-dropdown {
+    display: inline-flex;
+    position: relative;
+}
+
+.filter-dropdown__trigger {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 6px;
+    border-radius: var(--radius);
+    transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.filter-dropdown__trigger:hover {
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.filter-dropdown__trigger.has-filters {
+    color: var(--accent);
+}
+
+.filter-dropdown__indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    pointer-events: none;
+}
+
+.filter-dropdown__panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    z-index: 1000;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.18),
+        0 2px 8px rgba(0, 0, 0, 0.12);
+    animation: filterDropdownIn 150ms ease;
+    overflow: hidden;
+}
+
+@keyframes filterDropdownIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.filter-dropdown__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--surface) 95%, var(--accent));
+}
+
+.filter-dropdown__title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.filter-dropdown__close {
+    padding: 4px;
+    border-radius: 6px;
+    opacity: 0.6;
+    transition: opacity 120ms ease;
+}
+
+.filter-dropdown__close:hover {
+    opacity: 1;
+}
+
+.filter-dropdown__content {
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.filter-dropdown__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.filter-dropdown__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-dropdown__field + .filter-dropdown__field {
+    margin-top: 12px;
+}
+
+.filter-dropdown__grid .filter-dropdown__field + .filter-dropdown__field {
+    margin-top: 0;
+}
+
+.filter-dropdown__label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.filter-dropdown__actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* Divider between sections */
+.filter-dropdown__divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+}
+
+/* Checkbox row styling */
+.filter-dropdown__checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    background: color-mix(in oklab, var(--surface) 90%, var(--text-dim));
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    transition: background 120ms ease;
+}
+
+.filter-dropdown__checkbox:hover {
+    background: color-mix(in oklab, var(--surface) 85%, var(--text-dim));
+}
+
+.filter-dropdown__checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Info text styling */
+.filter-dropdown__info {
+    padding: 12px 14px;
+    margin-top: 16px;
+    background: color-mix(in oklab, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in oklab, var(--accent) 20%, transparent);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    text-align: center;
+}
+
+/* Small button variant */
+.btn-sm,
+.btn.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: calc(var(--radius) - 2px);
+    min-height: unset;
 }

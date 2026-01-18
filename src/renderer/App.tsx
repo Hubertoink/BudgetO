@@ -14,8 +14,7 @@ import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
-import MetaFilterModal from './components/modals/MetaFilterModal'
-import TimeFilterModal from './components/modals/TimeFilterModal'
+// MetaFilterModal and TimeFilterModal now replaced by inline dropdowns in JournalView
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
 import AttachmentsModal from './components/modals/AttachmentsModal'
 import PaymentsAssignModal from './components/modals/PaymentsAssignModal'
@@ -465,9 +464,7 @@ function AppInner() {
     // const [domDebug, setDomDebug] = useState<boolean>(false)
     // Global Tags Manager modal state
     const [showTagsManager, setShowTagsManager] = useState<boolean>(false)
-    // Time filter modal state
-    const [showTimeFilter, setShowTimeFilter] = useState<boolean>(false)
-    const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
+    // Time filter and Meta filter now use inline dropdowns in JournalView
     // Setup Wizard modal state
     const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
 
@@ -750,6 +747,12 @@ function AppInner() {
         return { infer, persist }
     }, [])
 
+    const clearJournalTimeFilter = React.useCallback(() => {
+        journalTimeFilter.persist('', '')
+        setFrom('')
+        setTo('')
+    }, [journalTimeFilter])
+
     // Restore explicit user choice for time filter across sessions.
     useEffect(() => {
         try {
@@ -763,7 +766,7 @@ function AppInner() {
         } catch {
             // ignore
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [])
 
     // Default: if an annual budget exists, default Buchungen to that budget year.
@@ -827,7 +830,7 @@ function AppInner() {
     const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
+        if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: clearJournalTimeFilter })
         if (filterCategoryId != null && useCategoriesModule) {
             const name = (customCategories || []).find(c => c.id === filterCategoryId)?.name
             list.push({ key: 'category', label: `Kategorie: ${name || ('#' + filterCategoryId)}`, clear: () => setFilterCategoryId(null) })
@@ -847,7 +850,7 @@ function AppInner() {
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
     if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '?' : ''), clear: () => setQ('') })
         return list
-    }, [from, to, filterSphere, filterCategoryId, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, useCategoriesModule, customCategories])
+    }, [from, to, filterSphere, filterCategoryId, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, useCategoriesModule, customCategories, clearJournalTimeFilter])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
     const activeChips = chips
 
@@ -1187,8 +1190,11 @@ function AppInner() {
                             bumpDataVersion={bumpDataVersion}
                             fmtDate={fmtDate}
                             setActivePage={setActivePage}
-                            setShowTimeFilter={setShowTimeFilter}
-                            setShowMetaFilter={setShowMetaFilter}
+                            // Dropdown data
+                            yearsAvail={yearsAvail}
+                            budgets={budgets}
+                            categories={usedCategories}
+                            onTimeFilterChange={(nf, nt) => { setFrom(nf); setTo(nt); journalTimeFilter.persist(nf, nt) }}
                             earmarks={earmarks}
                             tagDefs={tagDefs}
                             budgetsForEdit={budgetsForEdit}
@@ -1215,6 +1221,7 @@ function AppInner() {
                             q={q}
                             setFrom={setFrom}
                             setTo={setTo}
+                            clearTimeFilter={clearJournalTimeFilter}
                             setFilterSphere={setFilterSphere}
                             setFilterCategoryId={setFilterCategoryId}
                             setFilterType={setFilterType}
@@ -1396,27 +1403,7 @@ function AppInner() {
                     }}
                 />
             )}
-            {/* Time Filter Modal for Buchungen */}
-            <TimeFilterModal
-                open={activePage === 'Buchungen' && showTimeFilter}
-                onClose={() => setShowTimeFilter(false)}
-                yearsAvail={yearsAvail}
-                from={from}
-                to={to}
-                onApply={({ from: nf, to: nt }) => { setFrom(nf); setTo(nt); journalTimeFilter.persist(nf, nt) }}
-            />
-            {/* Meta Filter Modal (Kategorie, Zweckbindung, Budget) */}
-            <MetaFilterModal
-                open={activePage === 'Buchungen' && showMetaFilter}
-                onClose={() => setShowMetaFilter(false)}
-                earmarks={earmarks}
-                budgets={budgets}
-                categories={usedCategories}
-                categoryId={filterCategoryId}
-                earmarkId={filterEarmark}
-                budgetId={filterBudgetId}
-                onApply={({ categoryId, earmarkId, budgetId }) => { setFilterCategoryId(categoryId); setFilterEarmark(earmarkId); setFilterBudgetId(budgetId) }}
-            />
+            {/* Time Filter and Meta Filter Modals removed - now using inline dropdowns in JournalView */}
             {/* Global DOM debugger overlay */}
             {/* DomDebugger removed for release */}
             {/* Global Tags Manager Modal */}

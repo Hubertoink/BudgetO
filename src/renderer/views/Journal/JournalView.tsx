@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
-import BatchEarmarkModal from '../../components/modals/BatchEarmarkModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
+import { TimeFilterDropdown, MetaFilterDropdown, BatchAssignDropdown } from '../../components/dropdowns'
 import { useModules } from '../../context/moduleHooks'
 import { useAuth } from '../../context/authHooks'
 
@@ -67,8 +67,14 @@ interface JournalViewProps {
     bumpDataVersion: () => void
     fmtDate: (d: string) => string
     setActivePage: (page: 'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Verbindlichkeiten' | 'Mitglieder' | 'Einstellungen') => void
-    setShowTimeFilter: (show: boolean) => void
-    setShowMetaFilter: (show: boolean) => void
+    // Deprecated: kept for compatibility but dropdowns are now inline
+    setShowTimeFilter?: (show: boolean) => void
+    setShowMetaFilter?: (show: boolean) => void
+    // Dropdown filter data
+    yearsAvail: number[]
+    budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null }>
+    categories: Array<{ id: number; name: string; color?: string | null }>
+    onTimeFilterChange: (from: string, to: string) => void
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
@@ -100,6 +106,7 @@ interface JournalViewProps {
     q?: string
     setFrom?: (v: string) => void
     setTo?: (v: string) => void
+    clearTimeFilter?: () => void
     setFilterSphere?: (v: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null) => void
     setFilterCategoryId?: (v: number | null) => void
     setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
@@ -125,8 +132,14 @@ export default function JournalView({
     bumpDataVersion,
     fmtDate,
     setActivePage,
-    setShowTimeFilter,
-    setShowMetaFilter,
+    // Deprecated modal triggers (kept for compatibility)
+    setShowTimeFilter: _setShowTimeFilter,
+    setShowMetaFilter: _setShowMetaFilter,
+    // Dropdown data
+    yearsAvail,
+    budgets,
+    categories,
+    onTimeFilterChange,
     earmarks,
     tagDefs,
     budgetsForEdit,
@@ -155,6 +168,7 @@ export default function JournalView({
     q: qProp,
     setFrom: setFromProp,
     setTo: setToProp,
+    clearTimeFilter,
     setFilterSphere: setFilterSphereProp,
     setFilterCategoryId: setFilterCategoryIdProp,
     setFilterType: setFilterTypeProp,
@@ -235,7 +249,6 @@ export default function JournalView({
     // Column preferences now come from props (shared with Settings)
 
     // Modal states
-    const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
     const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
@@ -352,7 +365,20 @@ export default function JournalView({
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
+        if (activeFrom || activeTo) {
+            list.push({
+                key: 'range',
+                label: `${activeFrom || '…'} – ${activeTo || '…'}`,
+                clear: () => {
+                    if (clearTimeFilter) {
+                        clearTimeFilter()
+                        return
+                    }
+                    activeSetFrom('')
+                    activeSetTo('')
+                }
+            })
+        }
         if (useCategoriesModule && activeFilterCategoryId != null) {
             const name = categoryMap.get(activeFilterCategoryId)?.name
             list.push({ key: 'category', label: `Kategorie: ${name || ('#' + activeFilterCategoryId)}`, clear: () => activeSetFilterCategoryId(null) })
@@ -378,7 +404,7 @@ export default function JournalView({
         }
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, activeFilterTaxonomyTerm, earmarks, budgetNames, activeQ, activeSetFilterCategoryId, activeSetFilterTag, activeSetQ])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, activeFilterTaxonomyTerm, earmarks, budgetNames, activeQ, activeSetFilterCategoryId, activeSetFilterTag, activeSetQ, clearTimeFilter, activeSetFrom, activeSetTo, activeSetFilterSphere, activeSetFilterType, activeSetFilterPM, activeSetFilterEarmark, activeSetFilterBudgetId])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -567,81 +593,75 @@ export default function JournalView({
     // ==================== RENDER ====================
     return (
         <>
-            {/* Filter Toolbar */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-                <select className="input" value={activeFilterType ?? ''} onChange={(e) => activeSetFilterType((e.target.value as any) || null)}>
-                    <option value="">Alle</option>
-                    <option value="IN">IN</option>
-                    <option value="OUT">OUT</option>
-                    <option value="TRANSFER">TRANSFER</option>
-                </select>
-                <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-                <select className="input" value={activeFilterPM ?? ''} onChange={(e) => { const v = e.target.value as any; activeSetFilterPM(v || null); }}>
-                    <option value="">Alle</option>
-                    <option value="BAR">Bar</option>
-                    <option value="BANK">Bank</option>
-                </select>
-                <span style={{ color: 'var(--text-dim)' }}>Tag:</span>
-                <select className="input" value={activeFilterTag ?? ''} onChange={(e) => activeSetFilterTag(e.target.value || null)}>
-                    <option value="">Alle</option>
-                    {tagDefs.map(t => {
-                        const count = tagCounts[t.name] || 0
-                        return (
-                            <option key={t.id} value={t.name}>
-                                {t.name} ({count})
-                            </option>
-                        )
-                    })}
-                </select>
-
+            {/* Filter Toolbar - Clean design with just search + dropdown icons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
                 {/* Textsuche */}
                 <input
                     className="input"
                     placeholder="Suche (#ID, Text, Betrag …)"
                     value={activeQ}
                     onChange={(e) => { activeSetQ(e.target.value); activeSetPage(1); }}
-                    style={{ minWidth: 200, flex: '1 1 260px' }}
+                    style={{ flex: '1 1 300px' }}
                     aria-label="Suche"
                 />
 
-                {/* Icons: Zeitraum & Meta-Filter */}
-                <button
-                    className="btn ghost"
-                    title="Zeitraum wählen"
-                    aria-label="Zeitraum wählen"
-                    onClick={() => setShowTimeFilter(true)}
-                    style={{ display: 'grid', placeItems: 'center' }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm-1 6v12h12V8H6zm2 2h3v3H8v-3z" />
-                    </svg>
-                </button>
-                <button
-                    className="btn ghost"
-                    title="Kategorie / Zweckbindung / Budget filtern"
-                    aria-label="Kategorie / Zweckbindung / Budget filtern"
-                    onClick={() => setShowMetaFilter(true)}
-                    style={{ display: 'grid', placeItems: 'center' }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
-                    </svg>
-                </button>
+                {/* Dropdown: Zeitraum */}
+                <TimeFilterDropdown
+                    yearsAvail={yearsAvail}
+                    from={activeFrom}
+                    to={activeTo}
+                    onApply={({ from: nf, to: nt }) => {
+                        onTimeFilterChange(nf, nt)
+                    }}
+                />
 
-                <button
-                    className="btn ghost"
-                    title="Batch zuweisen (Kategorie/Zweckbindung/Tags/Budget/Taxonomien) auf aktuelle Filter anwenden"
-                    aria-label="Batch zuweisen (Kategorie/Zweckbindung/Tags/Budget/Taxonomien)"
-                    onClick={() => setShowBatchEarmark(true)}
-                    style={{ color: '#e91e63', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="3" y="4" width="18" height="4" rx="1" />
-                        <rect x="3" y="10" width="18" height="4" rx="1" />
-                        <rect x="3" y="16" width="18" height="4" rx="1" />
-                    </svg>
-                </button>
+                {/* Dropdown: Alle Filter (Art, Zahlweg, Tag, Kategorie, Zweckbindung, Budget) */}
+                <MetaFilterDropdown
+                    budgets={budgets}
+                    earmarks={earmarks}
+                    categories={categories}
+                    tagDefs={tagDefs}
+                    filterType={activeFilterType}
+                    filterPM={activeFilterPM}
+                    filterTag={activeFilterTag}
+                    categoryId={activeFilterCategoryId}
+                    earmarkId={activeFilterEarmark}
+                    budgetId={activeFilterBudgetId}
+                    onApply={({ filterType, filterPM, filterTag, categoryId, earmarkId, budgetId }) => {
+                        activeSetFilterType(filterType)
+                        activeSetFilterPM(filterPM)
+                        activeSetFilterTag(filterTag)
+                        activeSetFilterCategoryId(categoryId)
+                        activeSetFilterEarmark(earmarkId)
+                        activeSetFilterBudgetId(budgetId)
+                    }}
+                />
+
+                {/* Dropdown: Batch zuweisen */}
+                <BatchAssignDropdown
+                    earmarks={earmarks}
+                    tagDefs={tagDefs}
+                    budgets={budgetsForEdit}
+                    currentFilters={{
+                        paymentMethod: activeFilterPM || undefined,
+                        sphere: activeFilterSphere || undefined,
+                        categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
+                        type: activeFilterType || undefined,
+                        from: activeFrom || undefined,
+                        to: activeTo || undefined,
+                        q: activeQ || undefined,
+                        earmarkId: activeFilterEarmark || undefined,
+                        budgetId: activeFilterBudgetId || undefined,
+                        tag: activeFilterTag || undefined,
+                    }}
+                    useCategoriesModule={useCategoriesModule}
+                    onApplied={async (updated) => {
+                        notify('success', `${updated} Buchung(en) aktualisiert`)
+                        await loadRecent()
+                        bumpDataVersion()
+                    }}
+                    notify={notify}
+                />
             </div>
 
             {/* Active Filter Chips */}
@@ -665,8 +685,8 @@ export default function JournalView({
                                 activeSetFilterCategoryId(null);
                                 activeSetFilterEarmark(null);
                                 activeSetFilterBudgetId(null);
-                                activeSetFrom('');
-                                activeSetTo('');
+                                if (clearTimeFilter) clearTimeFilter();
+                                else { activeSetFrom(''); activeSetTo(''); }
                                 activeSetQ('');
                                 activeSetPage(1);
                             }}
@@ -782,35 +802,7 @@ export default function JournalView({
                     />
                 </div>
 
-                {/* Batch assign modal (earmark, tags, budget) */}
-                {showBatchEarmark && (
-                    <BatchEarmarkModal
-                        onClose={() => setShowBatchEarmark(false)}
-                        earmarks={earmarks}
-                        tagDefs={tagDefs}
-                        budgets={budgetsForEdit}
-                        useCategoriesModule={useCategoriesModule}
-                        currentFilters={{
-                            paymentMethod: activeFilterPM || undefined,
-                            sphere: activeFilterSphere || undefined,
-                            categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
-                            type: activeFilterType || undefined,
-                            from: activeFrom || undefined,
-                            to: activeTo || undefined,
-                            q: activeQ || undefined,
-                            earmarkId: activeFilterEarmark || undefined,
-                            budgetId: activeFilterBudgetId || undefined,
-                            tag: activeFilterTag || undefined,
-                        }}
-                        onApplied={async (updated) => {
-                            notify('success', `${updated} Buchung(en) aktualisiert`)
-                            setShowBatchEarmark(false)
-                            await loadRecent()
-                            bumpDataVersion()
-                        }}
-                        notify={notify}
-                    />
-                )}
+
 
                 {/* Edit Modal */}
                 {editRow && (
