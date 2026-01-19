@@ -63,6 +63,7 @@ export default function InviteEmailDropdown({
   onBodyChange
 }: InviteEmailDropdownProps) {
   const [orgName, setOrgName] = useState<string>('')
+  const [copyMsg, setCopyMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -106,9 +107,9 @@ export default function InviteEmailDropdown({
   async function copyBcc() {
     try {
       await navigator.clipboard.writeText(bccSemicolon)
-      alert(inviteCount ? `${inviteCount} E-Mail-Adressen kopiert (BCC).` : 'Keine E-Mail-Adressen vorhanden.')
+      setCopyMsg(inviteCount ? `${inviteCount} E-Mail-Adresse${inviteCount > 1 ? 'n' : ''} kopiert (BCC).` : 'Keine E-Mail-Adressen vorhanden.')
     } catch {
-      alert('Kopieren nicht möglich')
+      setCopyMsg('Kopieren nicht möglich')
     }
   }
 
@@ -240,6 +241,25 @@ export default function InviteEmailDropdown({
             </details>
           </section>
         </div>
+
+        {/* Copy confirmation toast */}
+        {copyMsg && (
+          <div className="invite-copy-toast" role="alert">
+            <div className="invite-copy-toast__content">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <path d="m9 11 3 3L22 4" />
+              </svg>
+              <span>{copyMsg}</span>
+            </div>
+            <button className="btn ghost invite-copy-toast__close" onClick={() => setCopyMsg(null)} aria-label="Schließen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </FilterDropdown>
   )
