@@ -63,7 +63,8 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
       alignRight
       width={340}
       ariaLabel="Zeitraum wählen"
-      buttonTitle="Zeitraum wählen"
+      buttonTitle="Zeitraum"
+      colorVariant="time"
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

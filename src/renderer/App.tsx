@@ -1209,6 +1209,7 @@ function AppInner() {
                             setCols={setCols}
                             order={order}
                             setOrder={setOrder}
+                            labelForCol={labelForCol}
                             from={from}
                             to={to}
                             filterSphere={filterSphere}

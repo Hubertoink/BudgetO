@@ -99,6 +99,7 @@ export default function MetaFilterDropdown({
       width={380}
       ariaLabel="Filter"
       buttonTitle="Filter"
+      colorVariant="filter"
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

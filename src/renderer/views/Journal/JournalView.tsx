@@ -3,7 +3,7 @@ import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
-import { TimeFilterDropdown, MetaFilterDropdown, BatchAssignDropdown } from '../../components/dropdowns'
+import { TimeFilterDropdown, MetaFilterDropdown, BatchAssignDropdown, ColumnSelectDropdown } from '../../components/dropdowns'
 import { useModules } from '../../context/moduleHooks'
 import { useAuth } from '../../context/authHooks'
 
@@ -93,6 +93,7 @@ interface JournalViewProps {
     setCols: (cols: Record<ColKey, boolean>) => void
     order: ColKey[]
     setOrder: (order: ColKey[]) => void
+    labelForCol: (k: string) => string
     // Filter states from App
     from?: string
     to?: string
@@ -155,6 +156,7 @@ export default function JournalView({
     setCols,
     order,
     setOrder,
+    labelForCol,
     // Filter props from App
     from: fromProp,
     to: toProp,
@@ -594,7 +596,7 @@ export default function JournalView({
     return (
         <>
             {/* Filter Toolbar - Clean design with just search + dropdown icons */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <div className="journal-toolbar">
                 {/* Textsuche */}
                 <input
                     className="input"
@@ -605,63 +607,80 @@ export default function JournalView({
                     aria-label="Suche"
                 />
 
-                {/* Dropdown: Zeitraum */}
-                <TimeFilterDropdown
-                    yearsAvail={yearsAvail}
-                    from={activeFrom}
-                    to={activeTo}
-                    onApply={({ from: nf, to: nt }) => {
-                        onTimeFilterChange(nf, nt)
-                    }}
-                />
+                {/* Icon-Gruppe: Anzeige */}
+                <div className="journal-toolbar__group">
+                    <ColumnSelectDropdown
+                        columns={order.map(k => ({
+                            key: k,
+                            label: labelForCol(k),
+                            checked: cols[k],
+                            onChange: (v) => setCols({ ...cols, [k]: v })
+                        }))}
+                        tip="Ziehe Einträge per Drag & Drop, um die Reihenfolge zu ändern."
+                        onReorder={(newOrder) => setOrder(newOrder as typeof order)}
+                    />
+                </div>
 
-                {/* Dropdown: Alle Filter (Art, Zahlweg, Tag, Kategorie, Zweckbindung, Budget) */}
-                <MetaFilterDropdown
-                    budgets={budgets}
-                    earmarks={earmarks}
-                    categories={categories}
-                    tagDefs={tagDefs}
-                    filterType={activeFilterType}
-                    filterPM={activeFilterPM}
-                    filterTag={activeFilterTag}
-                    categoryId={activeFilterCategoryId}
-                    earmarkId={activeFilterEarmark}
-                    budgetId={activeFilterBudgetId}
-                    onApply={({ filterType, filterPM, filterTag, categoryId, earmarkId, budgetId }) => {
-                        activeSetFilterType(filterType)
-                        activeSetFilterPM(filterPM)
-                        activeSetFilterTag(filterTag)
-                        activeSetFilterCategoryId(categoryId)
-                        activeSetFilterEarmark(earmarkId)
-                        activeSetFilterBudgetId(budgetId)
-                    }}
-                />
+                {/* Icon-Gruppe: Filter */}
+                <div className="journal-toolbar__group">
+                    <TimeFilterDropdown
+                        yearsAvail={yearsAvail}
+                        from={activeFrom}
+                        to={activeTo}
+                        onApply={({ from: nf, to: nt }) => {
+                            onTimeFilterChange(nf, nt)
+                        }}
+                    />
 
-                {/* Dropdown: Batch zuweisen */}
-                <BatchAssignDropdown
-                    earmarks={earmarks}
-                    tagDefs={tagDefs}
-                    budgets={budgetsForEdit}
-                    currentFilters={{
-                        paymentMethod: activeFilterPM || undefined,
-                        sphere: activeFilterSphere || undefined,
-                        categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
-                        type: activeFilterType || undefined,
-                        from: activeFrom || undefined,
-                        to: activeTo || undefined,
-                        q: activeQ || undefined,
-                        earmarkId: activeFilterEarmark || undefined,
-                        budgetId: activeFilterBudgetId || undefined,
-                        tag: activeFilterTag || undefined,
-                    }}
-                    useCategoriesModule={useCategoriesModule}
-                    onApplied={async (updated) => {
-                        notify('success', `${updated} Buchung(en) aktualisiert`)
-                        await loadRecent()
-                        bumpDataVersion()
-                    }}
-                    notify={notify}
-                />
+                    <MetaFilterDropdown
+                        budgets={budgets}
+                        earmarks={earmarks}
+                        categories={categories}
+                        tagDefs={tagDefs}
+                        filterType={activeFilterType}
+                        filterPM={activeFilterPM}
+                        filterTag={activeFilterTag}
+                        categoryId={activeFilterCategoryId}
+                        earmarkId={activeFilterEarmark}
+                        budgetId={activeFilterBudgetId}
+                        onApply={({ filterType, filterPM, filterTag, categoryId, earmarkId, budgetId }) => {
+                            activeSetFilterType(filterType)
+                            activeSetFilterPM(filterPM)
+                            activeSetFilterTag(filterTag)
+                            activeSetFilterCategoryId(categoryId)
+                            activeSetFilterEarmark(earmarkId)
+                            activeSetFilterBudgetId(budgetId)
+                        }}
+                    />
+                </div>
+
+                {/* Icon-Gruppe: Aktionen */}
+                <div className="journal-toolbar__group">
+                    <BatchAssignDropdown
+                        earmarks={earmarks}
+                        tagDefs={tagDefs}
+                        budgets={budgetsForEdit}
+                        currentFilters={{
+                            paymentMethod: activeFilterPM || undefined,
+                            sphere: activeFilterSphere || undefined,
+                            categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
+                            type: activeFilterType || undefined,
+                            from: activeFrom || undefined,
+                            to: activeTo || undefined,
+                            q: activeQ || undefined,
+                            earmarkId: activeFilterEarmark || undefined,
+                            budgetId: activeFilterBudgetId || undefined,
+                            tag: activeFilterTag || undefined,
+                        }}
+                        useCategoriesModule={useCategoriesModule}
+                        onApplied={async (updated) => {
+                            notify('success', `${updated} Buchung(en) aktualisiert`)
+                            await loadRecent()
+                            bumpDataVersion()
+                        }}
+                        notify={notify}
+                    />
+                </div>
             </div>
 
             {/* Active Filter Chips */}

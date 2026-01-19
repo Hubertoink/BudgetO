@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 
+type ColorVariant = 'default' | 'display' | 'time' | 'filter' | 'action'
+
 interface FilterDropdownProps {
   /** The trigger button content (usually an icon) */
   trigger: React.ReactNode
@@ -17,6 +19,8 @@ interface FilterDropdownProps {
   ariaLabel?: string
   /** Optional title/tooltip for trigger button */
   buttonTitle?: string
+  /** Optional color variant for visual grouping */
+  colorVariant?: ColorVariant
 }
 
 export default function FilterDropdown({
@@ -27,7 +31,8 @@ export default function FilterDropdown({
   alignRight = false,
   width = 320,
   ariaLabel,
-  buttonTitle
+  buttonTitle,
+  colorVariant = 'default'
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -72,10 +77,10 @@ export default function FilterDropdown({
   return (
     <div ref={containerRef} className="filter-dropdown" style={{ position: 'relative' }}>
       <button
-        className={`btn ghost filter-dropdown__trigger ${hasActiveFilters ? 'has-filters' : ''}`}
+        className={`btn ghost filter-dropdown__trigger filter-dropdown__trigger--${colorVariant} ${hasActiveFilters ? 'has-filters' : ''} has-tooltip`}
         onClick={() => setOpen(!open)}
         aria-label={ariaLabel}
-        title={buttonTitle}
+        data-tooltip={buttonTitle}
         aria-expanded={open}
         aria-haspopup="true"
       >

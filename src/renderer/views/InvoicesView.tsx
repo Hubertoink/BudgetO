@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../context/toastHooks'
-import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
 import { useAuth } from '../context/authHooks'
+import { ColumnSelectDropdown, InvoiceFilterDropdown } from '../components/dropdowns'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {
@@ -37,8 +37,7 @@ export default function InvoicesView() {
   // Sorting (persist to localStorage)
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
   const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount' | 'status'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount' | 'status') || 'due') } catch { return 'due' } })
-  // Due date modal state and available years
-  const [showDueFilter, setShowDueFilter] = useState<boolean>(false)
+  // Available years for filter
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
 
   // Data
@@ -50,7 +49,6 @@ export default function InvoicesView() {
   const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
 
   // Column preferences
-  const [showColumnsModal, setShowColumnsModal] = useState(false)
   const [colPrefs, setColPrefs] = useState<{ showTags: boolean; showBezahlt: boolean; showRest: boolean; showAttachments: boolean }>(() => {
     try {
       const raw = localStorage.getItem('invoices.columns')
@@ -414,35 +412,35 @@ export default function InvoicesView() {
         <h1>Verbindlichkeiten</h1>
         <div className="invoices-filters">
           <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
-          <select className="input" value={status} onChange={e => { setStatus(e.target.value as any); setOffset(0) }} aria-label="Status filtern">
-            <option value="ALL">Alle</option>
-            <option value="OPEN">Offen</option>
-            <option value="PARTIAL">Teilweise</option>
-            <option value="PAID">Bezahlt</option>
-          </select>
-          <select className="input" value={sphere} onChange={e => { setSphere((e.target.value || '') as any); setOffset(0) }} aria-label="Sphäre filtern">
-            <option value="">Sphäre: alle</option>
-            <option value="IDEELL">IDEELL</option>
-            <option value="ZWECK">ZWECK</option>
-            <option value="VERMOEGEN">VERMÖGEN</option>
-            <option value="WGB">WGB</option>
-          </select>
-          <select className="input" value={String(budgetId)} onChange={e => { const v = e.target.value; setBudgetId(v && v !== '' ? Number(v) : ''); setOffset(0) }} aria-label="Budget filtern">
-            <option value="">Budget: alle</option>
-            {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
-          </select>
-          <select className="input" value={tag} onChange={e => { setTag(e.target.value); setOffset(0) }} aria-label="Tag filtern">
-            <option value="">Tag: alle</option>
-            {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Fällig:</span>
-          <button className="btn" title="Fälligkeits-Zeitraum/Jahr wählen" onClick={() => setShowDueFilter(true)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
-          </button>
-          {(dueFrom || dueTo) && (<span className="helper">{dueFrom || '—'} – {dueTo || '—'}</span>)}
-          <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
-          </button>
+          <InvoiceFilterDropdown
+            status={status}
+            sphere={sphere}
+            budgetId={budgetId}
+            tag={tag}
+            dueFrom={dueFrom}
+            dueTo={dueTo}
+            budgets={budgets}
+            tags={tags}
+            yearsAvail={yearsAvail}
+            onApply={(vals) => {
+              setStatus(vals.status)
+              setSphere(vals.sphere)
+              setBudgetId(vals.budgetId)
+              setTag(vals.tag)
+              setDueFrom(vals.dueFrom)
+              setDueTo(vals.dueTo)
+              setOffset(0)
+            }}
+          />
+          <ColumnSelectDropdown
+            columns={[
+              { key: 'showTags', label: 'Tags anzeigen', checked: colPrefs.showTags, onChange: (v) => setColPrefs(p => ({ ...p, showTags: v })) },
+              { key: 'showBezahlt', label: 'Bezahlt anzeigen', checked: colPrefs.showBezahlt, onChange: (v) => setColPrefs(p => ({ ...p, showBezahlt: v })) },
+              { key: 'showRest', label: 'Rest anzeigen', checked: colPrefs.showRest, onChange: (v) => setColPrefs(p => ({ ...p, showRest: v })) },
+              { key: 'showAttachments', label: 'Anhänge (📎) anzeigen', checked: colPrefs.showAttachments, onChange: (v) => setColPrefs(p => ({ ...p, showAttachments: v })) },
+            ]}
+            tip="Tipp: Blende Spalten aus, die du nicht benötigst, um die Übersicht zu verbessern."
+          />
           {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
           <div className="filter-divider" />
           {canWrite && <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>}
@@ -600,8 +598,6 @@ export default function InvoicesView() {
         </>
       )}
 
-      <TimeFilterModal open={showDueFilter} onClose={() => setShowDueFilter(false)} yearsAvail={yearsAvail} from={dueFrom} to={dueTo} onApply={({ from: nf, to: nt }) => { setDueFrom(nf); setDueTo(nt); setOffset(0) }} />
-
       {showPayModal && createPortal((() => {
         const rowData = rows.find(r => r.id === showPayModal.id)
         const isIN = rowData?.voucherType === 'IN'
@@ -678,29 +674,105 @@ export default function InvoicesView() {
       {form && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal invoice-modal invoices-modal-grid" onClick={e => e.stopPropagation()}>
-            <div className="card invoices-form-header">
+            {/* Sticky Header */}
+            <header className="invoices-form-header">
               <div className="invoices-form-header-top">
-                <div className="invoices-form-header-info">
-                  <h2 style={{ margin: 0 }}>{(() => {
-                    const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
-                    return form.mode === 'create' ? `${type} anlegen` : `${type} bearbeiten`
-                  })()}</h2>
-                </div>
+                <h2 style={{ margin: 0, flex: 1 }}>{(() => {
+                  const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
+                  return form.mode === 'create' ? `${type} anlegen` : `${type} bearbeiten`
+                })()}</h2>
                 <div className="invoices-form-header-actions">
-                  {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
-                  <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
+                  <span className="helper" style={{ fontSize: 11, opacity: 0.7 }}>Ctrl+S · Esc</span>
+                  {form.mode === 'edit' && form.sourceRow?.status && (
+                    <span className="badge" style={{ 
+                      background: form.sourceRow.status === 'PAID' ? 'var(--success)' : form.sourceRow.status === 'PARTIAL' ? 'var(--warning)' : 'var(--muted)',
+                      color: form.sourceRow.status === 'PAID' || form.sourceRow.status === 'PARTIAL' ? '#fff' : 'var(--text)'
+                    }} title="Zahlstatus">{form.sourceRow.status === 'PAID' ? 'Bezahlt' : form.sourceRow.status === 'PARTIAL' ? 'Teilweise' : 'Offen'}</span>
+                  )}
+                  {form.mode === 'edit' && form.draft.id && (
+                    <button className="btn danger" style={{ padding: '6px 12px', fontSize: 13 }} title="Löschen" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑</button>
+                  )}
+                  <button className="btn" style={{ padding: '6px 12px', fontSize: 13 }} title="Abbrechen (Esc)" onClick={() => setForm(null)}>Abbrechen</button>
+                  <button className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { 
+                    setRequiredTouched(true)
+                    const missing: string[] = []
+                    if (!form.draft.date) missing.push('Datum')
+                    if (!(form.draft.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
+                    if (!form.draft.party?.trim()) missing.push('Partei')
+                    const a = parseAmount(form.draft.grossAmount)
+                    if (a == null || a <= 0) missing.push('Betrag')
+                    if (missing.length > 0) { setMissingRequired(missing); return }
+                    saveForm()
+                  }}>Speichern</button>
+                  <button className="btn ghost" onClick={() => setForm(null)} title="Schließen (ESC)" style={{ padding: 6 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="helper invoices-form-header-helper">
-                <span>Buchungstyp: <strong style={{ color: form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)' }}>{form.draft.voucherType}</strong></span>
-                <span>Betrag: <strong>{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : '—' })()}</strong></span>
-                <span>Fällig: <strong>{form.draft.dueDate || '—'}</strong></span>
-                <span>Zahlweg: <strong>{form.draft.paymentMethod || '—'}</strong></span>
-                <span>Sphäre: <strong>{form.draft.sphere}</strong></span>
+              {/* Summary Line */}
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '6px 12px', 
+                alignItems: 'center',
+                padding: '8px 12px',
+                background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
+                borderRadius: 8,
+                borderLeft: `4px solid ${form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)'}`,
+                fontSize: 13
+              }}>
+                <span style={{ fontWeight: 600 }}>{form.draft.date || '—'}</span>
+                <span style={{ 
+                  padding: '2px 8px', 
+                  borderRadius: 4, 
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)',
+                  color: 'white'
+                }}>
+                  {form.draft.voucherType}
+                </span>
+                <span style={{ color: 'var(--text-dim)' }}>{form.draft.paymentMethod || '—'}</span>
+                <span style={{ 
+                  color: form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)',
+                  fontWeight: 700
+                }}>
+                  {(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : '—' })()}
+                </span>
+                {form.draft.sphere && (
+                  <span style={{ 
+                    padding: '2px 8px', 
+                    borderRadius: 4, 
+                    fontSize: 11,
+                    background: 'var(--muted)',
+                    border: '1px solid var(--border)'
+                  }}>
+                    {form.draft.sphere}
+                  </span>
+                )}
+                {form.draft.dueDate && (
+                  <span style={{ color: 'var(--text)', opacity: 0.85 }}>📅 Fällig: {form.draft.dueDate}</span>
+                )}
+                {form.draft.tags && form.draft.tags.length > 0 && (
+                  <span style={{ 
+                    padding: '2px 8px', 
+                    borderRadius: 999, 
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: 'var(--muted)',
+                    border: '1px solid var(--border)'
+                  }}>
+                    🏷️ {form.draft.tags.length}
+                  </span>
+                )}
               </div>
-            </div>
+            </header>
 
-            {formError && <div className="invoices-text-danger">{formError}</div>}
+            {/* Scrollable Content */}
+            <div className="invoices-modal-content">
+              {formError && <div className="invoices-text-danger">{formError}</div>}
 
             <div className="invoices-form-grid">
               <div className="card invoices-form-card">
@@ -898,26 +970,9 @@ export default function InvoicesView() {
               </div>
             </div>
 
-            {(() => {
-              const missing: string[] = []
-              if (!form!.draft.date) missing.push('Datum')
-              if (!(form!.draft.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
-              if (!form!.draft.party?.trim()) missing.push('Partei')
-              const a = parseAmount(form!.draft.grossAmount)
-              if (a == null || a <= 0) missing.push('Betrag')
-              return (
-                <div className="invoices-form-footer">
-                  <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-                  <div className="invoices-form-footer-actions">
-                    {form.mode === 'edit' && form.draft.id && (
-                      <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
-                    )}
-                    <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                    <button className="btn primary" onClick={() => { setRequiredTouched(true); if (missing.length > 0) { setMissingRequired(missing); return } saveForm() }}>Speichern</button>
-                  </div>
-                </div>
-              )
-            })()}
+            {/* End of scrollable content */}
+            </div>
+
             <datalist id="party-suggestions">{partySuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>
             <datalist id="desc-suggestions">{descSuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>
           </div>
@@ -1054,40 +1109,6 @@ export default function InvoicesView() {
           </div>
         </div>,
         document.body
-      )}
-
-      {/* Column selection modal */}
-      {showColumnsModal && (
-        <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
-              <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
-            </header>
-            <div className="card" style={{ padding: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={colPrefs.showTags} onChange={(e) => setColPrefs(p => ({ ...p, showTags: e.target.checked }))} />
-                Tags anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showBezahlt} onChange={(e) => setColPrefs(p => ({ ...p, showBezahlt: e.target.checked }))} />
-                Bezahlt anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showRest} onChange={(e) => setColPrefs(p => ({ ...p, showRest: e.target.checked }))} />
-                Rest anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showAttachments} onChange={(e) => setColPrefs(p => ({ ...p, showAttachments: e.target.checked }))} />
-                Anhänge (📎) anzeigen
-              </label>
-              <div className="helper" style={{ marginTop: 8 }}>Tipp: Blende Spalten aus, die du nicht benötigst, um die Übersicht zu verbessern.</div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setShowColumnsModal(false)}>Schließen</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {deleteConfirm && createPortal(

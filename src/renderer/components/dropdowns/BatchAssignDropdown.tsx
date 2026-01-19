@@ -202,7 +202,8 @@ export default function BatchAssignDropdown({
       alignRight
       width={420}
       ariaLabel="Batch zuweisen"
-      buttonTitle="Batch zuweisen auf aktuelle Filter anwenden"
+      buttonTitle="Batch zuweisen"
+      colorVariant="action"
     >
       {/* Mode selector */}
       <div className="filter-dropdown__field">
