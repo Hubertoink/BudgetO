@@ -21,6 +21,11 @@ interface FilterDropdownProps {
   buttonTitle?: string
   /** Optional color variant for visual grouping */
   colorVariant?: ColorVariant
+
+  /** Optional: controlled open state */
+  open?: boolean
+  /** Optional: open state change handler (supports controlled/uncontrolled) */
+  onOpenChange?: (open: boolean) => void
 }
 
 export default function FilterDropdown({
@@ -32,11 +37,20 @@ export default function FilterDropdown({
   width = 320,
   ariaLabel,
   buttonTitle,
-  colorVariant = 'default'
+  colorVariant = 'default',
+  open: openProp,
+  onOpenChange
 }: FilterDropdownProps) {
-  const [open, setOpen] = useState(false)
+  const [openInternal, setOpenInternal] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  const open = openProp ?? openInternal
+
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenInternal(next)
+    onOpenChange?.(next)
+  }
 
   // Close on click outside
   useEffect(() => {

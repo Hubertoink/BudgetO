@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
-import { ColumnSelectDropdown } from '../../components/dropdowns'
+import { ColumnSelectDropdown, InviteEmailDropdown } from '../../components/dropdowns'
 
 export default function MembersView() {
     const [q, setQ] = useState('')
@@ -269,7 +269,20 @@ export default function MembersView() {
                 </div>
                 <div className="members-header-right">
                     <div className="helper">{busy ? <LoadingState size="small" message="" /> : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
+                    <InviteEmailDropdown
+                        open={showInvite}
+                        onOpenChange={setShowInvite}
+                        status={status}
+                        query={q}
+                        inviteBusy={inviteBusy}
+                        inviteEmails={inviteEmails}
+                        inviteActiveOnly={inviteActiveOnly}
+                        onInviteActiveOnlyChange={setInviteActiveOnly}
+                        subject={inviteSubject}
+                        onSubjectChange={setInviteSubject}
+                        body={inviteBody}
+                        onBodyChange={setInviteBody}
+                    />
                     <button className="btn btn-accent" onClick={() => { setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
@@ -604,65 +617,6 @@ export default function MembersView() {
                     </div>
                 </div>,
                 document.body
-            )}
-            {showInvite && (
-                <div className="modal-overlay" onClick={() => setShowInvite(false)}>
-                    <div className="modal invite-modal" onClick={(e)=>e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Einladung per E-Mail</h3>
-                            <button className="btn" onClick={()=>setShowInvite(false)}>×</button>
-                        </header>
-                        <div className="card" style={{ padding: 10 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <div className="helper">Aktuelle Filter: Status = {status}, Suche = {q ? `"${q}"` : '—'}</div>
-                                <label className="helper" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <input type="checkbox" checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
-                                    Nur aktive einladen
-                                </label>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
-                                <div className="field">
-                                    <label>Betreff</label>
-                                    <input className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
-                                </div>
-                                <div className="field">
-                                    <label>Anzahl Empfänger (BCC)</label>
-                                    <input className="input" value={inviteEmails.length || 0} readOnly />
-                                </div>
-                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                    <label>Nachricht</label>
-                                    <textarea className="input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} style={{ resize: 'vertical' }} />
-                                </div>
-                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                    <label>Empfänger (BCC)</label>
-                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <input className="input" readOnly value={inviteEmails.join('; ')} style={{ flex: 1 }} />
-                                        <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert('E-Mail-Adressen kopiert') } catch { alert('Kopieren nicht möglich') } }}>Kopieren</button>
-                                    </div>
-                                    <div className="helper">Die Liste basiert auf der aktuellen Ansicht (Filter & Suche) und enthält nur Kontakte mit E-Mail.</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div className="helper">{inviteBusy ? 'Sammle E-Mail-Adressen…' : `${inviteEmails.length} Empfänger gefunden`}</div>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="btn" onClick={()=>setShowInvite(false)}>Abbrechen</button>
-                                <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen kopiert (BCC).`) } catch { alert('Kopieren nicht möglich') } }}>Nur BCC kopieren</button>
-                                <button className="btn primary" disabled={!inviteEmails.length} onClick={() => {
-                                    const subject = encodeURIComponent(inviteSubject || '')
-                                    const body = encodeURIComponent(inviteBody || '')
-                                    const bccRaw = inviteEmails.join(',')
-                                    const mailto = `mailto:?bcc=${encodeURIComponent(bccRaw)}&subject=${subject}&body=${body}`
-                                    if (mailto.length <= 1800 && inviteEmails.length <= 50) {
-                                        try { window.location.href = mailto } catch { /* ignore */ }
-                                    } else {
-                                        (async () => { try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen in die Zwischenablage kopiert. Füge sie als BCC in dein E-Mail-Programm ein.`) } catch { alert('Link zu lang – E-Mail-Adressen konnten nicht automatisch kopiert werden.') } })()
-                                    }
-                                }}>Im Mail-Programm öffnen</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             )}
             {showPayments && (
                 <PaymentsAssignModal onClose={() => setShowPayments(false)} />
