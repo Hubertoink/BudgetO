@@ -594,7 +594,7 @@ export default function JournalView({
 
     // ==================== RENDER ====================
     return (
-        <>
+        <div className="journal-view">
             {/* Filter Toolbar - Clean design with just search + dropdown icons */}
             <div className="journal-toolbar">
                 {/* Textsuche */}
@@ -1593,6 +1593,6 @@ export default function JournalView({
                     />
                 )}
             </div>
-        </>
+        </div>
     )
 }

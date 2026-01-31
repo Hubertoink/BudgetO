@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import HoverTooltip from '../../../components/common/HoverTooltip'
 
 interface FilterTotalsProps {
     refreshKey?: number
@@ -17,9 +18,62 @@ interface FilterTotalsProps {
     showArchived?: boolean
 }
 
+const SPHERE_LABELS: Record<string, string> = {
+    IDEELL: 'Ideeller Bereich',
+    ZWECK: 'Zweckbetrieb',
+    VERMOEGEN: 'Vermögensverwaltung',
+    WGB: 'Wirtschaftlicher Geschäftsbetrieb'
+}
+
+const SPHERE_COLORS: Record<string, string> = {
+    IDEELL: 'var(--sphere-ideell)',
+    ZWECK: 'var(--sphere-zweck)',
+    VERMOEGEN: 'var(--sphere-vermoegen)',
+    WGB: 'var(--sphere-wgb)'
+}
+
+// Tooltip list component for hover cards
+function TooltipList({
+    title,
+    rows,
+    hint
+}: {
+    title: string
+    rows: Array<{ key: string; value: string; dotColor?: string }>
+    hint?: string
+}) {
+    return (
+        <div>
+            <div className="tooltip-modal__title">{title}</div>
+            {rows.length > 0 && (
+                <div className="tooltip-modal__list">
+                    {rows.map((r) => (
+                        <div key={r.key} className="tooltip-modal__row">
+                            <span className="tooltip-modal__key" style={{ '--tooltip-dot': r.dotColor || 'var(--border)' } as React.CSSProperties}>
+                                <span className="tooltip-modal__dot" />
+                                {r.key}
+                            </span>
+                            <span className="tooltip-modal__val">{r.value}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {hint && <div className="tooltip-modal__hint">{hint}</div>}
+        </div>
+    )
+}
+
+
 export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, categoryId, type, earmarkId, budgetId, q, tag, workYear, showArchived }: FilterTotalsProps) {
     const [loading, setLoading] = useState(false)
-    const [values, setValues] = useState<{ inGross: number; outGross: number; diff: number } | null>(null)
+    const [values, setValues] = useState<null | {
+        inGross: number
+        outGross: number
+        diff: number
+        bySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
+        inBySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
+        outBySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
+    }>(null)
 
     const annualYear = useMemo(() => {
         const parseYear = (s?: string) => {
@@ -50,14 +104,45 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                     const diff = Math.round((inflow - spent) * 100) / 100
                     if (alive) setValues({ inGross: inflow, outGross: spent, diff })
                 } else {
-                    const res = await window.api?.reports.summary?.({ from, to, paymentMethod, sphere, categoryId, type, earmarkId, q, tag, workYear, showArchived })
+                    const basePayload = { from, to, paymentMethod, sphere, categoryId, earmarkId, q, tag, workYear, showArchived }
+                    const res = await window.api?.reports.summary?.({ ...basePayload, type })
+                    
+                    // Fetch type-specific breakdowns for tooltips
+                    let inRes: any = null
+                    let outRes: any = null
+                    if (!type) {
+                        const [ir, or] = await Promise.all([
+                            window.api?.reports.summary?.({ ...basePayload, type: 'IN' }),
+                            window.api?.reports.summary?.({ ...basePayload, type: 'OUT' })
+                        ])
+                        inRes = ir || null
+                        outRes = or || null
+                    }
+                    
                     if (alive && res) {
                         const t = res.byType || []
                         const inGross = t.find((x: any) => x.key === 'IN')?.gross || 0
                         const outGrossRaw = t.find((x: any) => x.key === 'OUT')?.gross || 0
                         const outGross = Math.abs(outGrossRaw)
                         const diff = Math.round((inGross - outGross) * 100) / 100
-                        setValues({ inGross, outGross, diff })
+                        const bySphereRaw = Array.isArray(res.bySphere) ? res.bySphere : []
+                        const bySphere = bySphereRaw
+                            .map((s: any) => ({ key: s.key as any, gross: Number(s.gross || 0) }))
+                            .filter((s: any) => s.key && Number.isFinite(s.gross))
+                        
+                        // Process IN by sphere
+                        const inBySphereRaw = inRes?.bySphere || (type === 'IN' ? bySphereRaw : [])
+                        const inBySphere = inBySphereRaw
+                            .map((s: any) => ({ key: s.key as any, gross: Math.abs(Number(s.gross || 0)) }))
+                            .filter((s: any) => s.key && Number.isFinite(s.gross) && s.gross !== 0)
+                        
+                        // Process OUT by sphere
+                        const outBySphereRaw = outRes?.bySphere || (type === 'OUT' ? bySphereRaw : [])
+                        const outBySphere = outBySphereRaw
+                            .map((s: any) => ({ key: s.key as any, gross: Math.abs(Number(s.gross || 0)) }))
+                            .filter((s: any) => s.key && Number.isFinite(s.gross) && s.gross !== 0)
+                        
+                        setValues({ inGross, outGross, diff, bySphere, inBySphere, outBySphere })
                     }
                 }
             } finally {
@@ -102,23 +187,154 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
 
     const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     if (!values && !loading) return null
+
+    const inVal = values?.inGross ?? 0
+    const outVal = values?.outGross ?? 0
+    const diffVal = values?.diff ?? 0
+    const total = inVal + outVal
+    const inPercent = total > 0 ? (inVal / total) * 100 : 50
+
+    const spheres = (values?.bySphere || [])
+        .filter((s) => Math.abs(Number(s.gross || 0)) > 0.000001)
+        .map((s) => ({ key: s.key, gross: Math.abs(Number(s.gross || 0)) }))
+        .sort((a, b) => b.gross - a.gross)
+
+    // Prepare tooltip rows for IN card
+    const inSphereRows = (values?.inBySphere || [])
+        .filter(s => s.gross !== 0)
+        .map(s => ({
+            key: SPHERE_LABELS[s.key] || s.key,
+            value: fmt.format(s.gross),
+            dotColor: SPHERE_COLORS[s.key] || 'var(--border)'
+        }))
+
+    // Prepare tooltip rows for OUT card
+    const outSphereRows = (values?.outBySphere || [])
+        .filter(s => s.gross !== 0)
+        .map(s => ({
+            key: SPHERE_LABELS[s.key] || s.key,
+            value: fmt.format(s.gross),
+            dotColor: SPHERE_COLORS[s.key] || 'var(--border)'
+        }))
+
     return (
-        <div className="card" style={{ padding: 8, marginBottom: 8, display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong>Summe der Filterung:</strong>
-                <span style={{ color: 'var(--success)' }}>IN: {fmt.format(values?.inGross ?? 0)}</span>
-                <span style={{ color: 'var(--danger)' }}>OUT: {fmt.format(values?.outGross ?? 0)}</span>
-                <span style={{ color: ((values?.diff ?? 0) >= 0) ? 'var(--success)' : 'var(--danger)' }}>Differenz: {fmt.format(values?.diff ?? 0)}</span>
+        <div className="filter-totals-card">
+            {/* Visual Flow Bar */}
+            <div className="filter-totals-flow" aria-label="Einnahmen vs Ausgaben">
+                <div className="filter-totals-flow__in" style={{ width: `${inPercent}%` }} />
+                <div className="filter-totals-flow__out" style={{ width: `${100 - inPercent}%` }} />
             </div>
 
-            {(annual || annualLoading) && (
-                <div style={{ textAlign: 'right', display: 'grid', gap: 2, minWidth: 180 }}>
-                    <div className="helper" style={{ margin: 0 }}>
-                        Jahresbudget {annual?.year ?? annualYear}
+            <div className="filter-totals-row">
+                <div className="filter-totals-stats" aria-label="Summen">
+                    {/* IN Card with Hover Tooltip */}
+                    <HoverTooltip
+                        className="tooltip-modal"
+                        content={
+                            <TooltipList
+                                title={inSphereRows.length > 0 ? 'Einnahmen · Verteilung nach Sphäre' : 'Einnahmen'}
+                                rows={inSphereRows.length > 0 ? inSphereRows : [{ key: 'Summe', value: fmt.format(inVal), dotColor: 'var(--success)' }]}
+                            />
+                        }
+                    >
+                        {({ ref, props }) => (
+                            <div ref={ref} {...props} className="filter-totals-stat filter-totals-stat--in" tabIndex={0}>
+                                <div className="filter-totals-stat__icon" aria-hidden>↓</div>
+                                <div className="filter-totals-stat__content">
+                                    <span className="filter-totals-stat__label">Einnahmen</span>
+                                    <span className="filter-totals-stat__value">{fmt.format(inVal)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </HoverTooltip>
+
+                    {/* OUT Card with Hover Tooltip */}
+                    <HoverTooltip
+                        className="tooltip-modal"
+                        content={
+                            <TooltipList
+                                title={outSphereRows.length > 0 ? 'Ausgaben · Verteilung nach Sphäre' : 'Ausgaben'}
+                                rows={outSphereRows.length > 0 ? outSphereRows : [{ key: 'Summe', value: fmt.format(outVal), dotColor: 'var(--danger)' }]}
+                            />
+                        }
+                    >
+                        {({ ref, props }) => (
+                            <div ref={ref} {...props} className="filter-totals-stat filter-totals-stat--out" tabIndex={0}>
+                                <div className="filter-totals-stat__icon" aria-hidden>↑</div>
+                                <div className="filter-totals-stat__content">
+                                    <span className="filter-totals-stat__label">Ausgaben</span>
+                                    <span className="filter-totals-stat__value">{fmt.format(outVal)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </HoverTooltip>
+
+                    {/* Diff Card with Hover Tooltip */}
+                    <HoverTooltip
+                        className="tooltip-modal"
+                        content={
+                            <TooltipList
+                                title={diffVal >= 0 ? 'Überschuss' : 'Defizit'}
+                                rows={[
+                                    { key: 'Einnahmen', value: fmt.format(inVal), dotColor: 'var(--success)' },
+                                    { key: 'Ausgaben', value: fmt.format(outVal), dotColor: 'var(--danger)' },
+                                    { key: diffVal >= 0 ? 'Mehr eingenommen' : 'Mehr ausgegeben', value: fmt.format(Math.abs(diffVal)), dotColor: diffVal >= 0 ? 'var(--success)' : 'var(--danger)' }
+                                ]}
+                            />
+                        }
+                    >
+                        {({ ref, props }) => (
+                            <div ref={ref} {...props} className={`filter-totals-stat filter-totals-stat--diff ${diffVal >= 0 ? 'positive' : 'negative'}`} tabIndex={0}>
+                                <div className="filter-totals-stat__icon" aria-hidden>{diffVal >= 0 ? '✓' : '!'}</div>
+                                <div className="filter-totals-stat__content">
+                                    <span className="filter-totals-stat__label">{diffVal >= 0 ? 'Überschuss' : 'Defizit'}</span>
+                                    <span className="filter-totals-stat__value">{fmt.format(Math.abs(diffVal))}</span>
+                                </div>
+                            </div>
+                        )}
+                    </HoverTooltip>
+                </div>
+
+                {(annual || annualLoading) && (
+                    <div className="filter-totals-annual" aria-label="Jahresbudget">
+                        <div className="helper" style={{ margin: 0 }}>
+                            Jahresbudget {annual?.year ?? annualYear}
+                        </div>
+                        <div className="filter-totals-annual__value" style={{ color: (annual?.remaining ?? 0) < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                            {fmt.format(annual?.remaining ?? 0)} verbleibend
+                        </div>
                     </div>
-                    <div style={{ fontWeight: 600, color: (annual?.remaining ?? 0) < 0 ? 'var(--danger)' : 'var(--success)' }}>
-                        {fmt.format(annual?.remaining ?? 0)} verbleibend
-                    </div>
+                )}
+            </div>
+
+            {/* Sphere breakdown mini badges */}
+            {spheres.length > 1 && (
+                <div className="filter-totals-spheres" aria-label="Summen nach Sphäre">
+                    {spheres.map((s) => (
+                        <HoverTooltip
+                            key={s.key}
+                            className="tooltip-modal"
+                            content={
+                                <TooltipList
+                                    title={SPHERE_LABELS[s.key] || s.key}
+                                    rows={[{ key: 'Betrag', value: fmt.format(s.gross), dotColor: SPHERE_COLORS[s.key] || 'var(--border)' }]}
+                                />
+                            }
+                        >
+                            {({ ref, props }) => (
+                                <span
+                                    ref={ref}
+                                    {...props}
+                                    className="filter-totals-sphere-badge"
+                                    style={{ '--sphere-color': SPHERE_COLORS[s.key] || 'var(--border)' } as React.CSSProperties}
+                                >
+                                    <span className="filter-totals-sphere-badge__dot" aria-hidden />
+                                    <span className="filter-totals-sphere-badge__label">{s.key}</span>
+                                    <span className="filter-totals-sphere-badge__value">{fmt.format(s.gross)}</span>
+                                </span>
+                            )}
+                        </HoverTooltip>
+                    ))}
                 </div>
             )}
         </div>

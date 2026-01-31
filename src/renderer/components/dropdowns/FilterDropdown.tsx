@@ -21,6 +21,8 @@ interface FilterDropdownProps {
   buttonTitle?: string
   /** Optional color variant for visual grouping */
   colorVariant?: ColorVariant
+  /** Optional: align tooltip to left (for buttons near right edge) */
+  tooltipAlign?: 'center' | 'left'
 
   /** Optional: controlled open state */
   open?: boolean
@@ -38,6 +40,7 @@ export default function FilterDropdown({
   ariaLabel,
   buttonTitle,
   colorVariant = 'default',
+  tooltipAlign = 'center',
   open: openProp,
   onOpenChange
 }: FilterDropdownProps) {
@@ -91,7 +94,7 @@ export default function FilterDropdown({
   return (
     <div ref={containerRef} className="filter-dropdown" style={{ position: 'relative' }}>
       <button
-        className={`btn ghost filter-dropdown__trigger filter-dropdown__trigger--${colorVariant} ${hasActiveFilters ? 'has-filters' : ''} has-tooltip`}
+        className={`btn ghost filter-dropdown__trigger filter-dropdown__trigger--${colorVariant} ${hasActiveFilters ? 'has-filters' : ''} has-tooltip${tooltipAlign === 'left' ? ' tooltip-left' : ''}`}
         onClick={() => setOpen(!open)}
         aria-label={ariaLabel}
         data-tooltip={buttonTitle}

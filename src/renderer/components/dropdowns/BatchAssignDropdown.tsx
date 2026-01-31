@@ -200,6 +200,7 @@ export default function BatchAssignDropdown({
       title="Batch zuweisen"
       hasActiveFilters={false}
       alignRight
+      tooltipAlign="left"
       width={420}
       ariaLabel="Batch zuweisen"
       buttonTitle="Batch zuweisen"

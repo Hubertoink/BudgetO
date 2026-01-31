@@ -265,28 +265,10 @@ export default function JournalTable({
         return String(d) <= String(lockedUntil)
     }
 
-    // Column width configuration for fixed table layout (default values)
-    const defaultColWidths: Record<string, number> = {
-        actions: 50,
-        date: 90,
-        voucherNo: 110,
-        type: 70,
-        sphere: 70,
-        description: 200,
-        earmark: 120,
-        budget: 130,
-        paymentMethod: 95,
-        attachments: 40,
-        net: 85,
-        vat: 70,
-        gross: 95
-    }
-
-    // Get column width (user-defined or default)
-    const getColWidth = (k: string): string => {
+    // Get column width (user-defined only; otherwise let table auto-fit)
+    const getColWidth = (k: string): string | undefined => {
         if (columnWidths[k]) return `${columnWidths[k]}px`
-        if (k === 'description') return 'auto' // description flexes
-        return `${defaultColWidths[k] || 100}px`
+        return undefined
     }
 
     // Render resize handle
@@ -513,13 +495,15 @@ export default function JournalTable({
         )
     )
     return (
-        <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
-            <colgroup>
-                {visibleOrder.map((k) => (
-                    <col key={k} style={{ width: getColWidth(k) }} />
-                ))}
-            </colgroup>
-            <thead>
+        <div className="table-scroll-wrapper">
+            <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
+                <colgroup>
+                    {visibleOrder.map((k) => {
+                        const width = getColWidth(k)
+                        return <col key={k} style={width ? { width } : undefined} />
+                    })}
+                </colgroup>
+                <thead>
                 <tr>
                     {visibleOrder.map((k, idx) => {
                         const isLast = idx === visibleOrder.length - 1
@@ -555,5 +539,6 @@ export default function JournalTable({
                 )}
             </tbody>
         </table>
+        </div>
     )
 }
