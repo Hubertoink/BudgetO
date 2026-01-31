@@ -79,11 +79,15 @@ interface JournalTableProps {
         categoryName?: string | null
         categoryColor?: string | null
         earmarkId?: number | null
+        earmarkAmount?: number | null
         budgetId?: number | null
+        budgetAmount?: number | null
         tags?: string[]
         netAmount?: number
         grossAmount?: number
         vatRate?: number
+        budgets?: unknown[]
+        earmarksAssigned?: unknown[]
     }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
     onToggleSort: (col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => void
@@ -506,7 +510,6 @@ export default function JournalTable({
                 <thead>
                 <tr>
                     {visibleOrder.map((k, idx) => {
-                        const isLast = idx === visibleOrder.length - 1
                         const th = thFor(k)
                         // Clone the th and add resize handle
                         return React.cloneElement(th, {
@@ -515,7 +518,7 @@ export default function JournalTable({
                             children: (
                                 <>
                                     {th.props.children}
-                                    {!isLast && <ResizeHandle colKey={k} />}
+                                        <ResizeHandle colKey={k} />
                                 </>
                             )
                         })

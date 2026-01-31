@@ -851,18 +851,45 @@ export function summarizeVouchers(filters: {
 
 export function summarizeVouchersByCategory(filters: {
     paymentMethod?: 'BAR' | 'BANK'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
     to?: string
+    earmarkId?: number
+    q?: string
+    tag?: string
+    workYear?: number
+    showArchived?: boolean
 }) {
     const d = getDb()
-    const { paymentMethod, type, from, to } = filters
+    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
     const params: any[] = []
     const wh: string[] = []
+    let joinSql = ''
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
+    if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
+    if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
+    if (earmarkId != null) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
+    if (q && q.trim()) {
+        const like = `%${q.trim()}%`
+        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+        params.push(like, like, like, like)
+    }
+    if (tag) {
+        joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
+        wh.push('t.name = ?')
+        params.push(tag)
+    }
+
+    // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
+    if (showArchived === false && typeof workYear === 'number' && !from && !to) {
+        wh.push('v.date >= ? AND v.date <= ?')
+        params.push(`${workYear}-01-01`, `${workYear}-12-31`)
+    }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
 
     let rows: any[] = []
@@ -873,7 +900,7 @@ export function summarizeVouchersByCategory(filters: {
                 cc.name as categoryName,
                 cc.color as categoryColor,
                 IFNULL(SUM(v.gross_amount), 0) as gross
-            FROM vouchers v
+            FROM vouchers v${joinSql}
             LEFT JOIN custom_categories cc ON cc.id = v.category_id
             ${whereSql}
             GROUP BY v.category_id, cc.name, cc.color
@@ -887,7 +914,7 @@ export function summarizeVouchersByCategory(filters: {
                 c.name as categoryName,
                 NULL as categoryColor,
                 IFNULL(SUM(v.gross_amount), 0) as gross
-            FROM vouchers v
+            FROM vouchers v${joinSql}
             LEFT JOIN categories c ON c.id = v.category_id
             ${whereSql}
             GROUP BY v.category_id, c.name

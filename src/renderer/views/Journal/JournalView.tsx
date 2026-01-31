@@ -414,6 +414,7 @@ export default function JournalView({
         // Wait for archive settings to be ready before loading
         if (archiveSettingsReady === false) return
         try {
+            const effectiveShowArchived = showArchived ?? false
             const offset = (activePage - 1) * journalLimit
             const res = await (window.api?.vouchers?.list as any)?.({
                 limit: journalLimit,
@@ -432,8 +433,8 @@ export default function JournalView({
                 tag: activeFilterTag || undefined,
                 taxonomyTermId: activeFilterTaxonomyTerm?.termId || undefined,
                 // Archive mode: server-side filtering
-                workYear: showArchived === false ? workYear : undefined,
-                showArchived
+                workYear: effectiveShowArchived === false ? workYear : undefined,
+                showArchived: effectiveShowArchived
             } as any)
             if (res) {
                 setRows(res.rows || [])

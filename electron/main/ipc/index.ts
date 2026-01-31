@@ -175,7 +175,14 @@ export function registerIpcHandlers() {
                 from: parsed.from,
                 to: parsed.to,
                 paymentMethod: parsed.paymentMethod,
-                type: parsed.type
+                sphere: parsed.sphere,
+                categoryId: parsed.categoryId,
+                type: parsed.type,
+                earmarkId: parsed.earmarkId,
+                q: parsed.q,
+                tag: parsed.tag,
+                workYear: parsed.workYear,
+                showArchived: parsed.showArchived
             }))
         }
 
@@ -184,7 +191,14 @@ export function registerIpcHandlers() {
             from: parsed.from,
             to: parsed.to,
             paymentMethod: parsed.paymentMethod as any,
-            type: parsed.type as any
+            sphere: parsed.sphere as any,
+            categoryId: parsed.categoryId,
+            type: parsed.type as any,
+            earmarkId: parsed.earmarkId,
+            q: parsed.q,
+            tag: parsed.tag,
+            workYear: parsed.workYear,
+            showArchived: parsed.showArchived
         }) })
     })
 

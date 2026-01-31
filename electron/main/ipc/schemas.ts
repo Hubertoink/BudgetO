@@ -225,7 +225,15 @@ export const ReportsByCategoryInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
-    type: VoucherType.optional()
+    sphere: Sphere.optional(),
+    categoryId: z.number().optional(),
+    type: VoucherType.optional(),
+    earmarkId: z.number().optional(),
+    q: z.string().optional(),
+    tag: z.string().optional(),
+    // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
+    workYear: z.number().optional(),
+    showArchived: z.boolean().optional()
 })
 
 export const ReportsByCategoryOutput = z.object({

@@ -71,8 +71,8 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         outGross: number
         diff: number
         bySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
-        inBySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
-        outBySphere?: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; gross: number }>
+        inByCategory?: Array<{ name: string; gross: number; color?: string | null }>
+        outByCategory?: Array<{ name: string; gross: number; color?: string | null }>
     }>(null)
 
     const annualYear = useMemo(() => {
@@ -104,19 +104,34 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                     const diff = Math.round((inflow - spent) * 100) / 100
                     if (alive) setValues({ inGross: inflow, outGross: spent, diff })
                 } else {
-                    const basePayload = { from, to, paymentMethod, sphere, categoryId, earmarkId, q, tag, workYear, showArchived }
+                    const effectiveShowArchived = showArchived ?? false
+                    const basePayload = {
+                        from,
+                        to,
+                        paymentMethod,
+                        sphere,
+                        categoryId,
+                        earmarkId,
+                        q,
+                        tag,
+                        workYear: effectiveShowArchived === false ? workYear : undefined,
+                        showArchived: effectiveShowArchived
+                    }
                     const res = await window.api?.reports.summary?.({ ...basePayload, type })
-                    
-                    // Fetch type-specific breakdowns for tooltips
-                    let inRes: any = null
-                    let outRes: any = null
+                    // Fetch type-specific category breakdowns for tooltips
+                    let inCat: any = null
+                    let outCat: any = null
                     if (!type) {
-                        const [ir, or] = await Promise.all([
-                            window.api?.reports.summary?.({ ...basePayload, type: 'IN' }),
-                            window.api?.reports.summary?.({ ...basePayload, type: 'OUT' })
+                        const [inRes, outRes] = await Promise.all([
+                            window.api?.reports.byCategory?.({ ...basePayload, type: 'IN' }),
+                            window.api?.reports.byCategory?.({ ...basePayload, type: 'OUT' })
                         ])
-                        inRes = ir || null
-                        outRes = or || null
+                        inCat = inRes || null
+                        outCat = outRes || null
+                    } else if (type === 'IN') {
+                        inCat = (await window.api?.reports.byCategory?.({ ...basePayload, type: 'IN' })) || null
+                    } else if (type === 'OUT') {
+                        outCat = (await window.api?.reports.byCategory?.({ ...basePayload, type: 'OUT' })) || null
                     }
                     
                     if (alive && res) {
@@ -129,20 +144,23 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                         const bySphere = bySphereRaw
                             .map((s: any) => ({ key: s.key as any, gross: Number(s.gross || 0) }))
                             .filter((s: any) => s.key && Number.isFinite(s.gross))
-                        
-                        // Process IN by sphere
-                        const inBySphereRaw = inRes?.bySphere || (type === 'IN' ? bySphereRaw : [])
-                        const inBySphere = inBySphereRaw
-                            .map((s: any) => ({ key: s.key as any, gross: Math.abs(Number(s.gross || 0)) }))
-                            .filter((s: any) => s.key && Number.isFinite(s.gross) && s.gross !== 0)
-                        
-                        // Process OUT by sphere
-                        const outBySphereRaw = outRes?.bySphere || (type === 'OUT' ? bySphereRaw : [])
-                        const outBySphere = outBySphereRaw
-                            .map((s: any) => ({ key: s.key as any, gross: Math.abs(Number(s.gross || 0)) }))
-                            .filter((s: any) => s.key && Number.isFinite(s.gross) && s.gross !== 0)
-                        
-                        setValues({ inGross, outGross, diff, bySphere, inBySphere, outBySphere })
+
+                        const normalizeCategoryRows = (input: any) => {
+                            const rows = Array.isArray(input?.rows) ? input.rows : []
+                            return rows
+                                .map((r: any) => ({
+                                    name: String(r?.categoryName ?? 'Ohne Kategorie'),
+                                    gross: Math.abs(Number(r?.gross || 0)),
+                                    color: (typeof r?.categoryColor === 'string' ? r.categoryColor : null) as string | null
+                                }))
+                                .filter((r: any) => r.name && Number.isFinite(r.gross) && r.gross !== 0)
+                                .sort((a: any, b: any) => b.gross - a.gross)
+                        }
+
+                        const inByCategory = normalizeCategoryRows(inCat)
+                        const outByCategory = normalizeCategoryRows(outCat)
+
+                        setValues({ inGross, outGross, diff, bySphere, inByCategory, outByCategory })
                     }
                 }
             } finally {
@@ -199,23 +217,22 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         .map((s) => ({ key: s.key, gross: Math.abs(Number(s.gross || 0)) }))
         .sort((a, b) => b.gross - a.gross)
 
-    // Prepare tooltip rows for IN card
-    const inSphereRows = (values?.inBySphere || [])
-        .filter(s => s.gross !== 0)
-        .map(s => ({
-            key: SPHERE_LABELS[s.key] || s.key,
-            value: fmt.format(s.gross),
-            dotColor: SPHERE_COLORS[s.key] || 'var(--border)'
-        }))
+    const buildCategoryTooltip = (rows: Array<{ name: string; gross: number; color?: string | null }>) => {
+        const max = 8
+        const shown = rows.slice(0, max)
+        const remaining = Math.max(0, rows.length - shown.length)
+        return {
+            rows: shown.map((r) => ({
+                key: r.name,
+                value: fmt.format(r.gross),
+                dotColor: r.color || 'var(--border)'
+            })),
+            hint: remaining > 0 ? `+${remaining} weitere` : undefined
+        }
+    }
 
-    // Prepare tooltip rows for OUT card
-    const outSphereRows = (values?.outBySphere || [])
-        .filter(s => s.gross !== 0)
-        .map(s => ({
-            key: SPHERE_LABELS[s.key] || s.key,
-            value: fmt.format(s.gross),
-            dotColor: SPHERE_COLORS[s.key] || 'var(--border)'
-        }))
+    const inCategory = buildCategoryTooltip(values?.inByCategory || [])
+    const outCategory = buildCategoryTooltip(values?.outByCategory || [])
 
     return (
         <div className="filter-totals-card">
@@ -232,8 +249,9 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                         className="tooltip-modal"
                         content={
                             <TooltipList
-                                title={inSphereRows.length > 0 ? 'Einnahmen · Verteilung nach Sphäre' : 'Einnahmen'}
-                                rows={inSphereRows.length > 0 ? inSphereRows : [{ key: 'Summe', value: fmt.format(inVal), dotColor: 'var(--success)' }]}
+                                title={inCategory.rows.length > 0 ? 'Einnahmen · Verteilung nach Kategorie' : 'Einnahmen'}
+                                rows={inCategory.rows.length > 0 ? inCategory.rows : [{ key: 'Summe', value: fmt.format(inVal), dotColor: 'var(--success)' }]}
+                                hint={inCategory.rows.length > 0 ? inCategory.hint : undefined}
                             />
                         }
                     >
@@ -253,8 +271,9 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                         className="tooltip-modal"
                         content={
                             <TooltipList
-                                title={outSphereRows.length > 0 ? 'Ausgaben · Verteilung nach Sphäre' : 'Ausgaben'}
-                                rows={outSphereRows.length > 0 ? outSphereRows : [{ key: 'Summe', value: fmt.format(outVal), dotColor: 'var(--danger)' }]}
+                                title={outCategory.rows.length > 0 ? 'Ausgaben · Verteilung nach Kategorie' : 'Ausgaben'}
+                                rows={outCategory.rows.length > 0 ? outCategory.rows : [{ key: 'Summe', value: fmt.format(outVal), dotColor: 'var(--danger)' }]}
+                                hint={outCategory.rows.length > 0 ? outCategory.hint : undefined}
                             />
                         }
                     >
