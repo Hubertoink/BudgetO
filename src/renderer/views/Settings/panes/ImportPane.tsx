@@ -2,6 +2,7 @@ import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
 import { ImportXlsxCard } from '../components/ImportXlsxCard'
+import { MembersImportCard } from '../components/MembersImportCard'
 
 /**
  * ImportPane - Data Import (XLSX & camt.053 XML)
@@ -12,13 +13,14 @@ export function ImportPane({ notify }: ImportPaneProps) {
   const [logRows, setLogRows] = React.useState<Array<{ id: number; createdAt: string; entity: string; action: string; diff?: any | null }>>([])
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  const [tab, setTab] = React.useState<'vouchers' | 'members'>('vouchers')
 
   async function loadLog() {
     setErr(''); setBusy(true)
     try {
       const res = await window.api?.audit?.recent?.({ limit: 50 })
       const all = res?.rows || []
-      const onlyImports = all.filter((r: any) => r.entity === 'imports' && r.action === 'EXECUTE')
+      const onlyImports = all.filter((r: any) => (r.entity === 'imports' || r.entity === 'members_import') && r.action === 'EXECUTE')
       setLogRows(onlyImports)
     } catch (e: any) { setErr(e?.message || String(e)) }
     finally { setBusy(false) }
@@ -45,8 +47,18 @@ export function ImportPane({ notify }: ImportPaneProps) {
         </div>
       </div>
 
-      {/* Full Excel/camt.053 XML import functionality */}
-      <ImportXlsxCard notify={notify} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button className={tab === 'vouchers' ? 'btn primary' : 'btn'} onClick={() => setTab('vouchers')}>Buchungen</button>
+        <button 
+          className={tab === 'members' ? 'btn' : 'btn'} 
+          onClick={() => setTab('members')}
+          style={tab === 'members' ? { background: 'rgba(80, 180, 180, 0.85)', color: '#fff' } : { borderColor: 'rgba(80, 180, 180, 0.5)', color: 'rgba(80, 180, 180, 1)' }}
+        >Mitglieder</button>
+      </div>
+
+      {/* Full import functionality */}
+      {tab === 'vouchers' && <ImportXlsxCard notify={notify} />}
+      {tab === 'members' && <MembersImportCard notify={notify} />}
 
       {showLog && createPortal(
         <div className="modal-overlay" onClick={() => setShowLog(false)} role="dialog" aria-modal="true">
@@ -66,8 +78,9 @@ export function ImportPane({ notify }: ImportPaneProps) {
                   <thead>
                     <tr>
                       <th align="left">Zeit</th>
-                      <th align="left">Format</th>
+                      <th align="left">Typ</th>
                       <th align="right">Importiert</th>
+                      <th align="right">Aktualisiert</th>
                       <th align="right">Übersprungen</th>
                       <th align="right">Fehler</th>
                       <th align="left">Fehler-Datei</th>
@@ -76,13 +89,15 @@ export function ImportPane({ notify }: ImportPaneProps) {
                   <tbody>
                     {logRows.map((r, i) => {
                       const d = r.diff || {}
-                      const fmt = d.format || 'XLSX'
+                      const fmt = r.entity === 'members_import' ? 'Mitglieder' : (d.format || 'XLSX')
                       const errCnt = Number(d.errorCount || 0)
+                      const upd = d.updated
                       return (
                         <tr key={r.id || i}>
                           <td>{new Date(r.createdAt || d.when || '').toLocaleString()}</td>
                           <td>{fmt}</td>
                           <td align="right">{d.imported ?? '—'}</td>
+                          <td align="right">{upd ?? '—'}</td>
                           <td align="right">{d.skipped ?? '—'}</td>
                           <td align="right" style={{ color: errCnt > 0 ? 'var(--danger)' : undefined }}>{errCnt}</td>
                           <td>{d.errorFilePath ? (
@@ -92,7 +107,7 @@ export function ImportPane({ notify }: ImportPaneProps) {
                       )
                     })}
                     {logRows.length === 0 && (
-                      <tr><td colSpan={6} className="helper">Keine Einträge vorhanden.</td></tr>
+                      <tr><td colSpan={7} className="helper">Keine Einträge vorhanden.</td></tr>
                     )}
                   </tbody>
                 </table>

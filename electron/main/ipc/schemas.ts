@@ -1014,6 +1014,42 @@ export const MemberDeleteOutput = z.object({ id: z.number() })
 export const MemberGetInput = z.object({ id: z.number() })
 export const MemberGetOutput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, boardRole: BoardRole.nullable().optional(), createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() }).nullable()
 
+// Members Import (Excel)
+export const MembersImportPreviewInput = z.object({ fileBase64: z.string() })
+export const MembersImportPreviewOutput = z.object({
+    headers: z.array(z.string()),
+    sample: z.array(z.record(z.any())),
+    suggestedMapping: z.record(z.string().nullable()),
+    headerRowIndex: z.number()
+})
+
+export const MembersImportExecuteInput = z.object({
+    fileBase64: z.string(),
+    mapping: z.record(z.string().nullable()),
+    options: z
+        .object({
+            updateExisting: z.boolean().optional(),
+            selectedRows: z.array(z.number()).optional(),
+            rowEdits: z.record(z.record(z.any())).optional()
+        })
+        .optional()
+})
+
+export const MembersImportExecuteOutput = z.object({
+    imported: z.number(),
+    updated: z.number(),
+    skipped: z.number(),
+    errors: z.array(z.object({ row: z.number(), message: z.string() })),
+    rowStatuses: z.array(z.object({ row: z.number(), ok: z.boolean(), message: z.string().optional() })).optional(),
+    errorFilePath: z.string().optional()
+})
+
+export const MembersImportTemplateInput = z.object({}).optional()
+export const MembersImportTemplateOutput = z.object({ filePath: z.string() })
+
+export const MembersImportTestDataInput = z.object({}).optional()
+export const MembersImportTestDataOutput = z.object({ filePath: z.string() })
+
 // Membership payments (Phase 3)
 export const PaymentsListDueInput = z.object({ interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), periodKey: z.string().optional(), from: z.string().optional(), to: z.string().optional(), q: z.string().optional(), includePaid: z.boolean().optional(), memberId: z.number().optional() })
 export const PaymentsListDueOutput = z.object({ rows: z.array(z.object({ memberId: z.number(), name: z.string(), memberNo: z.string().nullable().optional(), status: MemberStatus, periodKey: z.string(), interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), amount: z.number(), paid: z.number(), voucherId: z.number().nullable().optional(), verified: z.number().optional() })), total: z.number() })

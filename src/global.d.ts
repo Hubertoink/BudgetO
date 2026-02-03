@@ -188,6 +188,14 @@ declare global {
                 template: () => Promise<{ filePath: string }>
                 testdata: () => Promise<{ filePath: string }>
             }
+            members?: {
+                import?: {
+                    preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
+                    execute: (payload: { fileBase64: string; mapping: Record<string, string | null>; options?: { updateExisting?: boolean; selectedRows?: number[]; rowEdits?: Record<string, Record<string, any>> } }) => Promise<{ imported: number; updated: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; errorFilePath?: string }>
+                    template: () => Promise<{ filePath: string }>
+                    testdata: () => Promise<{ filePath: string }>
+                }
+            }
             db: {
                 export: () => Promise<{ filePath: string }>
                 import: () => Promise<{ ok: boolean; filePath?: string }>
