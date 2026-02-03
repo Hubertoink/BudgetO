@@ -1644,6 +1644,11 @@ tbody tr:nth-child(even):hover {
     -webkit-overflow-scrolling: touch;
 }
 
+/* Journal: avoid inner vertical scrollbar; let the main content area scroll */
+.journal-table-scroll {
+    overflow: visible;
+}
+
 .resizable-th {
     position: relative;
 }
@@ -4864,6 +4869,87 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .journal-view > * {
     max-width: 100%;
+}
+
+/* Allow hover tooltips in Buchungen table (budget usage) to escape the card */
+.journal-table-card {
+    overflow: visible;
+}
+
+/* ==================== Journal: Budget usage tooltip ==================== */
+.budget-usage-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0;
+    box-shadow: 0 18px 55px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+
+.budget-usage-tooltip__list {
+    display: grid;
+}
+
+.budget-usage-tooltip__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: color-mix(in oklab, var(--surface) 86%, var(--surface-alt));
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+}
+
+.budget-usage-tooltip__item--active {
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.budget-usage-tooltip__itemLabel {
+    font-weight: 650;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.budget-usage-tooltip__itemPct {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.budget-usage-tooltip__body {
+    padding: 12px;
+}
+
+.budget-usage-tooltip__bar {
+    height: 8px;
+    background: var(--muted);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 10px;
+}
+
+.budget-usage-tooltip__barFill {
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.budget-usage-tooltip__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 12px;
+}
+
+.budget-usage-tooltip__statLabel {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.budget-usage-tooltip__statValue {
+    font-weight: 700;
 }
 
 .journal-toolbar {

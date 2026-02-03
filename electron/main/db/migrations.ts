@@ -955,6 +955,19 @@ export const MIGRATIONS: Mig[] = [
       `)
     }
   }
+  ,
+  {
+    version: 36,
+    up(db: DB) {
+      // Budgets: add archive flag (0=active, 1=archived)
+      const cols = db.prepare('PRAGMA table_info(budgets)').all() as Array<{ name: string }>
+      const hasArchived = cols.some((c) => c.name === 'is_archived')
+      if (!hasArchived) {
+        db.exec(`ALTER TABLE budgets ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;`)
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_budgets_archived ON budgets(is_archived);`)
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

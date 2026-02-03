@@ -56,7 +56,9 @@ interface JournalTableProps {
         budgetId?: number | null
         budgetLabel?: string | null
         budgetColor?: string | null
+        budgets?: unknown[]
         tags?: string[]
+        earmarksAssigned?: unknown[]
         taxonomyTerms?: Array<{ taxonomyId: number; taxonomyName: string; termId: number; termName: string; termColor?: string | null }>
     }>
     order: string[]
@@ -105,6 +107,9 @@ interface JournalTableProps {
     useCategoriesModule?: boolean
     canWrite?: boolean
 }
+
+type BudgetAssignment = { budgetId: number; amount?: number; label?: string | null }
+type EarmarkAssignment = { earmarkId: number; amount?: number; code?: string | null; name?: string | null }
 
 export default function JournalTable({
     rows,
@@ -383,22 +388,64 @@ export default function JournalTable({
                 </div>
             </td>
         ) : k === 'earmark' ? (
-            <td key={k} align="center">{r.earmarkCode ? (() => {
-                const em = earmarks.find(e => e.code === r.earmarkCode)
-                const bg = em?.color
-                const fg = contrastText(bg)
-                const id = r.earmarkId as number | null | undefined
-                return (
-                    <button
-                        className="badge-earmark"
-                        title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
-                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                        onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
-                    >
-                        {r.earmarkCode}
-                    </button>
-                )
-            })() : ''}</td>
+            <td key={k} align="center">
+                {(() => {
+                    const maxVisible = 2
+                    const raw: unknown = (r as any).earmarksAssigned
+                    const multi = Array.isArray(raw) ? (raw as EarmarkAssignment[]).filter((e) => typeof e?.earmarkId === 'number' || !!e?.code) : []
+
+                    const singleId = r.earmarkId as number | null | undefined
+                    const singleCode = r.earmarkCode as string | null | undefined
+                    const fallbackSingle: EarmarkAssignment[] = (singleId != null || singleCode) ? [{ earmarkId: singleId ?? 0, code: singleCode ?? null }] : []
+
+                    const list = multi.length ? multi : fallbackSingle
+                    if (!list.length) return ''
+
+                    const visible = list.slice(0, maxVisible)
+                    const rest = Math.max(0, list.length - visible.length)
+
+                    return (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'hidden' }}>
+                            {visible.map((ea, idx) => {
+                                const meta = (ea.earmarkId ? earmarks.find((e) => e.id === ea.earmarkId) : undefined)
+                                    || (ea.code ? earmarks.find((e) => e.code === ea.code) : undefined)
+
+                                const id = (ea.earmarkId && ea.earmarkId > 0) ? ea.earmarkId : meta?.id
+                                const code = (ea.code && String(ea.code).trim()) ? String(ea.code).trim() : (meta?.code || (id ? `#${id}` : '—'))
+                                const bg = meta?.color
+                                const fg = contrastText(bg)
+
+                                return (
+                                    <button
+                                        key={`${id || code}:${idx}`}
+                                        className="badge-earmark"
+                                        title={`Nach Zweckbindung ${code} filtern`}
+                                        style={{
+                                            background: bg || undefined,
+                                            color: bg ? fg : undefined,
+                                            cursor: (onEarmarkClick && id != null) ? 'pointer' : 'default',
+                                            border: bg ? `1px solid ${bg}` : undefined,
+                                            maxWidth: 92,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
+                                    >
+                                        {code}
+                                    </button>
+                                )
+                            })}
+
+                            {rest > 0 && (
+                                <span className="badge" style={{ background: 'var(--muted)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={`${rest} weitere Zweckbindung(en)`}>
+                                    +{rest}
+                                </span>
+                            )}
+                        </div>
+                    )
+                })()}
+            </td>
         ) : k === 'paymentMethod' ? (
             <td key={k}>
                 {r.type === 'TRANSFER' ? (
@@ -427,67 +474,143 @@ export default function JournalTable({
                 )}
             </td>
         ) : k === 'budget' ? (
-            <td key={k} align="center">{r.budgetLabel ? (
-                (() => {
-                    const bg = (r as any).budgetColor || undefined
-                    const fg = contrastText(bg)
-                    const id = r.budgetId as number | null | undefined
-                    const usage = id ? budgetUsage?.[id] : undefined
-                    const tooltip = usage ? `Budgetiert: ${eurFmt.format(usage.planned)} • Netto: ${eurFmt.format(usage.spent - usage.inflow)} • Verfügbar: ${eurFmt.format(usage.remaining)} (${usage.percent.toFixed(1)}%)` : `Nach Budget ${r.budgetLabel} filtern`
-                    const hoverActive = usage && hoverBudget === id
-                    const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
-                    const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : usage.color || bg || 'var(--accent)') : (bg || 'var(--accent)')
+            <td key={k} align="center">
+                {(() => {
+                    const maxVisible = 2
+                    const raw: unknown = (r as any).budgets
+                    const multi = Array.isArray(raw) ? (raw as BudgetAssignment[]).filter((b) => typeof b?.budgetId === 'number' && b.budgetId > 0) : []
+
+                    const singleId = r.budgetId as number | null | undefined
+                    const singleLabel = r.budgetLabel as string | null | undefined
+                    const singleColor = (r as any).budgetColor || undefined
+                    const fallbackSingle: BudgetAssignment[] = (singleId != null || singleLabel) ? [{ budgetId: singleId ?? 0, label: singleLabel ?? null }] : []
+
+                    const list = multi.length ? multi : fallbackSingle
+                    if (!list.length) return ''
+
+                    const visible = list.slice(0, maxVisible)
+                    const rest = Math.max(0, list.length - visible.length)
+
                     return (
-                        <div style={{ position: 'relative', display: 'inline-block' }} onMouseEnter={() => setHoverBudget(id || null)} onMouseLeave={() => setHoverBudget(null)}>
-                            <button
-                                className="badge-budget"
-                                title={tooltip}
-                                style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                                onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
-                            >
-                                {r.budgetLabel}
-                            </button>
-                            {usage && (
-                                <div
-                                    style={{
-                                        position: 'absolute',
-                                        top: '110%',
-                                        left: '50%',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 10,
-                                        padding: '10px 12px',
-                                        minWidth: 220,
-                                        boxShadow: '0 10px 40px rgba(0,0,0,0.35)',
-                                        opacity: hoverActive ? 1 : 0,
-                                        pointerEvents: hoverActive ? 'auto' : 'none',
-                                        transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                        transformOrigin: 'top',
-                                        zIndex: 20,
-                                        transform: hoverActive ? 'translate(-50%, 0)' : 'translate(-50%, -6px)'
-                                    }}
-                                    role="tooltip"
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-                                        <div style={{ fontWeight: 600 }}>{r.budgetLabel}</div>
-                                        <div style={{ fontSize: 12, color: barColor }}>{usage.percent.toFixed(1)}%</div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'hidden' }}>
+                            {visible.map((ba, idx) => {
+                                const id = ba.budgetId
+                                const usage = id ? budgetUsage?.[id] : undefined
+                                const bg = (usage?.color || (id === singleId ? singleColor : undefined)) as string | undefined
+                                const fg = contrastText(bg)
+                                const label = (ba.label && String(ba.label).trim()) ? String(ba.label).trim() : (id ? `#${id}` : '—')
+                                const tooltip = usage
+                                    ? `Budgetiert: ${eurFmt.format(usage.planned)} • Netto: ${eurFmt.format(usage.spent - usage.inflow)} • Verfügbar: ${eurFmt.format(usage.remaining)} (${usage.percent.toFixed(1)}%)`
+                                    : `Nach Budget ${label} filtern`
+                                const hoverActive = hoverBudget === id
+                                const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
+                                const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : usage.color || bg || 'var(--accent)') : (bg || 'var(--accent)')
+
+                                return (
+                                    <div
+                                        key={`${id}:${idx}`}
+                                        style={{ position: 'relative', display: 'inline-block', maxWidth: 120 }}
+                                        onMouseEnter={() => setHoverBudget(id || null)}
+                                        onMouseLeave={() => setHoverBudget(null)}
+                                    >
+                                        <button
+                                            className="badge-budget"
+                                            title={tooltip}
+                                            style={{
+                                                background: bg,
+                                                color: bg ? fg : undefined,
+                                                cursor: (onBudgetClick && id != null) ? 'pointer' : 'default',
+                                                border: bg ? `1px solid ${bg}` : undefined,
+                                                maxWidth: 120,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
+                                        >
+                                            {label}
+                                        </button>
+
+                                        {(usage || hoverActive) && (
+                                            <div
+                                                className="budget-usage-tooltip"
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '110%',
+                                                    right: 0,
+                                                    minWidth: 260,
+                                                    maxWidth: 'min(340px, calc(100vw - 32px))',
+                                                    opacity: hoverActive ? 1 : 0,
+                                                    pointerEvents: hoverActive ? 'auto' : 'none',
+                                                    transition: 'opacity 0.15s ease, transform 0.15s ease',
+                                                    transformOrigin: 'top',
+                                                    zIndex: 20,
+                                                    transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
+                                                }}
+                                                role="tooltip"
+                                            >
+                                                <div className="budget-usage-tooltip__list">
+                                                    {list.slice(0, 3).map((b: any, i: number) => {
+                                                        const bid = Number(b?.budgetId)
+                                                        const u = bid ? budgetUsage?.[bid] : undefined
+                                                        const pct = u ? u.percent : 0
+                                                        const pctColor = u ? (u.percent >= 100 ? 'var(--danger)' : u.percent >= 80 ? 'var(--warning)' : 'var(--text-dim)') : 'var(--text-dim)'
+                                                        const itemLabel = (b?.label && String(b.label).trim()) ? String(b.label).trim() : (bid ? `#${bid}` : '—')
+                                                        const active = bid === id
+                                                        return (
+                                                            <div key={`${bid}:${i}`} className={`budget-usage-tooltip__item ${active ? 'budget-usage-tooltip__item--active' : ''}`.trim()}>
+                                                                <div className="budget-usage-tooltip__itemLabel">{itemLabel}</div>
+                                                                <div className="budget-usage-tooltip__itemPct" style={{ color: pctColor }}>{pct.toFixed(1)}%</div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                <div className="budget-usage-tooltip__body">
+                                                    {usage ? (
+                                                        <>
+                                                            <div className="budget-usage-tooltip__bar">
+                                                                <div className="budget-usage-tooltip__barFill" style={{ width: `${barPct}%`, background: barColor }} />
+                                                            </div>
+
+                                                            <div className="budget-usage-tooltip__stats">
+                                                                <div>
+                                                                    <div className="budget-usage-tooltip__statLabel">Budget</div>
+                                                                    <div className="budget-usage-tooltip__statValue">{eurFmt.format(usage.planned)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="budget-usage-tooltip__statLabel">Verfügbar</div>
+                                                                    <div className="budget-usage-tooltip__statValue" style={{ color: usage.remaining < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(usage.remaining)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="budget-usage-tooltip__statLabel">Ausgaben netto</div>
+                                                                    <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.spent - usage.inflow)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="budget-usage-tooltip__statLabel">Brutto-Ausgaben</div>
+                                                                    <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.spent)}</div>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="helper" style={{ padding: 6 }}>Budgetdaten werden geladen…</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div style={{ height: 8, background: 'var(--muted)', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
-                                        <div style={{ height: '100%', width: `${barPct}%`, background: barColor, transition: 'width 0.2s ease' }} />
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, fontSize: 12 }}>
-                                        <div><div className="helper">Budget</div><div style={{ fontWeight: 600 }}>{eurFmt.format(usage.planned)}</div></div>
-                                        <div><div className="helper">Verfügbar</div><div style={{ fontWeight: 600, color: usage.remaining < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(usage.remaining)}</div></div>
-                                        <div><div className="helper">Ausgaben netto</div><div style={{ fontWeight: 500 }}>{eurFmt.format(usage.spent - usage.inflow)}</div></div>
-                                        <div><div className="helper">Brutto-Ausgaben</div><div style={{ fontWeight: 500 }}>{eurFmt.format(usage.spent)}</div></div>
-                                    </div>
-                                </div>
+                                )
+                            })}
+
+                            {rest > 0 && (
+                                <span className="badge" style={{ background: 'var(--muted)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={`${rest} weitere Budget(s)`}>
+                                    +{rest}
+                                </span>
                             )}
                         </div>
                     )
-                })()
-            ) : ''}</td>
+                })()}
+            </td>
         ) : k === 'attachments' ? (
             <td key={k} align="center">{(r.fileCount && r.fileCount > 0) ? <span className="badge" title={`${r.fileCount} Anhang${r.fileCount > 1 ? 'e' : ''}`}>📎</span> : ''}</td>
         ) : k === 'net' ? (
@@ -499,7 +622,7 @@ export default function JournalTable({
         )
     )
     return (
-        <div className="table-scroll-wrapper">
+        <div className="table-scroll-wrapper journal-table-scroll">
             <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
                 <colgroup>
                     {visibleOrder.map((k) => {

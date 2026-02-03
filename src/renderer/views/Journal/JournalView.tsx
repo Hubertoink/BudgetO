@@ -323,8 +323,23 @@ export default function JournalView({
     }, [])
 
     useEffect(() => {
-        const ids = Array.from(new Set(rows.map(r => r.budgetId).filter((id): id is number => typeof id === 'number')))
-            .filter((id) => !budgetUsage[id])
+        const ids = Array.from(
+            new Set(
+                rows
+                    .flatMap((r: any) => {
+                        const out: number[] = []
+                        if (typeof r.budgetId === 'number') out.push(r.budgetId)
+                        if (Array.isArray(r.budgets)) {
+                            for (const b of r.budgets) {
+                                const bid = Number((b as any)?.budgetId)
+                                if (bid) out.push(bid)
+                            }
+                        }
+                        return out
+                    })
+                    .filter((id) => typeof id === 'number' && Number.isFinite(id) && id > 0)
+            )
+        ).filter((id) => !budgetUsage[id])
         if (!ids.length) return
 
         let cancelled = false
@@ -437,14 +452,46 @@ export default function JournalView({
                 showArchived: effectiveShowArchived
             } as any)
             if (res) {
-                setRows(res.rows || [])
+                const incoming: VoucherRow[] = (res.rows || []) as VoucherRow[]
+
+                const enriched = incoming.map((row) => {
+                    const budgetsRaw: unknown = (row as any).budgets
+                    const earmarksRaw: unknown = (row as any).earmarksAssigned
+
+                    const budgetsEnriched = Array.isArray(budgetsRaw)
+                        ? (budgetsRaw as any[]).map((b) => ({
+                            ...b,
+                            label: b?.label || budgetNames.get(Number(b?.budgetId)) || undefined
+                        }))
+                        : budgetsRaw
+
+                    const earmarksEnriched = Array.isArray(earmarksRaw)
+                        ? (earmarksRaw as any[]).map((e) => {
+                            const id = Number(e?.earmarkId)
+                            const meta = earmarks.find((m) => m.id === id)
+                            return {
+                                ...e,
+                                code: e?.code || meta?.code || undefined,
+                                name: e?.name || meta?.name || undefined
+                            }
+                        })
+                        : earmarksRaw
+
+                    return {
+                        ...row,
+                        budgets: budgetsEnriched as any,
+                        earmarksAssigned: earmarksEnriched as any
+                    }
+                })
+
+                setRows(enriched)
                 setTotalRows(res.total || 0)
             }
         } catch (e: any) {
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady, budgetNames, earmarks])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -740,7 +787,7 @@ export default function JournalView({
 
             {/* Main Table Card */}
             <div>
-                <div className="card">
+                <div className="card journal-table-card">
                     {/* Pagination controls */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
                         <div className="helper">Seite {activePage} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>

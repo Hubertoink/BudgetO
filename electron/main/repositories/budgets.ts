@@ -11,12 +11,12 @@ export type BudgetKey = {
     earmarkId?: number | null
 }
 
-export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amountPlanned: number } & { name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: boolean }) {
+export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amountPlanned: number } & { name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: boolean; isArchived?: boolean }) {
     return withTransaction((d: DB) => {
         if (input.id != null) {
             // Update by explicit id
             d.prepare(
-                `UPDATE budgets SET year=?, sphere=?, category_id=?, project_id=?, earmark_id=?, amount_planned=?, name=?, category_name=?, project_name=?, start_date=?, end_date=?, color=?, enforce_time_range=? WHERE id=?`
+                `UPDATE budgets SET year=?, sphere=?, category_id=?, project_id=?, earmark_id=?, amount_planned=?, name=?, category_name=?, project_name=?, start_date=?, end_date=?, color=?, enforce_time_range=?, is_archived=COALESCE(?, is_archived) WHERE id=?`
             ).run(
                 input.year,
                 input.sphere,
@@ -31,6 +31,7 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
                 input.endDate ?? null,
                 input.color ?? null,
                 (input.enforceTimeRange ?? false) ? 1 : 0,
+                input.isArchived === undefined ? null : (input.isArchived ? 1 : 0),
                 input.id
             )
             return { id: input.id, updated: true }
@@ -38,7 +39,7 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
             // Insert a new budget row
             const info = d
                 .prepare(
-                    `INSERT INTO budgets(year, sphere, category_id, project_id, earmark_id, amount_planned, name, category_name, project_name, start_date, end_date, color, enforce_time_range) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+                    `INSERT INTO budgets(year, sphere, category_id, project_id, earmark_id, amount_planned, name, category_name, project_name, start_date, end_date, color, enforce_time_range, is_archived) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
                 )
                 .run(
                     input.year,
@@ -53,24 +54,31 @@ export function upsertBudget(input: Partial<{ id: number }> & BudgetKey & { amou
                     input.startDate ?? null,
                     input.endDate ?? null,
                     input.color ?? null,
-                    (input.enforceTimeRange ?? false) ? 1 : 0
+                    (input.enforceTimeRange ?? false) ? 1 : 0,
+                    (input.isArchived ?? false) ? 1 : 0
                 )
             return { id: Number(info.lastInsertRowid), created: true }
         }
     })
 }
 
-export function listBudgets(params: { year?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null }) {
+export function listBudgets(params: { year?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; includeArchived?: boolean; archivedOnly?: boolean }) {
     const d = getDb()
     const wh: string[] = []
     const vals: any[] = []
     if (params.year != null) { wh.push('year = ?'); vals.push(params.year) }
     if (params.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
     if (params.earmarkId !== undefined) { wh.push('IFNULL(earmark_id,-1) = IFNULL(?, -1)'); vals.push(params.earmarkId) }
+    if (params.archivedOnly) {
+        wh.push('is_archived = 1')
+    } else if (!params.includeArchived) {
+        wh.push('is_archived = 0')
+    }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const rows = d.prepare(`SELECT id, year, sphere, category_id as categoryId, project_id as projectId, earmark_id as earmarkId, amount_planned as amountPlanned,
-        name, category_name as categoryName, project_name as projectName, start_date as startDate, end_date as endDate, color, enforce_time_range as enforceTimeRange
-        FROM budgets${whereSql} ORDER BY year DESC, sphere`).all(...vals) as any[]
+        name, category_name as categoryName, project_name as projectName, start_date as startDate, end_date as endDate, color, enforce_time_range as enforceTimeRange,
+        is_archived as isArchived
+        FROM budgets${whereSql} ORDER BY is_archived ASC, year DESC, sphere`).all(...vals) as any[]
     return rows
 }
 

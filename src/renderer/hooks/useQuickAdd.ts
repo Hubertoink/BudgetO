@@ -119,13 +119,26 @@ export function useQuickAdd(
         
         if (Array.isArray(qa.tags)) payload.tags = qa.tags
         
-        // Multiple budgets support
-        if (qa.budgets && qa.budgets.length > 0) {
-            payload.budgets = qa.budgets.filter(b => b.budgetId > 0)
+        // Multiple budgets/earmarks support (canonical keys: budgets + earmarks)
+        const budgets = (qa.budgets || []).filter((b) => b.budgetId > 0 && b.amount > 0)
+        const earmarks = (qa.earmarksAssigned || []).filter((e) => e.earmarkId > 0 && e.amount > 0)
+        if (budgets.length) payload.budgets = budgets
+        if (earmarks.length) payload.earmarks = earmarks
+
+        // Legacy compatibility (also set first assignment)
+        if (budgets.length) {
+            payload.budgetId = budgets[0].budgetId
+            payload.budgetAmount = budgets[0].amount
+        } else if (typeof qa.budgetId === 'number' && qa.budgetId > 0) {
+            payload.budgetId = qa.budgetId
+            payload.budgetAmount = payload.grossAmount ?? payload.netAmount ?? null
         }
-        // Multiple earmarks support
-        if (qa.earmarksAssigned && qa.earmarksAssigned.length > 0) {
-            payload.earmarksAssigned = qa.earmarksAssigned.filter(e => e.earmarkId > 0)
+        if (earmarks.length) {
+            payload.earmarkId = earmarks[0].earmarkId
+            payload.earmarkAmount = earmarks[0].amount
+        } else if (typeof qa.earmarkId === 'number' && qa.earmarkId > 0) {
+            payload.earmarkId = qa.earmarkId
+            payload.earmarkAmount = payload.grossAmount ?? payload.netAmount ?? null
         }
 
         // Convert attachments to Base64

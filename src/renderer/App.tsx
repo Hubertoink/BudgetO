@@ -822,7 +822,8 @@ function AppInner() {
         try {
             const res = await window.api?.bindings?.list?.({ activeOnly: true })
             const rows = (res as any)?.rows || []
-            setEarmarks(rows)
+            const active = rows.filter((r: any) => r?.isActive == null || !!r.isActive)
+            setEarmarks(active)
         } catch { /* ignore */ }
     }
     useEffect(() => { loadEarmarks() }, [])
@@ -1018,12 +1019,15 @@ function AppInner() {
     // Zweckbindungen (Bindings) state (kept for Buchungen page dropdowns/filters)
     const [bindings, setBindings] = useState<Array<{ id: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive: number; color?: string | null; budget?: number | null }>>([])
     async function loadBindings() {
-        const res = await window.api?.bindings.list?.({})
-        if (res) setBindings(res.rows)
+        const res = await window.api?.bindings.list?.({ activeOnly: true })
+        if (res) {
+            const rows = (res as any)?.rows || []
+            setBindings(rows)
+        }
     }
 
     // Budgets state (kept for Buchungen page dropdowns/filters)
-    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
+    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; isArchived?: number }>>([])
     const budgetsForEdit = useMemo(() => {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
@@ -1039,13 +1043,15 @@ function AppInner() {
         return (budgets || []).map((b) => ({ id: b.id, label: makeLabel(b) }))
     }, [budgets, earmarks])
     async function loadBudgets() {
-        const res = await window.api?.budgets.list?.({})
+        const res = await window.api?.budgets.list?.({ includeArchived: true })
         if (res) {
-            setBudgets(res.rows)
+            const rows = (res as any)?.rows || []
+            const activeRows = rows.filter((b: any) => !b?.isArchived)
+            setBudgets(activeRows)
             try {
                 const map = new Map<number, string>()
                 const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
-                for (const b of res.rows) {
+                for (const b of activeRows) {
                     let label = ''
                     if (b.name && String(b.name).trim()) label = String(b.name).trim()
                     else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} ? ${b.categoryName}`

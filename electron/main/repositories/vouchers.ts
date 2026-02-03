@@ -30,6 +30,8 @@ export type CreateVoucherInput = {
     earmarkAmount?: number | null
     budgetId?: number
     budgetAmount?: number | null
+    budgets?: Array<{ budgetId: number; amount: number }>
+    earmarks?: Array<{ earmarkId: number; amount: number }>
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
@@ -167,6 +169,34 @@ export function createVoucherTx(d: DB, input: CreateVoucherInput) {
         }
     }
     if (!id) throw new Error('Belegerstellung fehlgeschlagen')
+
+    // Persist multi-assignments (if provided). Keep legacy columns in sync.
+    if (Array.isArray(input.budgets)) {
+        d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(id)
+        const stmtB = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
+        for (const a of input.budgets) {
+            if (a?.budgetId && a.amount > 0) stmtB.run(id, a.budgetId, a.amount)
+        }
+        if (input.budgets.length > 0 && input.budgets[0].budgetId) {
+            d.prepare('UPDATE vouchers SET budget_id = ?, budget_amount = ? WHERE id = ?')
+                .run(input.budgets[0].budgetId, input.budgets[0].amount, id)
+        } else {
+            d.prepare('UPDATE vouchers SET budget_id = NULL, budget_amount = NULL WHERE id = ?').run(id)
+        }
+    }
+    if (Array.isArray(input.earmarks)) {
+        d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(id)
+        const stmtE = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
+        for (const a of input.earmarks) {
+            if (a?.earmarkId && a.amount > 0) stmtE.run(id, a.earmarkId, a.amount)
+        }
+        if (input.earmarks.length > 0 && input.earmarks[0].earmarkId) {
+            d.prepare('UPDATE vouchers SET earmark_id = ?, earmark_amount = ? WHERE id = ?')
+                .run(input.earmarks[0].earmarkId, input.earmarks[0].amount, id)
+        } else {
+            d.prepare('UPDATE vouchers SET earmark_id = NULL, earmark_amount = NULL WHERE id = ?').run(id)
+        }
+    }
 
     if (input.files?.length) {
         const { filesDir } = getAppDataDir()

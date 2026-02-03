@@ -1,5 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
+// Monochrome SVG Icons
+const IconEdit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-1.42.59H8v-4a2 2 0 0 1 .59-1.42l7.17-7.17m4.83 4.83l1.88-1.88a2 2 0 0 0 0-2.83l-2-2a2 2 0 0 0-2.83 0l-1.88 1.88m4.83 4.83l-4.83-4.83" />
+  </svg>
+)
+const IconReceipt = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+  </svg>
+)
+
 function contrastText(bg?: string | null) {
   if (!bg) return 'var(--text)'
   try {
@@ -28,6 +43,7 @@ export interface EarmarkUsageCardBinding {
   id: number
   code: string
   name: string
+  isActive?: number
   color?: string | null
   budget?: number | null
   startDate?: string | null
@@ -70,6 +86,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginTop: 12 }}>
       {bindings.map(b => {
         const u = usage[b.id]
+        const inactive = b.isActive !== undefined ? !b.isActive : false
         const bg = b.color || '#8b5cf6'
         const fg = contrastText(bg)
         const budget = u?.budget ?? b.budget ?? 0
@@ -92,7 +109,9 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
             style={{ 
               padding: 0, 
               overflow: 'hidden',
-              transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              opacity: inactive ? 0.65 : 1,
+              filter: inactive ? 'grayscale(0.65)' : undefined
             }}
           >
             {/* Header with color */}
@@ -115,6 +134,13 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                   <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.name}>
                     {b.name}
                   </div>
+                  {inactive && (
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,0,0,0.2)' }}>
+                        archiviert
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {!!b.enforceTimeRange && (
                   <span title="Strikter Zeitraum aktiv" style={{ fontSize: 16 }}>🔒</span>
@@ -192,17 +218,18 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                 <button 
                   className="btn ghost" 
                   onClick={() => onGoToBookings?.(b.id)} 
-                  style={{ flex: 1, fontSize: 12 }}
+                  style={{ flex: 1, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
-                  📄 Buchungen
+                  <IconReceipt /> Buchungen
                 </button>
                 {onEdit && (
                   <button 
-                    className="btn btn-edit" 
+                    className="btn ghost" 
                     onClick={() => onEdit(b)} 
                     title="Bearbeiten"
+                    style={{ padding: '6px 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    ✎
+                    <IconEdit />
                   </button>
                 )}
               </div>
