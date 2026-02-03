@@ -300,6 +300,10 @@ export default function JournalView({
     const [budgetMeta, setBudgetMeta] = useState<Record<number, { planned: number; color?: string | null; label?: string }>>({})
     const [budgetUsage, setBudgetUsage] = useState<Record<number, BudgetUsageInfo>>({})
 
+    // ==================== EARMARK USAGE LOOKUPS ====================
+    type EarmarkUsageInfo = { allocated: number; released: number; balance: number; budget: number; remaining: number; percent: number; color?: string | null }
+    const [earmarkUsage, setEarmarkUsage] = useState<Record<number, EarmarkUsageInfo>>({})
+
     useEffect(() => {
         let cancelled = false
         ;(async () => {
@@ -366,6 +370,50 @@ export default function JournalView({
         return () => { cancelled = true }
     }, [rows, budgetMeta, budgetUsage])
 
+    // Load earmark usage for visible rows
+    useEffect(() => {
+        const ids = Array.from(
+            new Set(
+                rows
+                    .flatMap((r: any) => {
+                        const out: number[] = []
+                        if (typeof r.earmarkId === 'number') out.push(r.earmarkId)
+                        if (Array.isArray(r.earmarksAssigned)) {
+                            for (const e of r.earmarksAssigned) {
+                                const eid = Number((e as any)?.earmarkId)
+                                if (eid) out.push(eid)
+                            }
+                        }
+                        return out
+                    })
+                    .filter((id) => typeof id === 'number' && Number.isFinite(id) && id > 0)
+            )
+        ).filter((id) => !earmarkUsage[id])
+        if (!ids.length) return
+
+        let cancelled = false
+        ;(async () => {
+            const updates: Record<number, EarmarkUsageInfo> = {}
+            for (const id of ids) {
+                try {
+                    const u = await window.api?.bindings?.usage?.({ earmarkId: id })
+                    const meta = earmarks.find(e => e.id === id)
+                    const budget = Math.max(0, Number(u?.budget || 0))
+                    const allocated = Math.max(0, Number(u?.allocated || 0))
+                    const released = Math.max(0, Number(u?.released || 0))
+                    const balance = Number(u?.balance || 0)
+                    const remaining = Number(u?.remaining || (budget - allocated + released))
+                    const percent = budget > 0 ? Math.min(200, Math.max(0, Math.round((allocated / budget) * 1000) / 10)) : 0
+                    updates[id] = { allocated, released, balance, budget, remaining, percent, color: meta?.color ?? null }
+                } catch {
+                    updates[id] = { allocated: 0, released: 0, balance: 0, budget: 0, remaining: 0, percent: 0, color: null }
+                }
+            }
+            if (!cancelled && Object.keys(updates).length) setEarmarkUsage(prev => ({ ...prev, ...updates }))
+        })()
+        return () => { cancelled = true }
+    }, [rows, earmarks, earmarkUsage])
+
     // ==================== TAG COUNTS ====================
     // Use usage counts from tagDefs (loaded with includeUsage: true in App.tsx)
     // This ensures counts reflect ALL vouchers, not just current page
@@ -381,7 +429,7 @@ export default function JournalView({
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
-        const list: Array<{ key: string; label: string; clear: () => void }> = []
+        const list: Array<{ key: string; label: string; clear: () => void; color?: string | null }> = []
         if (activeFrom || activeTo) {
             list.push({
                 key: 'range',
@@ -397,8 +445,8 @@ export default function JournalView({
             })
         }
         if (useCategoriesModule && activeFilterCategoryId != null) {
-            const name = categoryMap.get(activeFilterCategoryId)?.name
-            list.push({ key: 'category', label: `Kategorie: ${name || ('#' + activeFilterCategoryId)}`, clear: () => activeSetFilterCategoryId(null) })
+            const cat = categoryMap.get(activeFilterCategoryId)
+            list.push({ key: 'category', label: `Kategorie: ${cat?.name || ('#' + activeFilterCategoryId)}`, clear: () => activeSetFilterCategoryId(null), color: cat?.color })
         } else if (activeFilterSphere) {
             list.push({ key: 'sphere', label: `Kategorie: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
         }
@@ -406,13 +454,17 @@ export default function JournalView({
         if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
         if (activeFilterEarmark != null) {
             const em = earmarks.find(e => e.id === activeFilterEarmark)
-            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}` , clear: () => activeSetFilterEarmark(null) })
+            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}` , clear: () => activeSetFilterEarmark(null), color: em?.color })
         }
         if (activeFilterBudgetId != null) {
             const label = budgetNames.get(activeFilterBudgetId) || `#${activeFilterBudgetId}`
-            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null) })
+            const bud = budgets.find(b => b.id === activeFilterBudgetId)
+            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null), color: (bud as any)?.color })
         }
-        if (activeFilterTag) list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null) })
+        if (activeFilterTag) {
+            const tagMeta = tagDefs.find(t => t.name === activeFilterTag)
+            list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null), color: tagMeta?.color })
+        }
         if (activeFilterTaxonomyTerm?.termId) {
             const label = activeFilterTaxonomyTerm.taxonomyName && activeFilterTaxonomyTerm.termName
                 ? `Klassifizierung: ${activeFilterTaxonomyTerm.taxonomyName} = ${activeFilterTaxonomyTerm.termName}`
@@ -734,12 +786,28 @@ export default function JournalView({
             {/* Active Filter Chips */}
             {chips.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
-                    {chips.map((c) => (
-                        <span key={c.key} className="chip">
-                            {c.label}
-                            <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
-                        </span>
-                    ))}
+                    {chips.map((c) => {
+                        const chipStyle: React.CSSProperties = c.color ? {
+                            background: c.color,
+                            color: (() => {
+                                try {
+                                    const hex = c.color.startsWith('#') ? c.color.slice(1) : c.color
+                                    if (hex.length === 6) {
+                                        const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16)
+                                        return (0.299*r + 0.587*g + 0.114*b)/255 > 0.6 ? '#000' : '#fff'
+                                    }
+                                } catch {}
+                                return 'inherit'
+                            })(),
+                            borderColor: c.color
+                        } : {}
+                        return (
+                            <span key={c.key} className="chip" style={chipStyle}>
+                                {c.label}
+                                <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={c.color ? { color: 'inherit' } : {}}>×</button>
+                            </span>
+                        )
+                    })}
                     {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterCategoryId != null || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
                         <button
                             className="btn ghost"
@@ -809,6 +877,7 @@ export default function JournalView({
                         eurFmt={eurFmt}
                         fmtDate={fmtDate}
                         budgetUsage={budgetUsage}
+                        earmarkUsage={earmarkUsage}
                         canWrite={canWrite}
                         onEdit={(r) => setEditRow({
                             ...r,

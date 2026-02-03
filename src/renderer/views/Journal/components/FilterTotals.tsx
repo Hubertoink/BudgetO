@@ -210,7 +210,12 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
     const outVal = values?.outGross ?? 0
     const diffVal = values?.diff ?? 0
     const total = inVal + outVal
-    const inPercent = total > 0 ? (inVal / total) * 100 : 50
+    // When annual budget is set: bar shows budget usage (spent vs budget)
+    // Otherwise: bar shows income vs expenses ratio
+    const hasBudget = annual && annual.budgeted > 0
+    const budgetSpent = hasBudget ? Math.max(0, annual.budgeted - annual.remaining) : 0
+    const budgetPct = hasBudget ? Math.min(100, (budgetSpent / annual.budgeted) * 100) : 0
+    const inPercent = hasBudget ? (100 - budgetPct) : (total > 0 ? (inVal / total) * 100 : 50)
 
     const spheres = (values?.bySphere || [])
         .filter((s) => Math.abs(Number(s.gross || 0)) > 0.000001)
@@ -237,7 +242,11 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
     return (
         <div className="filter-totals-card">
             {/* Visual Flow Bar */}
-            <div className="filter-totals-flow" aria-label="Einnahmen vs Ausgaben">
+            <div
+                className="filter-totals-flow"
+                aria-label={hasBudget ? 'Budgetverbrauch' : 'Einnahmen vs Ausgaben'}
+                title={hasBudget ? `${budgetPct.toFixed(1)}% des Budgets verbraucht` : undefined}
+            >
                 <div className="filter-totals-flow__in" style={{ width: `${inPercent}%` }} />
                 <div className="filter-totals-flow__out" style={{ width: `${100 - inPercent}%` }} />
             </div>

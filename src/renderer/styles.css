@@ -4952,6 +4952,82 @@ html[data-glass-modals="true"] .flyout-arrow {
     font-weight: 700;
 }
 
+/* ==================== Journal: Earmark usage tooltip ==================== */
+.earmark-usage-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0;
+    box-shadow: 0 18px 55px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+
+.earmark-usage-tooltip__list {
+    display: grid;
+}
+
+.earmark-usage-tooltip__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: color-mix(in oklab, var(--surface) 86%, var(--surface-alt));
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+}
+
+.earmark-usage-tooltip__item--active {
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.earmark-usage-tooltip__itemLabel {
+    font-weight: 650;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.earmark-usage-tooltip__itemPct {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.earmark-usage-tooltip__body {
+    padding: 12px;
+}
+
+.earmark-usage-tooltip__bar {
+    height: 8px;
+    background: var(--muted);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 10px;
+}
+
+.earmark-usage-tooltip__barFill {
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.earmark-usage-tooltip__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 12px;
+}
+
+.earmark-usage-tooltip__statLabel {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.earmark-usage-tooltip__statValue {
+    font-weight: 700;
+}
+
 .journal-toolbar {
     display: flex;
     gap: 8px;

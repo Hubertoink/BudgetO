@@ -104,6 +104,7 @@ interface JournalTableProps {
     lockedUntil?: string | null
     onRowDoubleClick?: (row: any) => void
     budgetUsage?: Record<number, { planned: number; spent: number; inflow: number; remaining: number; percent: number; color?: string | null }>
+    earmarkUsage?: Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; percent: number; color?: string | null }>
     useCategoriesModule?: boolean
     canWrite?: boolean
 }
@@ -134,12 +135,14 @@ export default function JournalTable({
     lockedUntil,
     onRowDoubleClick,
     budgetUsage,
+    earmarkUsage,
     useCategoriesModule = false,
     canWrite = true
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
-    const [hoverBudget, setHoverBudget] = useState<number | null>(null)
+    const [hoverBudgetKey, setHoverBudgetKey] = useState<string | null>(null)
+    const [hoverEarmarkKey, setHoverEarmarkKey] = useState<string | null>(null)
     
     // Column resize state
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
@@ -405,35 +408,112 @@ export default function JournalTable({
                     const rest = Math.max(0, list.length - visible.length)
 
                     return (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'hidden' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'visible' }}>
                             {visible.map((ea, idx) => {
                                 const meta = (ea.earmarkId ? earmarks.find((e) => e.id === ea.earmarkId) : undefined)
                                     || (ea.code ? earmarks.find((e) => e.code === ea.code) : undefined)
 
                                 const id = (ea.earmarkId && ea.earmarkId > 0) ? ea.earmarkId : meta?.id
                                 const code = (ea.code && String(ea.code).trim()) ? String(ea.code).trim() : (meta?.code || (id ? `#${id}` : '—'))
+                                const name = (ea.name && String(ea.name).trim()) ? String(ea.name).trim() : (meta?.name || code)
                                 const bg = meta?.color
                                 const fg = contrastText(bg)
+                                const usage = id ? earmarkUsage?.[id] : undefined
+                                const hoverKey = `${r.id}:earmark:${id ?? 'none'}:${idx}`
+                                const hoverActive = hoverEarmarkKey === hoverKey
+                                const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
+                                const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : bg || 'var(--accent)') : (bg || 'var(--accent)')
 
                                 return (
-                                    <button
+                                    <div
                                         key={`${id || code}:${idx}`}
-                                        className="badge-earmark"
-                                        title={`Nach Zweckbindung ${code} filtern`}
-                                        style={{
-                                            background: bg || undefined,
-                                            color: bg ? fg : undefined,
-                                            cursor: (onEarmarkClick && id != null) ? 'pointer' : 'default',
-                                            border: bg ? `1px solid ${bg}` : undefined,
-                                            maxWidth: 92,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                        onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
+                                        style={{ position: 'relative', display: 'inline-block', maxWidth: 100 }}
+                                        onMouseEnter={() => setHoverEarmarkKey(hoverKey)}
+                                        onMouseLeave={() => setHoverEarmarkKey(null)}
                                     >
-                                        {code}
-                                    </button>
+                                        <button
+                                            className="badge-earmark"
+                                            style={{
+                                                background: bg || undefined,
+                                                color: bg ? fg : undefined,
+                                                cursor: (onEarmarkClick && id != null) ? 'pointer' : 'default',
+                                                border: bg ? `1px solid ${bg}` : undefined,
+                                                maxWidth: 92,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
+                                        >
+                                            {code}
+                                        </button>
+
+                                        <div
+                                            className="earmark-usage-tooltip"
+                                            style={{
+                                                position: 'absolute',
+                                                top: '110%',
+                                                right: 0,
+                                                minWidth: 240,
+                                                maxWidth: 'min(320px, calc(100vw - 32px))',
+                                                opacity: hoverActive ? 1 : 0,
+                                                pointerEvents: hoverActive ? 'auto' : 'none',
+                                                transition: 'opacity 0.15s ease, transform 0.15s ease',
+                                                transformOrigin: 'top',
+                                                zIndex: 9999,
+                                                transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
+                                            }}
+                                            role="tooltip"
+                                        >
+                                                <div className="earmark-usage-tooltip__list">
+                                                    {list.slice(0, 3).map((e: any, i: number) => {
+                                                        const eid = Number(e?.earmarkId)
+                                                        const u = eid ? earmarkUsage?.[eid] : undefined
+                                                        const pct = u ? u.percent : 0
+                                                        const pctColor = u ? (u.percent >= 100 ? 'var(--danger)' : u.percent >= 80 ? 'var(--warning)' : 'var(--text-dim)') : 'var(--text-dim)'
+                                                        const itemCode = (e?.code && String(e.code).trim()) ? String(e.code).trim() : (eid ? `#${eid}` : '—')
+                                                        const active = eid === id
+                                                        return (
+                                                            <div key={`${eid}:${i}`} className={`earmark-usage-tooltip__item ${active ? 'earmark-usage-tooltip__item--active' : ''}`.trim()}>
+                                                                <div className="earmark-usage-tooltip__itemLabel">{itemCode}</div>
+                                                                <div className="earmark-usage-tooltip__itemPct" style={{ color: pctColor }}>{pct.toFixed(1)}%</div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                <div className="earmark-usage-tooltip__body">
+                                                    {usage ? (
+                                                        <>
+                                                            <div className="earmark-usage-tooltip__bar">
+                                                                <div className="earmark-usage-tooltip__barFill" style={{ width: `${barPct}%`, background: barColor }} />
+                                                            </div>
+
+                                                            <div className="earmark-usage-tooltip__stats">
+                                                                <div>
+                                                                    <div className="earmark-usage-tooltip__statLabel">Budget</div>
+                                                                    <div className="earmark-usage-tooltip__statValue">{eurFmt.format(usage.budget)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="earmark-usage-tooltip__statLabel">Verfügbar</div>
+                                                                    <div className="earmark-usage-tooltip__statValue" style={{ color: usage.remaining < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(usage.remaining)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="earmark-usage-tooltip__statLabel">Ausgaben</div>
+                                                                    <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.allocated)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="earmark-usage-tooltip__statLabel">Einnahmen</div>
+                                                                    <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.released)}</div>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="helper" style={{ padding: 6 }}>Zweckbindungsdaten werden geladen…</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                    </div>
                                 )
                             })}
 
@@ -492,17 +572,15 @@ export default function JournalTable({
                     const rest = Math.max(0, list.length - visible.length)
 
                     return (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'hidden' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', overflow: 'visible' }}>
                             {visible.map((ba, idx) => {
                                 const id = ba.budgetId
                                 const usage = id ? budgetUsage?.[id] : undefined
                                 const bg = (usage?.color || (id === singleId ? singleColor : undefined)) as string | undefined
                                 const fg = contrastText(bg)
                                 const label = (ba.label && String(ba.label).trim()) ? String(ba.label).trim() : (id ? `#${id}` : '—')
-                                const tooltip = usage
-                                    ? `Budgetiert: ${eurFmt.format(usage.planned)} • Netto: ${eurFmt.format(usage.spent - usage.inflow)} • Verfügbar: ${eurFmt.format(usage.remaining)} (${usage.percent.toFixed(1)}%)`
-                                    : `Nach Budget ${label} filtern`
-                                const hoverActive = hoverBudget === id
+                                const hoverKey = `${r.id}:budget:${id ?? 'none'}:${idx}`
+                                const hoverActive = hoverBudgetKey === hoverKey
                                 const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
                                 const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : usage.color || bg || 'var(--accent)') : (bg || 'var(--accent)')
 
@@ -510,12 +588,11 @@ export default function JournalTable({
                                     <div
                                         key={`${id}:${idx}`}
                                         style={{ position: 'relative', display: 'inline-block', maxWidth: 120 }}
-                                        onMouseEnter={() => setHoverBudget(id || null)}
-                                        onMouseLeave={() => setHoverBudget(null)}
+                                        onMouseEnter={() => setHoverBudgetKey(hoverKey)}
+                                        onMouseLeave={() => setHoverBudgetKey(null)}
                                     >
                                         <button
                                             className="badge-budget"
-                                            title={tooltip}
                                             style={{
                                                 background: bg,
                                                 color: bg ? fg : undefined,
@@ -531,24 +608,23 @@ export default function JournalTable({
                                             {label}
                                         </button>
 
-                                        {(usage || hoverActive) && (
-                                            <div
-                                                className="budget-usage-tooltip"
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '110%',
-                                                    right: 0,
-                                                    minWidth: 260,
-                                                    maxWidth: 'min(340px, calc(100vw - 32px))',
-                                                    opacity: hoverActive ? 1 : 0,
-                                                    pointerEvents: hoverActive ? 'auto' : 'none',
-                                                    transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                                    transformOrigin: 'top',
-                                                    zIndex: 20,
-                                                    transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
-                                                }}
-                                                role="tooltip"
-                                            >
+                                        <div
+                                            className="budget-usage-tooltip"
+                                            style={{
+                                                position: 'absolute',
+                                                top: '110%',
+                                                right: 0,
+                                                minWidth: 260,
+                                                maxWidth: 'min(340px, calc(100vw - 32px))',
+                                                opacity: hoverActive ? 1 : 0,
+                                                pointerEvents: hoverActive ? 'auto' : 'none',
+                                                transition: 'opacity 0.15s ease, transform 0.15s ease',
+                                                transformOrigin: 'top',
+                                                zIndex: 9999,
+                                                transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
+                                            }}
+                                            role="tooltip"
+                                        >
                                                 <div className="budget-usage-tooltip__list">
                                                     {list.slice(0, 3).map((b: any, i: number) => {
                                                         const bid = Number(b?.budgetId)
@@ -597,7 +673,6 @@ export default function JournalTable({
                                                     )}
                                                 </div>
                                             </div>
-                                        )}
                                     </div>
                                 )
                             })}

@@ -4,11 +4,6 @@ import BudgetModal from '../../components/modals/BudgetModal'
 import { useAuth } from '../../context/authHooks'
 
 // Monochrome SVG icons
-const IconEdit = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-1.42.59H8v-4a2 2 0 0 1 .59-1.42l7.17-7.17m4.83 4.83l1.88-1.88a2 2 0 0 0 0-2.83l-2-2a2 2 0 0 0-2.83 0l-1.88 1.88m4.83 4.83l-4.83-4.83" />
-  </svg>
-)
 const IconArchive = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="21 8 21 21 3 21 3 8" />
@@ -236,7 +231,7 @@ export default function BudgetsView({
                   {canWrite && (
                     <>
                       <button
-                        className="btn ghost"
+                        className="btn btn-edit"
                         onClick={() =>
                           setEditBudget({
                             id: b.id,
@@ -256,15 +251,13 @@ export default function BudgetsView({
                           })
                         }
                         title="Bearbeiten"
-                        style={{ padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <IconEdit />
+                        ✎
                       </button>
                       <button
                         className="btn ghost"
                         onClick={() => setArchiveConfirm({ budget: b, nextArchived: !b.isArchived })}
                         title={b.isArchived ? 'Wiederherstellen' : 'Archivieren'}
-                        style={{ padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         {b.isArchived ? <IconRestore /> : <IconArchive />}
                       </button>

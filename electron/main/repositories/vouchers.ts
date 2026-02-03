@@ -380,8 +380,16 @@ export function listVouchersAdvanced(filters: {
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
-    if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
+    // Check both legacy column and junction table for earmarks
+    if (earmarkId) {
+        wh.push('(v.earmark_id = ? OR EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = v.id AND ve.earmark_id = ?))')
+        params.push(earmarkId, earmarkId)
+    }
+    // Check both legacy column and junction table for budgets
+    if (budgetId) {
+        wh.push('(v.budget_id = ? OR EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?))')
+        params.push(budgetId, budgetId)
+    }
     if (q && q.trim()) {
         const like = `%${q.trim()}%`
         wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
@@ -445,8 +453,16 @@ export function listVouchersAdvancedPaged(filters: {
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
-    if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
+    // Check both legacy column and junction table for earmarks
+    if (earmarkId) {
+        wh.push('(v.earmark_id = ? OR EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = v.id AND ve.earmark_id = ?))')
+        params.push(earmarkId, earmarkId)
+    }
+    // Check both legacy column and junction table for budgets
+    if (budgetId) {
+        wh.push('(v.budget_id = ? OR EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?))')
+        params.push(budgetId, budgetId)
+    }
     if (q && q.trim()) {
         const like = `%${q.trim()}%`
         wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
