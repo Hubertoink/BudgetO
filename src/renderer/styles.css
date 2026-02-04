@@ -3206,6 +3206,24 @@ textarea:focus {
 .side-nav { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
 .nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; position: relative; }
 .nav-btn.active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
+
+/* Top navigation: subtle icon hover lift */
+.top-nav .nav-btn > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(0);
+    transition: transform 0.15s ease-out;
+}
+
+.top-nav .nav-btn:hover > span:first-child,
+.top-nav .nav-btn:focus-visible > span:first-child {
+    transform: translateY(-3px);
+}
+
+.top-nav .nav-btn:active > span:first-child {
+    transform: translateY(0) scale(0.96);
+}
 .nav-badge { 
   position: absolute; 
   top: -4px; 
@@ -3778,6 +3796,16 @@ label .req-asterisk {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 12px;
+        }
+
+        /* Dashboard: avoid Chromium paint glitches in scroll container */
+        .dashboard-recent-activity {
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
+            background: color-mix(in oklab, var(--surface) 92%, transparent);
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
         /* Period selector row */

@@ -322,7 +322,7 @@ function DashboardRecentActivity() {
   }
 
   return (
-    <div className="card" style={{ padding: 12 }}>
+    <div className="card dashboard-recent-activity" style={{ padding: 12 }}>
       <div className="helper">Letzte Aktivitäten</div>
       {rows.length === 0 && !loading && <div className="helper">Keine Einträge.</div>}
       <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
