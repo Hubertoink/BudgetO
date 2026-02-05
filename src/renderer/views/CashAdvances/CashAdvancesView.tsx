@@ -705,7 +705,7 @@ export default function CashAdvancesView() {
 
       {/* Create Modal */}
       {canWrite && createModal && createPortal(
-        <div className="modal-overlay" onClick={() => setCreateModal(null)} role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <ModalHeader title="Barvorschuss anlegen" onClose={() => setCreateModal(null)} />
             <div style={{ display: 'grid', gap: 12 }}>
@@ -805,7 +805,7 @@ export default function CashAdvancesView() {
 
       {/* Partial Modal (Vorschuss vergeben) */}
       {canWrite && partialModal && createPortal(
-        <div className="modal-overlay" onClick={() => setPartialModal(null)} role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader title="Teil-Vorschuss vergeben" onClose={() => setPartialModal(null)} />
             <div className="helper" style={{ marginBottom: 12 }}>
@@ -868,7 +868,7 @@ export default function CashAdvancesView() {
 
       {/* Settle Modal (Vorschuss abrechnen) */}
       {canWrite && settleModal && createPortal(
-        <div className="modal-overlay" onClick={() => setSettleModal(null)} role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader title="Teil-Vorschuss abrechnen" onClose={() => setSettleModal(null)} />
             <div className="helper" style={{ marginBottom: 12 }}>
@@ -926,7 +926,7 @@ export default function CashAdvancesView() {
 
       {/* Resolve Modal (irreversibel abschließen) */}
       {canWrite && resolveModal && detail && createPortal(
-        <div className="modal-overlay" onClick={() => setResolveModal(null)} role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <ModalHeader title="Barvorschuss abschließen" onClose={() => setResolveModal(null)} />
             <div style={{ display: 'grid', gap: 12 }}>

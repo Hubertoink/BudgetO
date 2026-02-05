@@ -5435,6 +5435,102 @@ html[data-glass-modals="true"] .flyout-arrow {
     margin: 16px 0;
 }
 
+/* Tag dropdown inside filter (custom, to allow tag colors) */
+.tag-filter {
+    position: relative;
+}
+
+.tag-filter__trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+}
+
+.tag-filter__trigger-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.tag-filter__trigger-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-filter__swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    flex: 0 0 auto;
+}
+
+.tag-filter__arrow {
+    color: var(--text-dim);
+    flex: 0 0 auto;
+}
+
+.tag-filter__dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-1);
+    padding: 6px;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.tag-filter__option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.tag-filter__option:hover {
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.tag-filter__option.active {
+    background: color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+.tag-filter__count {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+}
+
+.tag-filter__chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Checkbox row styling */
 .filter-dropdown__checkbox {
     display: flex;

@@ -1,5 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import FilterDropdown from './FilterDropdown'
+
+/** Compute a readable foreground color for a given background hex */
+function contrastText(bg?: string | null): string {
+  if (!bg) return 'inherit'
+  const hex = bg.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return lum > 0.55 ? '#1a1a2e' : '#ffffff'
+}
 
 interface MetaFilterDropdownProps {
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
@@ -39,6 +50,8 @@ export default function MetaFilterDropdown({
   const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(filterType)
   const [pm, setPm] = useState<'BAR' | 'BANK' | null>(filterPM)
   const [tag, setTag] = useState<string | null>(filterTag)
+  const [tagOpen, setTagOpen] = useState(false)
+  const tagDropdownRef = useRef<HTMLDivElement>(null)
   const [c, setC] = useState<number | null>(categoryId)
   const [e, setE] = useState<number | null>(earmarkId)
   const [b, setB] = useState<number | null>(budgetId)
@@ -53,10 +66,26 @@ export default function MetaFilterDropdown({
     setB(budgetId)
   }, [filterType, filterPM, filterTag, categoryId, earmarkId, budgetId])
 
+  // Close tag dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setTagOpen(false)
+      }
+    }
+    if (tagOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [tagOpen])
+
   const hasFilters = filterType != null || filterPM != null || filterTag != null || categoryId != null || earmarkId != null || budgetId != null
 
   const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
     (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
+
+  const selectedTagDef = tag ? tagDefs.find(t => t.name === tag) : undefined
+  const visibleTagDefs = tagDefs.filter(t => (t.usage ?? 0) > 0 || (tag != null && t.name === tag))
 
   const handleApply = () => {
     onApply({
@@ -132,18 +161,69 @@ export default function MetaFilterDropdown({
 
       <div className="filter-dropdown__field">
         <label className="filter-dropdown__label">Tag</label>
-        <select
-          className="input"
-          value={tag ?? ''}
-          onChange={(ev) => setTag(ev.target.value || null)}
-        >
-          <option value="">Alle</option>
-          {tagDefs.map(t => (
-            <option key={t.id} value={t.name}>
-              {t.name} {t.usage !== undefined ? `(${t.usage})` : ''}
-            </option>
-          ))}
-        </select>
+        <div className="tag-filter" ref={tagDropdownRef}>
+          <button
+            type="button"
+            className="input tag-filter__trigger"
+            onClick={() => setTagOpen(v => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={tagOpen}
+            aria-label="Tag Filter"
+          >
+            <span className="tag-filter__trigger-label">
+              {selectedTagDef?.color ? (
+                <span className="tag-filter__swatch" style={{ background: selectedTagDef.color }} aria-hidden="true" />
+              ) : null}
+              <span className="tag-filter__trigger-text">{tag ?? 'Alle'}</span>
+            </span>
+            <span className="tag-filter__arrow" aria-hidden="true">{tagOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {tagOpen && (
+            <div className="tag-filter__dropdown" role="listbox" aria-label="Tag auswählen">
+              <button
+                type="button"
+                className={`tag-filter__option ${tag == null ? 'active' : ''}`}
+                role="option"
+                aria-selected={tag == null}
+                onClick={() => {
+                  setTag(null)
+                  setTagOpen(false)
+                }}
+              >
+                <span>Alle</span>
+              </button>
+
+              {visibleTagDefs.map(t => {
+                const bg = t.color || undefined
+                const fg = bg ? contrastText(bg) : undefined
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`tag-filter__option ${tag === t.name ? 'active' : ''}`}
+                    role="option"
+                    aria-selected={tag === t.name}
+                    onClick={() => {
+                      setTag(t.name)
+                      setTagOpen(false)
+                    }}
+                  >
+                    <span className="tag-filter__row">
+                      <span
+                        className="tag-filter__chip"
+                        style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}
+                      >
+                        {t.name}
+                      </span>
+                    </span>
+                    <span className="tag-filter__count">{typeof t.usage === 'number' ? `(${t.usage})` : ''}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="filter-dropdown__divider" />
