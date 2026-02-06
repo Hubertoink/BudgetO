@@ -968,6 +968,37 @@ export const MIGRATIONS: Mig[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_budgets_archived ON budgets(is_archived);`)
     }
   }
+  ,
+  {
+    version: 37,
+    up(db: DB) {
+      // Cash advances: placeholder voucher link + purchases (drafts)
+      const caCols = db.prepare("PRAGMA table_info(cash_advances)").all() as Array<{ name: string }>
+      if (!caCols.some(c => c.name === 'placeholder_voucher_id')) {
+        db.exec('ALTER TABLE cash_advances ADD COLUMN placeholder_voucher_id INTEGER')
+      }
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cash_advance_purchases (
+          id INTEGER PRIMARY KEY,
+          cash_advance_id INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL DEFAULT 'IDEELL',
+          category_id INTEGER,
+          description TEXT,
+          gross_amount REAL NOT NULL,
+          vat_rate REAL NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          posted_voucher_id INTEGER,
+          FOREIGN KEY(cash_advance_id) REFERENCES cash_advances(id) ON DELETE CASCADE,
+          FOREIGN KEY(posted_voucher_id) REFERENCES vouchers(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_cash_advance_purchases_ca_id ON cash_advance_purchases(cash_advance_id);
+        CREATE INDEX IF NOT EXISTS idx_cash_advance_purchases_posted ON cash_advance_purchases(posted_voucher_id);
+      `)
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

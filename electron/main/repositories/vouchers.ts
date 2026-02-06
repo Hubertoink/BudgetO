@@ -486,7 +486,7 @@ export function listVouchersAdvancedPaged(filters: {
         params.push(tag)
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-    const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v${joinSql}${whereSql}`).get(...params) as any)?.c || 0
+    const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v LEFT JOIN cash_advances ca ON ca.placeholder_voucher_id = v.id AND ca.status = 'OPEN'${joinSql}${whereSql}`).get(...params) as any)?.c || 0
     // Determine ORDER BY expression
     const orderExpr = (() => {
         switch (sortBy) {
@@ -508,6 +508,7 @@ export function listVouchersAdvancedPaged(filters: {
             v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
+                CASE WHEN ca.id IS NOT NULL THEN 1 ELSE 0 END as isCashAdvancePlaceholder,
                 v.earmark_id as earmarkId,
                 v.earmark_amount as earmarkAmount,
                 (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
@@ -527,12 +528,30 @@ export function listVouchersAdvancedPaged(filters: {
                     FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
                     WHERE vt.voucher_id = v.id
                 ) as tagsConcat
-         FROM vouchers v${joinSql}${whereSql}
+         FROM vouchers v
+         LEFT JOIN cash_advances ca ON ca.placeholder_voucher_id = v.id AND ca.status = 'OPEN'
+         ${joinSql}${whereSql}
          ORDER BY ${orderExpr} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
          LIMIT ? OFFSET ?`
     ).all(...params, limit, offset) as any[]
-    const mapped = rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
+    const mapped = rows.map(r => ({
+        ...r,
+        isCashAdvancePlaceholder: !!(r as any).isCashAdvancePlaceholder,
+        tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : []
+    }))
     return { rows: mapped, total }
+}
+
+function assertNotCashAdvancePlaceholder(d: DB, voucherId: number) {
+    const hit = d.prepare(`
+        SELECT 1
+        FROM cash_advances
+        WHERE placeholder_voucher_id = ? AND status = 'OPEN'
+        LIMIT 1
+    `).get(voucherId)
+    if (hit) {
+        throw new Error('Dieser Beleg ist ein Barvorschuss-Platzhalter und kann nicht bearbeitet/gelöscht werden. Änderungen bitte im Barvorschuss vornehmen.')
+    }
 }
 
 export type VoucherTaxonomyTermBadge = {
@@ -1079,6 +1098,9 @@ export function updateVoucher(input: {
     const d = getDb()
     const warnings: string[] = []
 
+    // Barvorschuss-Platzhalter dürfen nicht manuell editiert werden.
+    assertNotCashAdvancePlaceholder(d as any, input.id)
+
     if (input.categoryId !== undefined && input.categoryId !== null) {
         const exists = d.prepare('SELECT id FROM custom_categories WHERE id=?').get(input.categoryId) as any
         if (!exists) throw new Error('Kategorie nicht gefunden')
@@ -1248,12 +1270,31 @@ export function updateVoucher(input: {
 
 export function deleteVoucher(id: number) {
     const d = getDb()
+    // Barvorschuss-Platzhalter dürfen nicht manuell gelöscht werden (wird über Barvorschuss-Abschluss/Löschen entfernt).
+    assertNotCashAdvancePlaceholder(d as any, id)
     // Snapshot before deletion for audit
     const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount FROM vouchers WHERE id=?').get(id) as any
     if (!snap) throw new Error('Beleg nicht gefunden')
     // Block deletion in closed year
     ensurePeriodOpen(snap.date, d)
     // Optional: cascade delete files on disk
+    const files = d.prepare('SELECT file_path FROM voucher_files WHERE voucher_id=?').all(id) as any[]
+    d.prepare('DELETE FROM voucher_files WHERE voucher_id=?').run(id)
+    d.prepare('DELETE FROM vouchers WHERE id=?').run(id)
+    for (const f of files) {
+        try { fs.unlinkSync(f.file_path) } catch { }
+    }
+    try { writeAudit(d as any, null, 'vouchers', id, 'DELETE', { snapshot: snap }) } catch { }
+    return { id }
+}
+
+export function deleteVoucherTx(d: DB, id: number) {
+    // Snapshot before deletion for audit
+    const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount FROM vouchers WHERE id=?').get(id) as any
+    if (!snap) throw new Error('Beleg nicht gefunden')
+    // Block deletion in closed year
+    ensurePeriodOpen(snap.date, d)
+    // Remove files (should be none for placeholder, but keep consistent)
     const files = d.prepare('SELECT file_path FROM voucher_files WHERE voucher_id=?').all(id) as any[]
     d.prepare('DELETE FROM voucher_files WHERE voucher_id=?').run(id)
     d.prepare('DELETE FROM vouchers WHERE id=?').run(id)

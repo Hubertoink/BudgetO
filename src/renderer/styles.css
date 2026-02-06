@@ -5056,6 +5056,158 @@ html[data-glass-modals="true"] .flyout-arrow {
     font-weight: 700;
 }
 
+/* ==================== Journal: Category usage tooltip ==================== */
+.category-usage-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0;
+    box-shadow: 0 18px 55px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+
+.category-usage-tooltip__list {
+    display: grid;
+}
+
+.category-usage-tooltip__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: color-mix(in oklab, var(--surface) 86%, var(--surface-alt));
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+}
+
+.category-usage-tooltip__item--active {
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.category-usage-tooltip__itemLabel {
+    font-weight: 650;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.category-usage-tooltip__itemPct {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.category-usage-tooltip__body {
+    padding: 12px;
+}
+
+.category-usage-tooltip__bar {
+    height: 8px;
+    background: var(--muted);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 10px;
+}
+
+.category-usage-tooltip__barFill {
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.category-usage-tooltip__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 12px;
+}
+
+.category-usage-tooltip__statLabel {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.category-usage-tooltip__statValue {
+    font-weight: 700;
+}
+
+/* ==================== Journal: Tag usage tooltip ==================== */
+.tag-usage-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0;
+    box-shadow: 0 18px 55px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+
+.tag-usage-tooltip__list {
+    display: grid;
+}
+
+.tag-usage-tooltip__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: color-mix(in oklab, var(--surface) 86%, var(--surface-alt));
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+}
+
+.tag-usage-tooltip__item--active {
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.tag-usage-tooltip__itemLabel {
+    font-weight: 650;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-usage-tooltip__itemPct {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tag-usage-tooltip__body {
+    padding: 12px;
+}
+
+.tag-usage-tooltip__bar {
+    height: 8px;
+    background: var(--muted);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 10px;
+}
+
+.tag-usage-tooltip__barFill {
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.tag-usage-tooltip__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 12px;
+}
+
+.tag-usage-tooltip__statLabel {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.tag-usage-tooltip__statValue {
+    font-weight: 700;
+}
+
 .journal-toolbar {
     display: flex;
     gap: 8px;

@@ -3172,6 +3172,39 @@ export function registerIpcHandlers() {
         return PartialCashAdvanceDeleteOutput.parse(res)
     })
 
+    // Purchases (Käufe)
+    ipcMain.handle('cashAdvances.purchases.add', async (_e, payload) => {
+        const { CashAdvancePurchaseAddInput, CashAdvancePurchaseAddOutput } = await import('./schemas')
+        const parsed = CashAdvancePurchaseAddInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvancePurchaseAddOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.purchases.add', parsed))
+        }
+
+        const { addCashAdvancePurchase } = await import('../repositories/cashAdvances')
+        const res = addCashAdvancePurchase(parsed)
+        return CashAdvancePurchaseAddOutput.parse(res)
+    })
+
+    ipcMain.handle('cashAdvances.purchases.delete', async (_e, payload) => {
+        const { CashAdvancePurchaseDeleteInput, CashAdvancePurchaseDeleteOutput } = await import('./schemas')
+        const parsed = CashAdvancePurchaseDeleteInput.parse(payload)
+
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashAdvancePurchaseDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.purchases.delete', parsed))
+        }
+
+        const { deleteCashAdvancePurchase } = await import('../repositories/cashAdvances')
+        const res = deleteCashAdvancePurchase(parsed)
+        return CashAdvancePurchaseDeleteOutput.parse(res)
+    })
+
     // Settlements
     ipcMain.handle('cashAdvances.settlements.add', async (_e, payload) => {
         const { CashAdvanceSettlementAddInput, CashAdvanceSettlementAddOutput } = await import('./schemas')

@@ -335,6 +335,8 @@ export const VouchersListOutput = z.object({
             vatAmount: z.number(),
             grossAmount: z.number(),
             fileCount: z.number().optional(),
+            // Cash-advance placeholder voucher (created on Barvorschuss creation; removed on resolve/delete)
+            isCashAdvancePlaceholder: z.boolean().optional(),
             earmarkId: z.number().nullable().optional(),
             earmarkAmount: z.number().nullable().optional(),
             earmarkCode: z.string().nullable().optional(),
@@ -1483,9 +1485,23 @@ export const CashAdvanceSettlementSchema = z.object({
   voucherId: z.number().nullable()
 })
 
+export const CashAdvancePurchaseSchema = z.object({
+    id: z.number(),
+    cashAdvanceId: z.number(),
+    date: z.string(),
+    sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']),
+    categoryId: z.number().nullable(),
+    description: z.string().nullable(),
+    grossAmount: z.number(),
+    vatRate: z.number(),
+    createdAt: z.string(),
+    postedVoucherId: z.number().nullable()
+})
+
 export const CashAdvanceWithDetailsSchema = CashAdvanceSchema.extend({
   partials: z.array(PartialCashAdvanceSchema),
   settlements: z.array(CashAdvanceSettlementSchema),
+    purchases: z.array(CashAdvancePurchaseSchema),
   totalPlanned: z.number(),
   totalSettled: z.number(),
   plannedRemaining: z.number(),
@@ -1544,12 +1560,10 @@ export const CashAdvanceUpdateOutput = z.object({ id: z.number() })
 
 // Resolve (irreversible close)
 export const CashAdvanceResolveInput = z.object({
-    id: z.number(),
-    createCounterVoucher: z.boolean().optional()
+    id: z.number()
 })
 export const CashAdvanceResolveOutput = z.object({
-    id: z.number(),
-    counterVoucherId: z.number().optional()
+    id: z.number()
 })
 
 // Delete
@@ -1585,6 +1599,21 @@ export const PartialCashAdvanceSettleOutput = z.object({ id: z.number() })
 export const PartialCashAdvanceDeleteInput = z.object({ id: z.number() })
 export const PartialCashAdvanceDeleteOutput = z.object({ id: z.number() })
 
+// Purchases
+export const CashAdvancePurchaseAddInput = z.object({
+    cashAdvanceId: z.number(),
+    date: z.string(),
+    sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']),
+    categoryId: z.number().nullable().optional(),
+    description: z.string().nullable().optional(),
+    grossAmount: z.number(),
+    vatRate: z.number().optional()
+})
+export const CashAdvancePurchaseAddOutput = z.object({ id: z.number() })
+
+export const CashAdvancePurchaseDeleteInput = z.object({ id: z.number() })
+export const CashAdvancePurchaseDeleteOutput = z.object({ id: z.number() })
+
 // Settlements
 export const CashAdvanceSettlementAddInput = z.object({
   cashAdvanceId: z.number(),
@@ -1606,6 +1635,11 @@ export type TCashAdvanceStatus = z.infer<typeof CashAdvanceStatus>
 export type TCashAdvance = z.infer<typeof CashAdvanceSchema>
 export type TPartialCashAdvance = z.infer<typeof PartialCashAdvanceSchema>
 export type TCashAdvanceSettlement = z.infer<typeof CashAdvanceSettlementSchema>
+export type TCashAdvancePurchase = z.infer<typeof CashAdvancePurchaseSchema>
 export type TCashAdvanceWithDetails = z.infer<typeof CashAdvanceWithDetailsSchema>
 export type TCashAdvanceResolveInput = z.infer<typeof CashAdvanceResolveInput>
 export type TCashAdvanceResolveOutput = z.infer<typeof CashAdvanceResolveOutput>
+export type TCashAdvancePurchaseAddInput = z.infer<typeof CashAdvancePurchaseAddInput>
+export type TCashAdvancePurchaseAddOutput = z.infer<typeof CashAdvancePurchaseAddOutput>
+export type TCashAdvancePurchaseDeleteInput = z.infer<typeof CashAdvancePurchaseDeleteInput>
+export type TCashAdvancePurchaseDeleteOutput = z.infer<typeof CashAdvancePurchaseDeleteOutput>

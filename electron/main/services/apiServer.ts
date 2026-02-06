@@ -773,6 +773,17 @@ function registerHandlers() {
     return deletePartialCashAdvance(body.id)
   })
 
+  // Purchases (Käufe) - drafts inside cash advances
+  apiHandlers.set('cashAdvances.purchases.add', async (body) => {
+    const { addCashAdvancePurchase } = await import('../repositories/cashAdvances')
+    return addCashAdvancePurchase(body)
+  })
+
+  apiHandlers.set('cashAdvances.purchases.delete', async (body) => {
+    const { deleteCashAdvancePurchase } = await import('../repositories/cashAdvances')
+    return deleteCashAdvancePurchase(body)
+  })
+
   apiHandlers.set('cashAdvances.settlements.add', async (body) => {
     const { addSettlement } = await import('../repositories/cashAdvances')
     return addSettlement(body)

@@ -875,19 +875,31 @@ export default function JournalView({
                         earmarks={earmarks}
                         tagDefs={tagDefs}
                         eurFmt={eurFmt}
-                        fmtDate={fmtDate}
+                        fmtDate={(s) => fmtDate(s || '')}
                         budgetUsage={budgetUsage}
                         earmarkUsage={earmarkUsage}
                         canWrite={canWrite}
-                        onEdit={(r) => setEditRow({
+                        onEdit={(r: any) => {
+                            if ((r as any)?.isCashAdvancePlaceholder) {
+                                notify('info', 'Barvorschuss-Platzhalter ist nicht editierbar. Bitte im Barvorschuss abschließen oder löschen.')
+                                return
+                            }
+                            setEditRow({
                             ...r,
                             // Modus-Inferenz: Wenn Netto-Betrag gespeichert wurde (>0) => NETTO, sonst BRUTTO
                             mode: ((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS',
                             netAmount: (r as any).netAmount ?? null,
                             grossAmount: (r as any).grossAmount ?? null,
                             vatRate: (r as any).vatRate ?? 0
-                        } as any)}
-                        onDelete={(r) => setDeleteRow(r)}
+                        } as any)
+                        }}
+                        onDelete={(r: any) => {
+                            if ((r as any)?.isCashAdvancePlaceholder) {
+                                notify('info', 'Barvorschuss-Platzhalter ist nicht löschbar. Bitte den Barvorschuss löschen, dann wird der Platzhalter entfernt.')
+                                return
+                            }
+                            setDeleteRow(r)
+                        }}
                         onToggleSort={(col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
                             setPage(1)
                             setSortBy(col)
@@ -1178,7 +1190,7 @@ export default function JournalView({
                                                     <select 
                                                         value={editRow.categoryId ?? ''} 
                                                         disabled={editRow.type === 'TRANSFER'} 
-                                                        onChange={(e) => setEditRow({ ...editRow, categoryId: e.target.value ? Number(e.target.value) : undefined, sphere: undefined })}
+                                                        onChange={(e) => setEditRow({ ...editRow, categoryId: e.target.value ? Number(e.target.value) : undefined })}
                                                     >
                                                         <option value="">— Keine Kategorie —</option>
                                                         {customCategories.map(cat => (

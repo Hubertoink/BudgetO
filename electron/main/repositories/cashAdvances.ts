@@ -12,7 +12,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { getAppDataDir, getDb, withTransaction } from '../db/database'
-import { createVoucherTx } from './vouchers'
+import { createVoucherTx, deleteVoucherTx } from './vouchers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -58,12 +58,26 @@ export interface CashAdvanceSettlement {
   voucherId: number | null
 }
 
+export interface CashAdvancePurchase {
+  id: number
+  cashAdvanceId: number
+  date: string
+  sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  categoryId: number | null
+  description: string | null
+  grossAmount: number
+  vatRate: number
+  createdAt: string
+  postedVoucherId: number | null
+}
+
 export interface CashAdvanceWithDetails extends CashAdvance {
   partials: PartialCashAdvance[]
   settlements: CashAdvanceSettlement[]
+  purchases: CashAdvancePurchase[]
   // Neue Berechnungen
   totalPlanned: number      // Summe aller vergebenen Teil-Vorschüsse
-  totalSettled: number      // Summe aller Abrechnungen (aus Teil-Vorschüssen)
+  totalSettled: number      // Summe aller Käufe (faktisch ausgegeben)
   plannedRemaining: number  // Planerisch noch verfügbar: totalAmount - totalPlanned
   actualRemaining: number   // Faktisch noch verfügbar: totalAmount - totalSettled
   coverage: number          // Über-/Unterdeckung: totalSettled - totalPlanned (negative = gut)
@@ -125,7 +139,7 @@ export function listCashAdvances(opts?: {
       ca.due_date as dueDate, ca.notes, ca.cost_center_id as costCenterId,
       COALESCE((SELECT COUNT(*) FROM partial_cash_advances WHERE cash_advance_id = ca.id), 0) as recipientCount,
       COALESCE((SELECT SUM(amount) FROM partial_cash_advances WHERE cash_advance_id = ca.id), 0) as totalPlanned,
-      COALESCE((SELECT SUM(settled_amount) FROM partial_cash_advances WHERE cash_advance_id = ca.id AND is_settled = 1), 0) as totalSettled
+      COALESCE((SELECT SUM(gross_amount) FROM cash_advance_purchases WHERE cash_advance_id = ca.id), 0) as totalSettled
     FROM cash_advances ca
     WHERE ${where.replace(/\b(status|order_number|employee_name|purpose)\b/g, 'ca.$1')}
     ORDER BY ca.created_at DESC
@@ -176,9 +190,25 @@ export function getCashAdvanceById(id: number): CashAdvanceWithDetails | null {
     ORDER BY settled_at ASC
   `).all(id) as CashAdvanceSettlement[]
 
+  const purchases = db.prepare(`
+    SELECT id,
+           cash_advance_id as cashAdvanceId,
+           date,
+           sphere,
+           category_id as categoryId,
+           description,
+           gross_amount as grossAmount,
+           vat_rate as vatRate,
+           created_at as createdAt,
+           posted_voucher_id as postedVoucherId
+    FROM cash_advance_purchases
+    WHERE cash_advance_id = ?
+    ORDER BY date ASC, id ASC
+  `).all(id) as CashAdvancePurchase[]
+
   // Neue Berechnungen
   const totalPlanned = partials.reduce((sum, p) => sum + p.amount, 0)
-  const totalSettled = partials.reduce((sum, p) => sum + (p.settledAmount || 0), 0)
+  const totalSettled = purchases.reduce((sum, p) => sum + (Number(p.grossAmount) || 0), 0)
   const plannedRemaining = row.totalAmount - totalPlanned
   const actualRemaining = row.totalAmount - totalSettled
   const coverage = totalSettled - totalPlanned
@@ -187,6 +217,7 @@ export function getCashAdvanceById(id: number): CashAdvanceWithDetails | null {
     ...row,
     partials,
     settlements,
+    purchases,
     totalPlanned,
     totalSettled,
     plannedRemaining,
@@ -204,23 +235,40 @@ export function createCashAdvance(input: {
   notes?: string | null
   costCenterId?: number | null
 }): { id: number } {
-  const db = getDb()
   const { orderNumber, employeeName, purpose, totalAmount, dueDate, notes, costCenterId } = input
 
   if (!orderNumber?.trim()) throw new Error('Anordnungsnummer ist erforderlich')
   if (!employeeName?.trim()) throw new Error('Name ist erforderlich')
   if (totalAmount == null || totalAmount <= 0) throw new Error('Barvorschuss-Betrag muss positiv sein')
 
-  // Check uniqueness
-  const existing = db.prepare('SELECT id FROM cash_advances WHERE order_number = ?').get(orderNumber.trim())
-  if (existing) throw new Error(`Anordnungsnummer "${orderNumber}" existiert bereits`)
+  return withTransaction((db) => {
+    // Check uniqueness
+    const existing = db.prepare('SELECT id FROM cash_advances WHERE order_number = ?').get(orderNumber.trim())
+    if (existing) throw new Error(`Anordnungsnummer "${orderNumber}" existiert bereits`)
 
-  const info = db.prepare(`
-    INSERT INTO cash_advances (order_number, employee_name, purpose, total_amount, due_date, notes, cost_center_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(orderNumber.trim(), employeeName.trim(), purpose ?? null, totalAmount, dueDate ?? null, notes ?? null, costCenterId ?? null)
+    const info = db.prepare(`
+      INSERT INTO cash_advances (order_number, employee_name, purpose, total_amount, due_date, notes, cost_center_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(orderNumber.trim(), employeeName.trim(), purpose ?? null, totalAmount, dueDate ?? null, notes ?? null, costCenterId ?? null)
 
-  return { id: Number(info.lastInsertRowid) }
+    const cashAdvanceId = Number(info.lastInsertRowid)
+
+    // Create placeholder voucher in Journal (will be deleted on resolve)
+    const today = new Date().toISOString().slice(0, 10)
+    const voucherRes = createVoucherTx(db as any, {
+      date: today,
+      type: 'OUT',
+      sphere: 'IDEELL',
+      description: `Barvorschuss ${orderNumber.trim()} - Platzhalter${purpose ? ` - ${purpose}` : ''}`,
+      grossAmount: totalAmount,
+      vatRate: 0,
+      paymentMethod: 'BAR'
+    })
+
+    db.prepare('UPDATE cash_advances SET placeholder_voucher_id = ? WHERE id = ?').run(voucherRes.id, cashAdvanceId)
+
+    return { id: cashAdvanceId }
+  })
 }
 
 export function updateCashAdvance(input: {
@@ -301,14 +349,14 @@ export function updateCashAdvance(input: {
 
 export function resolveCashAdvance(input: {
   id: number
-  createCounterVoucher?: boolean
 }): { id: number; counterVoucherId?: number } {
-  const { id, createCounterVoucher = false } = input
+  const { id } = input
 
   return withTransaction((db) => {
     const row = db.prepare(`
       SELECT id, order_number as orderNumber, employee_name as employeeName,
-             purpose, total_amount as totalAmount, status, resolved_at as resolvedAt
+             purpose, total_amount as totalAmount, status, resolved_at as resolvedAt,
+             placeholder_voucher_id as placeholderVoucherId
       FROM cash_advances WHERE id = ?
     `).get(id) as { id: number; orderNumber: string; employeeName: string; purpose: string | null; totalAmount: number; status: CashAdvanceStatus; resolvedAt: string | null } | undefined
 
@@ -319,38 +367,40 @@ export function resolveCashAdvance(input: {
       return { id: row.id }
     }
 
-    const openPartialsRow = db.prepare(`
-      SELECT COUNT(*) as cnt
-      FROM partial_cash_advances
-      WHERE cash_advance_id = ? AND is_settled = 0
-    `).get(id) as { cnt: number }
+    const purchases = db.prepare(`
+      SELECT id, date, sphere, category_id as categoryId, description, gross_amount as grossAmount, vat_rate as vatRate
+      FROM cash_advance_purchases
+      WHERE cash_advance_id = ?
+      ORDER BY date ASC, id ASC
+    `).all(id) as Array<{ id: number; date: string; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; description: string | null; grossAmount: number; vatRate: number }>
 
-    if ((openPartialsRow?.cnt || 0) > 0) {
-      throw new Error('Alle Teil-Vorschüsse müssen abgerechnet sein, bevor abgeschlossen werden kann')
+    if (purchases.length === 0) {
+      throw new Error('Keine Käufe erfasst. Bitte erst Käufe hinzufügen, dann abschließen.')
     }
 
-    const totalSettledRow = db.prepare(`
-      SELECT COALESCE(SUM(settled_amount), 0) as totalSettled
-      FROM partial_cash_advances
-      WHERE cash_advance_id = ? AND is_settled = 1
-    `).get(id) as { totalSettled: number }
-
-    const totalSettled = Number(totalSettledRow?.totalSettled ?? 0) || 0
-    const diff = (Number(row.totalAmount) || 0) - totalSettled
-
-    let counterVoucherId: number | undefined
-    if (createCounterVoucher && Math.round(diff * 100) !== 0) {
-      const today = new Date().toISOString().slice(0, 10)
+    // Post purchases into vouchers
+    for (const p of purchases) {
       const voucherRes = createVoucherTx(db as any, {
-        date: today,
-        type: diff > 0 ? 'IN' : 'OUT',
-        sphere: 'IDEELL',
-        description: `Barvorschuss ${row.orderNumber} - Differenz ${diff > 0 ? '(Rückgeld)' : '(Nachschuss)'}${row.purpose ? ` - ${row.purpose}` : ''}`,
-        grossAmount: Math.abs(diff),
-        vatRate: 0,
-        paymentMethod: 'BAR'
+        date: p.date,
+        type: 'OUT',
+        sphere: p.sphere,
+        categoryId: p.categoryId ?? null,
+        description: p.description ?? null,
+        grossAmount: Number(p.grossAmount) || 0,
+        vatRate: Number(p.vatRate) || 0,
+        paymentMethod: 'BAR',
+        tags: [`Barvorschuss:${row.orderNumber}`]
       })
-      counterVoucherId = voucherRes.id
+      db.prepare('UPDATE cash_advance_purchases SET posted_voucher_id = ? WHERE id = ?').run(voucherRes.id, p.id)
+    }
+
+    // Delete placeholder voucher (if present)
+    const placeholderId = (row as any).placeholderVoucherId as number | null | undefined
+    if (placeholderId != null) {
+      const exists = db.prepare('SELECT id FROM vouchers WHERE id = ?').get(placeholderId)
+      if (exists) {
+        deleteVoucherTx(db as any, placeholderId)
+      }
     }
 
     db.prepare(`
@@ -359,23 +409,94 @@ export function resolveCashAdvance(input: {
       WHERE id = ?
     `).run(id)
 
-    return counterVoucherId != null ? { id, counterVoucherId } : { id }
+    return { id }
   })
 }
 
-export function deleteCashAdvance(id: number): { id: number } {
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchases (Käufe) - Drafts inside a cash advance
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function addCashAdvancePurchase(input: {
+  cashAdvanceId: number
+  date: string
+  sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  categoryId?: number | null
+  description?: string | null
+  grossAmount: number
+  vatRate?: number
+}): { id: number } {
   const db = getDb()
+  const { cashAdvanceId, date, sphere, categoryId, description, grossAmount, vatRate } = input
+  if (!date) throw new Error('Datum ist erforderlich')
+  if (!sphere) throw new Error('Sphäre ist erforderlich')
+  if (grossAmount == null || grossAmount <= 0) throw new Error('Betrag muss positiv sein')
 
-  // Delete associated files first
-  const settlements = db.prepare('SELECT receipt_file_path as filePath FROM cash_advance_settlements WHERE cash_advance_id = ?').all(id) as { filePath: string | null }[]
-  for (const s of settlements) {
-    if (s.filePath && fs.existsSync(s.filePath)) {
-      try { fs.unlinkSync(s.filePath) } catch { /* ignore */ }
+  const ca = db.prepare('SELECT id, status FROM cash_advances WHERE id = ?').get(cashAdvanceId) as { id: number; status: CashAdvanceStatus } | undefined
+  if (!ca) throw new Error('Barvorschuss nicht gefunden')
+  if (ca.status === 'RESOLVED') throw new Error('Barvorschuss ist abgeschlossen')
+
+  const info = db.prepare(`
+    INSERT INTO cash_advance_purchases (cash_advance_id, date, sphere, category_id, description, gross_amount, vat_rate)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    cashAdvanceId,
+    date,
+    sphere,
+    categoryId ?? null,
+    description ?? null,
+    grossAmount,
+    Number(vatRate ?? 0)
+  )
+  return { id: Number(info.lastInsertRowid) }
+}
+
+export function deleteCashAdvancePurchase(input: { id: number }): { id: number } {
+  const db = getDb()
+  const row = db.prepare(`
+    SELECT cap.id, ca.status as status
+    FROM cash_advance_purchases cap
+    JOIN cash_advances ca ON ca.id = cap.cash_advance_id
+    WHERE cap.id = ?
+  `).get(input.id) as { id: number; status: CashAdvanceStatus } | undefined
+  if (!row) throw new Error('Kauf nicht gefunden')
+  if (row.status === 'RESOLVED') throw new Error('Barvorschuss ist abgeschlossen')
+  db.prepare('DELETE FROM cash_advance_purchases WHERE id = ?').run(input.id)
+  return { id: input.id }
+}
+
+export function deleteCashAdvance(id: number): { id: number } {
+  return withTransaction((db) => {
+    const row = db.prepare(`
+      SELECT id, status, placeholder_voucher_id as placeholderVoucherId
+      FROM cash_advances
+      WHERE id = ?
+    `).get(id) as { id: number; status: CashAdvanceStatus; placeholderVoucherId: number | null } | undefined
+    if (!row) throw new Error('Barvorschuss nicht gefunden')
+    if (row.status === 'RESOLVED') throw new Error('Abgeschlossene Barvorschüsse können nicht gelöscht werden')
+
+    // Delete associated files (best-effort)
+    const settlements = db.prepare('SELECT receipt_file_path as filePath FROM cash_advance_settlements WHERE cash_advance_id = ?').all(id) as { filePath: string | null }[]
+    for (const s of settlements) {
+      if (s.filePath && fs.existsSync(s.filePath)) {
+        try { fs.unlinkSync(s.filePath) } catch { /* ignore */ }
+      }
     }
-  }
 
-  db.prepare('DELETE FROM cash_advances WHERE id = ?').run(id)
-  return { id }
+    // Delete child rows first
+    db.prepare('DELETE FROM cash_advance_purchases WHERE cash_advance_id = ?').run(id)
+    db.prepare('DELETE FROM partial_cash_advances WHERE cash_advance_id = ?').run(id)
+    db.prepare('DELETE FROM cash_advance_settlements WHERE cash_advance_id = ?').run(id)
+
+    // Delete placeholder voucher from Journal (if still present)
+    if (row.placeholderVoucherId != null) {
+      const exists = db.prepare('SELECT id FROM vouchers WHERE id = ?').get(row.placeholderVoucherId)
+      if (exists) deleteVoucherTx(db as any, row.placeholderVoucherId)
+    }
+
+    db.prepare('DELETE FROM cash_advances WHERE id = ?').run(id)
+    return { id }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -3,6 +3,8 @@ import TagsEditor from '../TagsEditor'
 import type { QA, BudgetAssignment, EarmarkAssignment } from '../../hooks/useQuickAdd'
 
 interface QuickAddModalProps {
+    title?: string
+    hideAttachments?: boolean
     qa: QA
     setQa: (qa: QA) => void
     onSave: () => void
@@ -29,6 +31,8 @@ interface QuickAddModalProps {
  * Extrahiert aus App.tsx für bessere Wartbarkeit
  */
 export default function QuickAddModal({
+    title = '+ Buchung',
+    hideAttachments = false,
     qa,
     setQa,
     onSave,
@@ -109,7 +113,7 @@ export default function QuickAddModal({
                 <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                     {/* Title row with action buttons */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                        <h2 style={{ margin: 0, flex: 1 }}>+ Buchung</h2>
+                        <h2 style={{ margin: 0, flex: 1 }}>{title}</h2>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <span className="helper" style={{ fontSize: 11, opacity: 0.7 }}>Ctrl+S</span>
                             <button type="submit" form="quick-add-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>Speichern</button>
@@ -603,50 +607,52 @@ export default function QuickAddModal({
                         </div>
 
                         {/* Block D – Anhänge */}
-                        <div
-                            className="card attachment-card"
-                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-                            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
-                        >
-                            <div className="attachment-header">
-                                <div className="attachment-title">
-                                    <strong>Anhänge</strong>
-                                    {files.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
+                        {!hideAttachments && (
+                            <div
+                                className="card attachment-card"
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
+                            >
+                                <div className="attachment-header">
+                                    <div className="attachment-title">
+                                        <strong>Anhänge</strong>
+                                        {files.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
+                                    </div>
+                                    <div className="flex-gap-8">
+                                        <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
+                                        <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
+                                        {files.length > 0 && (
+                                            <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex-gap-8">
-                                    <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
-                                    <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
-                                    {files.length > 0 && (
-                                        <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
-                                    )}
-                                </div>
+                                {files.length > 0 ? (
+                                    <ul className="file-list">
+                                        {files.map((f, i) => (
+                                            <li key={i} className="file-list-item">
+                                                <span className="file-name">{f.name}</span>
+                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div
+                                        style={{
+                                            marginTop: 8,
+                                            padding: 20,
+                                            border: '2px dashed var(--border)',
+                                            borderRadius: 8,
+                                            textAlign: 'center',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={openFilePicker}
+                                    >
+                                        <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                        <div className="helper">Dateien hierher ziehen oder klicken</div>
+                                    </div>
+                                )}
                             </div>
-                            {files.length > 0 ? (
-                                <ul className="file-list">
-                                    {files.map((f, i) => (
-                                        <li key={i} className="file-list-item">
-                                            <span className="file-name">{f.name}</span>
-                                            <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <div 
-                                    style={{ 
-                                        marginTop: 8, 
-                                        padding: 20, 
-                                        border: '2px dashed var(--border)', 
-                                        borderRadius: 8, 
-                                        textAlign: 'center',
-                                        cursor: 'pointer'
-                                    }}
-                                    onClick={openFilePicker}
-                                >
-                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
-                                    <div className="helper">Dateien hierher ziehen oder klicken</div>
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </div>
                 </form>
             </div>

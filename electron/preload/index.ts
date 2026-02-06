@@ -298,7 +298,7 @@ contextBridge.exposeInMainWorld('api', {
         getById: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.getById', payload),
         create: (payload: { orderNumber: string; employeeName: string; purpose?: string | null; totalAmount: number; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
             ipcRenderer.invoke('cashAdvances.create', payload),
-        resolve: (payload: { id: number; createCounterVoucher?: boolean }) =>
+        resolve: (payload: { id: number }) =>
             ipcRenderer.invoke('cashAdvances.resolve', payload),
         update: (payload: { id: number; orderNumber?: string; employeeName?: string; purpose?: string | null; totalAmount?: number; status?: string; dueDate?: string | null; notes?: string | null; costCenterId?: number | null }) => 
             ipcRenderer.invoke('cashAdvances.update', payload),
@@ -311,6 +311,11 @@ contextBridge.exposeInMainWorld('api', {
             settle: (payload: { id: number; settledAmount: number; settledAt?: string }) => 
                 ipcRenderer.invoke('cashAdvances.partials.settle', payload),
             delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.partials.delete', payload)
+        },
+        purchases: {
+            add: (payload: { cashAdvanceId: number; date: string; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number | null; description?: string | null; grossAmount: number; vatRate?: number }) =>
+                ipcRenderer.invoke('cashAdvances.purchases.add', payload),
+            delete: (payload: { id: number }) => ipcRenderer.invoke('cashAdvances.purchases.delete', payload)
         },
         settlements: {
             add: (payload: { cashAdvanceId: number; amount: number; settledAt?: string; description?: string | null; voucherId?: number | null; fileName?: string | null; dataBase64?: string | null; mimeType?: string | null }) => 

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
+import QuickAddModal from '../../components/modals/QuickAddModal'
+import type { QA } from '../../hooks/useQuickAdd'
 import { useToast } from '../../context/toastHooks'
 import { useAuth } from '../../context/authHooks'
 import { useArchiveSettings } from '../../hooks/useArchiveSettings'
@@ -39,8 +41,21 @@ type PartialCashAdvance = {
   settledAt: string | null
 }
 
+type CashAdvancePurchase = {
+  id: number
+  cashAdvanceId: number
+  date: string
+  sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  categoryId: number | null
+  description: string | null
+  grossAmount: number
+  vatRate: number
+  postedVoucherId: number | null
+}
+
 type CashAdvanceWithDetails = CashAdvance & {
   partials: PartialCashAdvance[]
+  purchases: CashAdvancePurchase[]
   settlements: any[]
   totalPlanned: number
   totalSettled: number
@@ -55,6 +70,16 @@ export default function CashAdvancesView() {
   const { workYear, showArchived, ready: archiveSettingsReady } = useArchiveSettings()
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
+  const fmtDate = useCallback((d: string) => {
+    // Very small helper to match other views (dd.mm.yyyy)
+    if (!d) return ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m, day] = d.split('-')
+      return `${day}.${m}.${y}`
+    }
+    return d
+  }, [])
+
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<CashAdvanceListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -67,6 +92,29 @@ export default function CashAdvancesView() {
   const [detail, setDetail] = useState<CashAdvanceWithDetails | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+
+  // Meta lists for QuickAdd (Budgets, Zweckbindungen, Tags)
+  const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
+  const [budgets, setBudgets] = useState<Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; earmarkId?: number | null; isArchived?: number }>>([])
+  const budgetsForEdit = useMemo(() => {
+    const byIdEarmark = new Map(earmarks.map((e) => [e.id, e]))
+    const makeLabel = (b: any) => {
+      if (b.name && String(b.name).trim()) return String(b.name).trim()
+      if (b.categoryName && String(b.categoryName).trim()) return `${b.year} · ${b.categoryName}`
+      if (b.projectName && String(b.projectName).trim()) return `${b.year} · ${b.projectName}`
+      if (b.earmarkId) {
+        const em = byIdEarmark.get(Number(b.earmarkId))
+        if (em) return `${b.year} · ${em.code}`
+      }
+      return String(b.year || '')
+    }
+    return (budgets || []).map((b) => ({ id: b.id, label: makeLabel(b) }))
+  }, [budgets, earmarks])
+
+  const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
+  const [purchaseDescSuggest, setPurchaseDescSuggest] = useState<string[]>([])
+
   // Modals
   const [createModal, setCreateModal] = useState<null | {
     orderNumber: string
@@ -75,8 +123,11 @@ export default function CashAdvancesView() {
     purpose: string
     dueDate: string
     notes: string
-    createVoucher: boolean
   }>(null)
+
+  const [purchaseDraft, setPurchaseDraft] = useState<null | { cashAdvanceId: number; qa: QA }>(null)
+  const [purchaseFiles, setPurchaseFiles] = useState<File[]>([])
+  const purchaseFileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [partialModal, setPartialModal] = useState<null | {
     cashAdvanceId: number
@@ -95,7 +146,6 @@ export default function CashAdvancesView() {
   }>(null)
 
   const [resolveModal, setResolveModal] = useState<null | {
-    createCounterVoucher: boolean
     confirmIrreversible: boolean
   }>(null)
 
@@ -103,6 +153,13 @@ export default function CashAdvancesView() {
     partialId: number
     recipientName: string
     amount: number
+  }>(null)
+
+  const [deleteCashAdvanceModal, setDeleteCashAdvanceModal] = useState<null | {
+    id: number
+    orderNumber: string
+    employeeName: string
+    totalAmount: number
   }>(null)
 
   const load = useCallback(async () => {
@@ -148,13 +205,112 @@ export default function CashAdvancesView() {
   useEffect(() => { if (selectedId) loadDetail(selectedId) }, [loadDetail, selectedId])
 
   useEffect(() => {
+    let cancelled = false
+    const loadCategories = async () => {
+      try {
+        const res = await (window as any).api?.customCategories?.list?.({ includeInactive: false })
+        const list =
+          Array.isArray(res) ? res :
+          Array.isArray(res?.categories) ? res.categories :
+          Array.isArray(res?.rows) ? res.rows :
+          Array.isArray(res?.items) ? res.items :
+          []
+        if (!cancelled) setCategories(list)
+      } catch {
+        if (!cancelled) setCategories([])
+      }
+    }
+    void loadCategories()
+    window.addEventListener('data-changed', loadCategories)
+    return () => {
+      cancelled = true
+      window.removeEventListener('data-changed', loadCategories)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadMeta = async () => {
+      try {
+        const em = await (window as any).api?.bindings?.list?.({ activeOnly: true })
+        const rows = (em as any)?.rows || []
+        const active = (rows as any[]).filter((r) => r?.isActive == null || !!r.isActive)
+        if (!cancelled) setEarmarks(active)
+      } catch {
+        if (!cancelled) setEarmarks([])
+      }
+
+      try {
+        const b = await (window as any).api?.budgets?.list?.({ includeArchived: true })
+        const rows = (b as any)?.rows || []
+        const active = (rows as any[]).filter((r) => !r?.isArchived)
+        if (!cancelled) setBudgets(active)
+      } catch {
+        if (!cancelled) setBudgets([])
+      }
+
+      try {
+        const t = await (window as any).api?.tags?.list?.({ includeUsage: true })
+        if (!cancelled) setTagDefs((t as any)?.rows || [])
+      } catch {
+        if (!cancelled) setTagDefs([])
+      }
+    }
+
+    void loadMeta()
+    const onChanged = () => { void loadMeta() }
+    window.addEventListener('data-changed', onChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener('data-changed', onChanged)
+    }
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        if (!purchaseDraft) return
+        const res = await (window as any).api?.vouchers?.recent?.({ limit: 50 })
+        const uniq = new Set<string>()
+        for (const r of (res?.rows || [])) {
+          const d = String(r?.description || '').trim()
+          if (d) uniq.add(d)
+          if (uniq.size >= 50) break
+        }
+        if (alive) setPurchaseDescSuggest(Array.from(uniq))
+      } catch {
+        if (alive) setPurchaseDescSuggest([])
+      }
+    }
+    void load()
+    return () => { alive = false }
+  }, [purchaseDraft])
+
+  useEffect(() => {
     if (canWrite) return
     setCreateModal(null)
     setPartialModal(null)
     setSettleModal(null)
     setResolveModal(null)
     setDeleteConfirmModal(null)
+    setDeleteCashAdvanceModal(null)
   }, [canWrite])
+
+  const confirmDeleteCashAdvance = async () => {
+    if (!canWrite) return
+    if (!deleteCashAdvanceModal) return
+    try {
+      await (window as any).api?.cashAdvances?.delete?.({ id: deleteCashAdvanceModal.id })
+      notify('success', 'Barvorschuss gelöscht')
+      setDeleteCashAdvanceModal(null)
+      setSelectedId(null)
+      setDetail(null)
+      await load()
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Create Cash Advance
@@ -163,15 +319,13 @@ export default function CashAdvancesView() {
     if (!canWrite) return
     try {
       const res = await (window as any).api?.cashAdvances?.nextOrderNumber?.()
-      const today = new Date().toISOString().slice(0, 10)
       setCreateModal({
         orderNumber: res?.orderNumber || '',
         employeeName: '',
         totalAmount: '',
         purpose: '',
         dueDate: '',
-        notes: '',
-        createVoucher: false
+        notes: ''
       })
     } catch {
       setCreateModal({
@@ -180,8 +334,7 @@ export default function CashAdvancesView() {
         totalAmount: '',
         purpose: '',
         dueDate: '',
-        notes: '',
-        createVoucher: false
+        notes: ''
       })
     }
   }
@@ -211,27 +364,8 @@ export default function CashAdvancesView() {
         dueDate: createModal.dueDate || null,
         notes: createModal.notes.trim() || null
       })
-      
-      // Optional: Als Buchung anlegen
-      if (createModal.createVoucher) {
-        try {
-          const today = new Date().toISOString().slice(0, 10)
-          await (window as any).api?.vouchers?.create?.({
-            date: today,
-            type: 'OUT', // Barvorschuss ist eine Ausgabe
-            sphere: 'IDEELL', // Standard-Sphäre für Jugendförderung
-            description: `Barvorschuss ${createModal.orderNumber.trim()} - ${createModal.purpose.trim() || createModal.employeeName.trim()}`,
-            grossAmount: totalAmount,
-            vatRate: 0, // Barvorschüsse sind ohne MwSt
-            paymentMethod: 'BAR'
-          })
-          notify('success', 'Barvorschuss und Buchung angelegt')
-        } catch (e: any) {
-          notify('error', `Barvorschuss angelegt, aber Buchung fehlgeschlagen: ${e?.message}`)
-        }
-      } else {
-        notify('success', 'Barvorschuss angelegt')
-      }
+
+      notify('success', 'Barvorschuss angelegt')
       
       setCreateModal(null)
       await load()
@@ -331,12 +465,11 @@ export default function CashAdvancesView() {
   const openResolve = () => {
     if (!canWrite) return
     if (!detail) return
-    const allPartialsSettled = detail.partials.every((p) => p.isSettled)
-    if (!allPartialsSettled) {
-      notify('error', 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind')
+    if ((detail.purchases || []).length === 0) {
+      notify('error', 'Abschließen ist erst möglich, wenn mindestens ein Kauf erfasst ist')
       return
     }
-    setResolveModal({ createCounterVoucher: false, confirmIrreversible: false })
+    setResolveModal({ confirmIrreversible: false })
   }
 
   const confirmResolve = async () => {
@@ -348,13 +481,84 @@ export default function CashAdvancesView() {
     }
     try {
       const res = await (window as any).api?.cashAdvances?.resolve?.({
-        id: detail.id,
-        createCounterVoucher: resolveModal.createCounterVoucher
+        id: detail.id
       })
-      notify('success', res?.counterVoucherId ? 'Barvorschuss abgeschlossen und Differenz gebucht' : 'Barvorschuss abgeschlossen')
+      notify('success', res?.id ? 'Barvorschuss abgeschlossen' : 'Barvorschuss abgeschlossen')
       setResolveModal(null)
       await load()
       await loadDetail(detail.id)
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Purchases (Käufe)
+  // ─────────────────────────────────────────────────────────────────────────
+  const addPurchaseFromQuickAdd = async () => {
+    if (!canWrite) return
+    if (!purchaseDraft) return
+    const { cashAdvanceId, qa } = purchaseDraft
+
+    if (qa.type === 'TRANSFER') {
+      notify('error', 'Transfers sind als Kauf nicht erlaubt')
+      return
+    }
+
+    const mode = (qa as any).mode as 'NET' | 'GROSS' | undefined
+    const rawGross = Number((qa as any).grossAmount)
+    const rawNet = Number(qa.netAmount)
+    const vatRate = Number(qa.vatRate || 0)
+
+    let grossAmount = 0
+    let vatRateForPurchase = 0
+    if (mode === 'NET') {
+      if (!Number.isFinite(rawNet) || rawNet <= 0) {
+        notify('error', 'Netto-Betrag muss positiv sein')
+        return
+      }
+      if (!Number.isFinite(vatRate) || vatRate < 0) {
+        notify('error', 'USt % ist ungültig')
+        return
+      }
+      grossAmount = Math.round((rawNet * (1 + vatRate / 100)) * 100) / 100
+      vatRateForPurchase = vatRate
+    } else {
+      if (!Number.isFinite(rawGross) || rawGross <= 0) {
+        notify('error', 'Brutto-Betrag muss positiv sein')
+        return
+      }
+      grossAmount = rawGross
+      vatRateForPurchase = 0
+    }
+
+    try {
+      await (window as any).api?.cashAdvances?.purchases?.add?.({
+        cashAdvanceId,
+        date: qa.date,
+        sphere: qa.sphere || 'IDEELL',
+        categoryId: typeof (qa as any).categoryId === 'number' ? (qa as any).categoryId : null,
+        description: (qa.description || '').trim() || null,
+        grossAmount,
+        vatRate: vatRateForPurchase
+      })
+      notify('success', 'Kauf erfasst')
+      setPurchaseDraft(null)
+      setPurchaseFiles([])
+      await load()
+      if (selectedId) await loadDetail(selectedId)
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    }
+  }
+
+  const deletePurchase = async (id: number) => {
+    if (!canWrite) return
+    try {
+      await (window as any).api?.cashAdvances?.purchases?.delete?.({ id })
+      notify('success', 'Kauf gelöscht')
+      await load()
+      if (selectedId) await loadDetail(selectedId)
     } catch (e: any) {
       notify('error', e?.message || String(e))
     }
@@ -558,24 +762,40 @@ export default function CashAdvancesView() {
                 <div style={{ marginTop: 8 }}>
                   {detail.status === 'OPEN' && (
                     (() => {
-                      const canResolve = detail.partials.every((p) => p.isSettled)
+                      const canResolve = (detail.purchases || []).length > 0
                       return (
                     canWrite ? (
-                      <button
-                        className="btn primary"
-                        onClick={openResolve}
-                        aria-disabled={!canResolve}
-                        title={!canResolve
-                          ? 'Abschließen ist erst möglich, wenn alle Teil-Vorschüsse abgerechnet sind'
-                          : undefined}
-                        style={{
-                          fontSize: 13,
-                          opacity: canResolve ? 1 : 0.6,
-                          cursor: canResolve ? 'pointer' : 'not-allowed'
-                        }}
-                      >
-                        ✓ Abschließen
-                      </button>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn ghost danger"
+                            onClick={() => {
+                              setDeleteCashAdvanceModal({
+                                id: detail.id,
+                                orderNumber: detail.orderNumber,
+                                employeeName: detail.employeeName,
+                                totalAmount: detail.totalAmount
+                              })
+                            }}
+                            title="Barvorschuss löschen"
+                          >
+                            🗑 Löschen
+                          </button>
+                          <button
+                            className="btn primary"
+                            onClick={openResolve}
+                            aria-disabled={!canResolve}
+                            title={!canResolve
+                              ? 'Abschließen ist erst möglich, wenn mindestens ein Kauf erfasst ist'
+                              : undefined}
+                            style={{
+                              fontSize: 13,
+                              opacity: canResolve ? 1 : 0.6,
+                              cursor: canResolve ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            ✓ Abschließen
+                          </button>
+                        </div>
                     ) : null
                       )
                     })()
@@ -610,6 +830,32 @@ export default function CashAdvancesView() {
             <div style={{ display: 'flex', gap: 8 }}>
               {canWrite && detail.status !== 'RESOLVED' && (
                 <button
+                  className="btn"
+                  onClick={() => {
+                    const today = new Date().toISOString().slice(0, 10)
+                    const qa: QA = {
+                      date: today,
+                      type: 'OUT',
+                      sphere: 'IDEELL',
+                      mode: 'GROSS',
+                      grossAmount: 0,
+                      vatRate: 0,
+                      description: '',
+                      paymentMethod: 'BAR',
+                      budgets: [],
+                      earmarksAssigned: [],
+                      tags: [],
+                      categoryId: null,
+                      taxonomySelectionById: {}
+                    }
+                    setPurchaseDraft({ cashAdvanceId: detail.id, qa })
+                  }}
+                >
+                  + Kauf erfassen
+                </button>
+              )}
+              {canWrite && detail.status !== 'RESOLVED' && (
+                <button
                   className="btn primary"
                   onClick={() => {
                     const today = new Date().toISOString().slice(0, 10)
@@ -619,6 +865,57 @@ export default function CashAdvancesView() {
                   + Vorschuss vergeben
                 </button>
               )}
+            </div>
+
+            {/* Käufe */}
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Käufe</div>
+              {(detail.purchases || []).length === 0 ? (
+                <div className="helper">Noch keine Käufe erfasst.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {(detail.purchases || []).map((k) => (
+                    <div key={k.id} className="card" style={{ padding: 12, background: 'var(--surface)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>
+                            {k.description || 'Ohne Beschreibung'}
+                          </div>
+                          <div className="helper" style={{ marginTop: 4 }}>
+                            {k.date} · {k.sphere}
+                            {k.categoryId ? (() => {
+                              const cat = (Array.isArray(categories) ? categories : []).find((c) => c.id === k.categoryId)
+                              return ` · ${cat?.name || `Kategorie #${k.categoryId}`}`
+                            })() : ''}
+                            {k.vatRate ? ` · ${k.vatRate}% MwSt.` : ''}
+                          </div>
+                          {k.postedVoucherId ? (
+                            <div className="helper" style={{ marginTop: 4 }}>Gebucht (Beleg-ID: {k.postedVoucherId})</div>
+                          ) : null}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 800, fontSize: 16 }}>{eurFmt.format(k.grossAmount)}</div>
+                          {canWrite && detail.status !== 'RESOLVED' && !k.postedVoucherId ? (
+                            <div style={{ marginTop: 8 }}>
+                              <button
+                                className="btn ghost danger"
+                                style={{ fontSize: 12, padding: '4px 8px' }}
+                                onClick={() => deletePurchase(k.id)}
+                                title="Löschen"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="helper" style={{ marginTop: 8 }}>
+                Hinweis: Diese Käufe werden erst beim Abschluss als Buchungen ins Journal übernommen.
+              </div>
             </div>
 
             {/* Teil-Vorschüsse */}
@@ -775,29 +1072,44 @@ export default function CashAdvancesView() {
                   placeholder="Interne Notizen…"
                 />
               </div>
-              
-              {/* Option: Als Buchung anlegen */}
-              <div className="card" style={{ padding: 12, background: 'var(--surface-alt)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={createModal.createVoucher}
-                    onChange={(e) => setCreateModal({ ...createModal, createVoucher: e.target.checked })}
-                    style={{ width: 18, height: 18 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600 }}>📝 Auch als Buchung anlegen</div>
-                    <div className="helper" style={{ marginTop: 2 }}>
-                      Erstellt automatisch eine Ausgabe-Buchung für diesen Barvorschuss
-                    </div>
-                  </div>
-                </label>
-              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button className="btn ghost" onClick={() => setCreateModal(null)}>Abbrechen</button>
               <button className="btn primary" onClick={createCashAdvance}>Anlegen</button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Purchase Modal (Kauf erfassen) – reuse booking modal UI (no attachments) */}
+      {canWrite && purchaseDraft && createPortal(
+        <div role="dialog" aria-modal="true" onClick={() => { setPurchaseDraft(null); setPurchaseFiles([]) }}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <QuickAddModal
+              title="Kauf erfassen"
+              hideAttachments
+              qa={purchaseDraft.qa}
+              setQa={(qa) => setPurchaseDraft({ ...purchaseDraft, qa })}
+              onSave={addPurchaseFromQuickAdd}
+              onClose={() => { setPurchaseDraft(null); setPurchaseFiles([]) }}
+              files={purchaseFiles}
+              setFiles={setPurchaseFiles}
+              openFilePicker={() => purchaseFileInputRef.current?.click()}
+              onDropFiles={(fileList) => {
+                if (!fileList) return
+                setPurchaseFiles((prev) => [...prev, ...Array.from(fileList)])
+              }}
+              fileInputRef={purchaseFileInputRef}
+              fmtDate={fmtDate}
+              eurFmt={eurFmt}
+              budgetsForEdit={budgetsForEdit}
+              earmarks={earmarks}
+              tagDefs={tagDefs}
+              descSuggest={purchaseDescSuggest}
+              customCategories={Array.isArray(categories) ? categories : []}
+              useCategoriesModule
+            />
           </div>
         </div>,
         document.body
@@ -950,22 +1262,8 @@ export default function CashAdvancesView() {
                     </div>
                     <div className="helper" style={{ marginTop: 4 }}>{label}</div>
 
-                    <div style={{ marginTop: 12 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: abs > 0 ? 'pointer' : 'not-allowed' }}>
-                        <input
-                          type="checkbox"
-                          checked={resolveModal.createCounterVoucher}
-                          disabled={abs === 0}
-                          onChange={(e) => setResolveModal({ ...resolveModal, createCounterVoucher: e.target.checked })}
-                          style={{ width: 18, height: 18 }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600 }}>🧾 Differenz gegenbuchen</div>
-                          <div className="helper" style={{ marginTop: 2 }}>
-                            Erstellt eine {diff > 0 ? 'Einnahme' : diff < 0 ? 'Ausgabe' : ''}-Buchung (Zahlweg: BAR)
-                          </div>
-                        </div>
-                      </label>
+                    <div className="helper" style={{ marginTop: 12 }}>
+                      Hinweis: Die Differenz wird nicht automatisch als Buchung erfasst.
                     </div>
                   </div>
                 )
@@ -997,7 +1295,13 @@ export default function CashAdvancesView() {
 
       {/* Delete Confirmation Modal */}
       {canWrite && deleteConfirmModal && createPortal(
-        <div className="modal-backdrop" onClick={() => setDeleteConfirmModal(null)}>
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Teil-Vorschuss löschen"
+          onClick={() => setDeleteConfirmModal(null)}
+        >
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Teil-Vorschuss löschen?" onClose={() => setDeleteConfirmModal(null)} />
             <div style={{ display: 'grid', gap: 16, padding: 16 }}>
@@ -1013,6 +1317,40 @@ export default function CashAdvancesView() {
               <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
                 <button className="btn ghost" onClick={() => setDeleteConfirmModal(null)}>Abbrechen</button>
                 <button className="btn danger" onClick={confirmDeletePartial}>Löschen</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Cash Advance Confirmation Modal */}
+      {canWrite && deleteCashAdvanceModal && createPortal(
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Barvorschuss löschen"
+          onClick={() => setDeleteCashAdvanceModal(null)}
+        >
+          <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <ModalHeader title="Barvorschuss löschen?" onClose={() => setDeleteCashAdvanceModal(null)} />
+            <div style={{ display: 'grid', gap: 16, padding: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
+                <div style={{ fontWeight: 500, marginBottom: 8 }}>
+                  Möchtest du diesen Barvorschuss wirklich löschen?
+                </div>
+                <div className="helper">
+                  {deleteCashAdvanceModal.orderNumber} · {deleteCashAdvanceModal.employeeName} · {eurFmt.format(deleteCashAdvanceModal.totalAmount)}
+                </div>
+                <div className="helper" style={{ marginTop: 10 }}>
+                  Hinweis: Der Platzhalter im Journal wird ebenfalls entfernt.
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                <button className="btn ghost" onClick={() => setDeleteCashAdvanceModal(null)}>Abbrechen</button>
+                <button className="btn danger" onClick={confirmDeleteCashAdvance}>Löschen</button>
               </div>
             </div>
           </div>
