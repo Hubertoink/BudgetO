@@ -147,6 +147,58 @@ function AboutModal({ onClose }: { onClose: () => void }) {
     )
 }
 
+function CloseWhileServerRunningModal({
+    payload,
+    onCancel,
+    onQuit,
+    onTray
+}: {
+    payload: { port?: number; connectedClients?: number }
+    onCancel: () => void
+    onQuit: () => void
+    onTray: () => void
+}) {
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                onCancel()
+            }
+        }
+        window.addEventListener('keydown', handleKey)
+        return () => window.removeEventListener('keydown', handleKey)
+    }, [onCancel])
+
+    const detailParts: string[] = []
+    if (typeof payload.port === 'number') detailParts.push(`Port ${payload.port}`)
+    if (typeof payload.connectedClients === 'number') detailParts.push(`Clients: ${payload.connectedClients}`)
+    const detail = detailParts.length ? detailParts.join(' · ') : ''
+
+    return createPortal(
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onCancel}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ margin: 0 }}>Server läuft</h2>
+                    <button className="btn ghost" onClick={onCancel} aria-label="Schließen">✕</button>
+                </header>
+
+                <div className="helper">
+                    Der BudgetO Server ist aktuell aktiv{detail ? ` (${detail})` : ''}. Wirklich beenden?
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn" onClick={onCancel}>Abbrechen</button>
+                    <button className="btn primary" onClick={onTray} style={{ whiteSpace: 'nowrap' }}>
+                        Im Tray weiterlaufen lassen
+                    </button>
+                    <button className="btn danger" onClick={onQuit}>Schließen</button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    )
+}
+
 function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
     const [showAbout, setShowAbout] = useState(false)
     
@@ -170,6 +222,27 @@ function AppInner() {
     const { authEnforced, isAuthenticated, isLoading: authLoading, logout, canAccessSettings, canWrite } = useAuth()
     // Use toast context
     const { notify } = useToast()
+
+    const [closeServerPayload, setCloseServerPayload] = useState<null | { port?: number; connectedClients?: number }>(null)
+    useEffect(() => {
+        const off = window.api?.app?.onCloseRequest?.((p) => {
+            if (!p?.running) return
+            setCloseServerPayload({ port: p.port, connectedClients: p.connectedClients })
+        })
+        return () => {
+            try { off?.() } catch { /* ignore */ }
+        }
+    }, [])
+
+    const onCloseCancel = useCallback(() => setCloseServerPayload(null), [])
+    const onCloseQuit = useCallback(() => {
+        setCloseServerPayload(null)
+        void window.api?.app?.closeAction?.({ action: 'quit' })
+    }, [])
+    const onCloseTray = useCallback(() => {
+        setCloseServerPayload(null)
+        void window.api?.app?.closeAction?.({ action: 'tray' })
+    }, [])
 
     const [serverMode, setServerMode] = useState<'local' | 'server' | 'client'>('local')
 
@@ -857,18 +930,44 @@ function AppInner() {
 
     // Global Tags state (for filters, table colorization, and tag manager)
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
-    async function loadTags() {
+    const [tagsLoaded, setTagsLoaded] = useState<boolean>(false)
+    async function loadTags(): Promise<boolean> {
         try {
             const res = await window.api?.tags?.list?.({ includeUsage: true })
-            if (res) setTagDefs(res.rows || [])
-        } catch { /* ignore */ }
+            if (res && Array.isArray((res as any).rows)) {
+                setTagDefs((res as any).rows || [])
+                setTagsLoaded(true)
+                return true
+            }
+        } catch {
+            // ignore (e.g. client not connected yet / auth not ready)
+        }
+        return false
     }
     useEffect(() => {
-        loadTags()
-        const onChanged = () => loadTags()
+        void loadTags()
+        const onChanged = () => { void loadTags() }
         window.addEventListener('data-changed', onChanged)
-        return () => window.removeEventListener('data-changed', onChanged)
+        window.addEventListener('server-config-changed', onChanged)
+        window.addEventListener('server-status-changed', onChanged)
+        window.addEventListener('auth-changed', onChanged)
+        return () => {
+            window.removeEventListener('data-changed', onChanged)
+            window.removeEventListener('server-config-changed', onChanged)
+            window.removeEventListener('server-status-changed', onChanged)
+            window.removeEventListener('auth-changed', onChanged)
+        }
     }, [])
+
+    // In client mode, initial tag load can fail before the server/auth is ready.
+    // Retry until we have a first successful response (even if empty).
+    useEffect(() => {
+        if (tagsLoaded) return
+        const id = window.setInterval(() => {
+            void loadTags()
+        }, 3000)
+        return () => window.clearInterval(id)
+    }, [tagsLoaded])
 
     // Journal table UI: column visibility and order (Buchungen view)
     type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
@@ -1524,6 +1623,15 @@ function AppInner() {
                             notify('error', e?.message || String(e))
                         }
                     }}
+                />
+            )}
+
+            {closeServerPayload && (
+                <CloseWhileServerRunningModal
+                    payload={closeServerPayload}
+                    onCancel={onCloseCancel}
+                    onQuit={onCloseQuit}
+                    onTray={onCloseTray}
                 />
             )}
         </div>

@@ -182,6 +182,11 @@ declare global {
                 inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
                 restore: (filePath: string) => Promise<{ ok: boolean; error?: string }>
             }
+            app?: {
+                version: () => Promise<{ version: string; name: string }>
+                closeAction: (payload: { action: 'quit' | 'tray' | 'cancel' }) => Promise<{ ok: boolean }>
+                onCloseRequest: (cb: (payload: { running: boolean; port?: number; connectedClients?: number }) => void) => () => void
+            }
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
                 execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; errorFilePath?: string }>

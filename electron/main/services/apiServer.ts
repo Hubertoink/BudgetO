@@ -19,6 +19,32 @@ let server: http.Server | null = null
 let connectedClients = 0
 const activeSockets = new Set<net.Socket>()
 
+// "Connected clients" is approximated as clients seen recently.
+// This avoids flickering to 0 when clients use short-lived HTTP connections.
+const RECENT_CLIENT_TTL_MS = 15_000
+const recentClientLastSeen = new Map<string, number>()
+
+function normalizeRemoteAddress(addr: string | undefined | null): string | null {
+  if (!addr) return null
+  if (addr === '::1') return '127.0.0.1'
+  if (addr.startsWith('::ffff:')) return addr.slice('::ffff:'.length)
+  return addr
+}
+
+function markClientSeen(addr: string | undefined | null) {
+  const norm = normalizeRemoteAddress(addr)
+  if (!norm) return
+  recentClientLastSeen.set(norm, Date.now())
+}
+
+function countRecentClients(now = Date.now()): number {
+  const cutoff = now - RECENT_CLIENT_TTL_MS
+  for (const [addr, ts] of recentClientLastSeen) {
+    if (ts < cutoff) recentClientLastSeen.delete(addr)
+  }
+  return recentClientLastSeen.size
+}
+
 // Change sequence for lightweight "new data" detection across clients
 let changeSeq = 0
 
@@ -92,6 +118,8 @@ export function setServerConfig(config: Partial<ServerConfig>): ServerConfig {
 
 export function getServerStatus() {
   const config = getServerConfig()
+  // Keep the exported value stable and up-to-date.
+  connectedClients = countRecentClients()
   return {
     running: server !== null,
     connectedClients,
@@ -840,6 +868,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
   
   const url = new URL(req.url || '/', `http://${req.headers.host}`)
+
+  // Track recently seen clients for stable connected-client counts.
+  try {
+    markClientSeen(req.socket?.remoteAddress ?? null)
+  } catch {
+    // ignore
+  }
   
   // Health check
   if (url.pathname === '/health') {
@@ -899,16 +934,60 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       }
 
       const isWriteRoute = (r: string) => {
-        return (
-          r === 'vouchers.create' ||
-          r === 'vouchers.update' ||
-          r === 'vouchers.delete' ||
-          r === 'vouchers.reverse' ||
-          r === 'vouchers.batchAssignEarmark' ||
-          r === 'vouchers.batchAssignBudget' ||
-          r === 'vouchers.batchAssignTags' ||
-          r === 'vouchers.clearAll'
-        )
+        // This route is explicitly safe to call frequently.
+        if (r === 'meta.getChangeSeq') return false
+        // Auth / reports are read-only from a data-refresh perspective.
+        if (r.startsWith('auth.')) return false
+        if (r.startsWith('reports.')) return false
+
+        // Known read-ish suffixes.
+        const readSuffixes = [
+          '.list',
+          '.get',
+          '.byId',
+          '.recent',
+          '.summary',
+          '.monthly',
+          '.years',
+          '.usage',
+          '.status',
+          '.preview',
+          '.inspect',
+          '.template',
+          '.testdata',
+          '.isRequired',
+          '.isEnforced'
+        ]
+        if (readSuffixes.some((s) => r.endsWith(s))) return false
+
+        // Heuristic: if a route name contains common write verbs, treat it as a write.
+        // False positives are acceptable because this only triggers a refresh hint.
+        const writeHints = [
+          'create',
+          'update',
+          'delete',
+          'upsert',
+          'reverse',
+          'execute',
+          'set',
+          'clear',
+          'batch',
+          'import',
+          'add',
+          'remove',
+          'mark',
+          'unmark',
+          'post',
+          'save',
+          'rename',
+          'switch',
+          'reset',
+          'restore',
+          'close',
+          'reopen'
+        ]
+        const lower = r.toLowerCase()
+        return writeHints.some((h) => lower.includes(h))
       }
 
       // Readonly users must never write
@@ -921,9 +1000,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const result = await handler(body, authUser)
 
       // Bump change sequence for lightweight update hints on clients.
-      if (isWriteRoute(route)) {
-        bumpChangeSeq()
-      }
+      if (isWriteRoute(route)) bumpChangeSeq()
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(result))
     } catch (e: any) {
@@ -988,16 +1065,22 @@ export async function startServer(): Promise<{ success: boolean; error?: string 
     server.on('connection', (socket) => {
       // Track active sockets instead of counting total connections ever seen.
       activeSockets.add(socket)
-      connectedClients = activeSockets.size
+      try {
+        markClientSeen(socket.remoteAddress ?? null)
+      } catch {
+        // ignore
+      }
+      connectedClients = countRecentClients()
       socket.on('close', () => {
         activeSockets.delete(socket)
-        connectedClients = activeSockets.size
+        connectedClients = countRecentClients()
       })
     })
 
     server.on('close', () => {
       activeSockets.clear()
       connectedClients = 0
+      recentClientLastSeen.clear()
     })
     
     server.listen(config.port, '0.0.0.0', () => {
@@ -1018,6 +1101,7 @@ export function stopServer(): Promise<void> {
       console.log('BudgetO API Server stopped')
       server = null
       connectedClients = 0
+      recentClientLastSeen.clear()
       resolve()
     })
   })

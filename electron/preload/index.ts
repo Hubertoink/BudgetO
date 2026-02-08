@@ -202,7 +202,13 @@ contextBridge.exposeInMainWorld('api', {
         restore: (filePath: string) => ipcRenderer.invoke('backup.restore', { filePath })
     },
     app: {
-        version: () => ipcRenderer.invoke('app.version')
+        version: () => ipcRenderer.invoke('app.version'),
+        closeAction: (payload: { action: 'quit' | 'tray' | 'cancel' }) => ipcRenderer.invoke('app.closeAction', payload),
+        onCloseRequest: (cb: (payload: { running: boolean; port?: number; connectedClients?: number }) => void) => {
+            const handler = (_e: any, payload: any) => cb(payload as any)
+            ipcRenderer.on('app.closeRequest', handler)
+            return () => ipcRenderer.removeListener('app.closeRequest', handler)
+        }
     },
     imports: {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),

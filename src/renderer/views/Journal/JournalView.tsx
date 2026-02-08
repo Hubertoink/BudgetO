@@ -550,6 +550,13 @@ export default function JournalView({
         loadRecent()
     }, [loadRecent])
 
+    // Global refresh hint (e.g. network-mode "Änderungen" refresh)
+    useEffect(() => {
+        const onChanged = () => { void loadRecent() }
+        try { window.addEventListener('data-changed', onChanged) } catch {}
+        return () => { try { window.removeEventListener('data-changed', onChanged) } catch {} }
+    }, [loadRecent])
+
     // Hydrate column prefs from server
     useEffect(() => {
         if (!allowData) return

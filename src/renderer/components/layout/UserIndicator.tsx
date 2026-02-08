@@ -20,6 +20,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export function UserIndicator() {
   const { user, isLoading, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  const [hasRemoteChanges, setHasRemoteChanges] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -37,6 +38,24 @@ export function UserIndicator() {
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
   }, [open])
+
+  useEffect(() => {
+    const onRemote = (e: Event) => {
+      const ce = e as CustomEvent
+      const next = !!(ce as any)?.detail?.hasRemoteChanges
+      setHasRemoteChanges(next)
+    }
+    const onChanged = () => {
+      // Optimistic: if we refreshed, clear the glow.
+      setHasRemoteChanges(false)
+    }
+    try { window.addEventListener('remote-changes', onRemote as any) } catch {}
+    try { window.addEventListener('data-changed', onChanged) } catch {}
+    return () => {
+      try { window.removeEventListener('remote-changes', onRemote as any) } catch {}
+      try { window.removeEventListener('data-changed', onChanged) } catch {}
+    }
+  }, [])
 
   if (isLoading || !user) {
     return null
@@ -63,6 +82,8 @@ export function UserIndicator() {
       {/* User Avatar/Badge */}
       <button
         type="button"
+        className="user-indicator__avatar"
+        data-has-changes={hasRemoteChanges ? 'true' : 'false'}
         style={{
           width: 28,
           height: 28,
@@ -78,9 +99,15 @@ export function UserIndicator() {
           border: 'none',
           padding: 0
         }}
-        title={`${user.name} (${ROLE_LABELS[user.role]})`}
+        title={`${user.name} (${ROLE_LABELS[user.role]})${hasRemoteChanges ? ' · Änderungen verfügbar' : ''}`}
         aria-label="Benutzermenü"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => {
+          if (hasRemoteChanges) {
+            try { window.dispatchEvent(new Event('data-changed')) } catch {}
+            setHasRemoteChanges(false)
+          }
+          setOpen(v => !v)
+        }}
       >
         {initials}
       </button>

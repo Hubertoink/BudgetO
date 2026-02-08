@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
+import { app, BrowserWindow, shell, Menu, session, dialog, Tray, nativeImage, ipcMain } from 'electron'
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
@@ -6,12 +6,16 @@ import { applyMigrations } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getServerStatus } from './services/apiServer'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 const enableDevTools = isDev || process.env.BUDGETO_DEVTOOLS === '1'
+
+let tray: Tray | null = null
+let allowQuit = false
 
 function getWindowsIconPath(): string {
     // Keep in sync with electron-builder.yml and ensure the file is packaged via `files: - assets/**`
@@ -21,6 +25,41 @@ function getWindowsIconPath(): string {
         return path.join(process.resourcesPath, 'app.asar', 'assets', icoName)
     }
     return path.join(process.cwd(), 'assets', icoName)
+}
+
+function ensureTray(win: BrowserWindow): Tray {
+    if (tray) return tray
+    const icon = nativeImage.createFromPath(getWindowsIconPath())
+    tray = new Tray(icon)
+    tray.setToolTip('BudgetO')
+
+    const showWindow = () => {
+        try { win.setSkipTaskbar(false) } catch {}
+        win.show()
+        win.focus()
+    }
+
+    const quitApp = () => {
+        allowQuit = true
+        app.quit()
+    }
+
+    const menu = Menu.buildFromTemplate([
+        { label: 'BudgetO öffnen', click: showWindow },
+        { type: 'separator' },
+        { label: 'Beenden', click: quitApp }
+    ])
+    tray.setContextMenu(menu)
+
+    tray.on('click', showWindow)
+    tray.on('double-click', showWindow)
+    return tray
+}
+
+function hideToTray(win: BrowserWindow) {
+    ensureTray(win)
+    try { win.setSkipTaskbar(true) } catch {}
+    win.hide()
 }
 
 async function createWindow(): Promise<BrowserWindow> {
@@ -178,6 +217,49 @@ app.whenReady().then(async () => {
     }
     
     const win = await createWindow()
+
+    // Allow normal quit behavior when the app is explicitly quitting.
+    app.on('before-quit', () => {
+        allowQuit = true
+    })
+
+    // When server is running, intercept close and ask renderer to confirm.
+    win.on('close', (e) => {
+        if (allowQuit) return
+        try {
+            const st = getServerStatus()
+            if (st?.running) {
+                e.preventDefault()
+                try {
+                    win.webContents.send('app.closeRequest', {
+                        running: true,
+                        port: st.port,
+                        connectedClients: st.connectedClients
+                    })
+                } catch {
+                    // If renderer cannot be reached, fall back to not closing.
+                }
+            }
+        } catch {
+            // ignore
+        }
+    })
+
+    // Renderer confirms close behavior.
+    try { ipcMain.removeHandler('app.closeAction') } catch {}
+    ipcMain.handle('app.closeAction', async (_e, payload: { action: 'quit' | 'tray' | 'cancel' }) => {
+        const action = payload?.action
+        if (action === 'quit') {
+            allowQuit = true
+            app.quit()
+            return { ok: true }
+        }
+        if (action === 'tray') {
+            hideToTray(win)
+            return { ok: true }
+        }
+        return { ok: true }
+    })
 
     // After window finished load, inform renderer if DB init failed
     if (dbInitError && win) {

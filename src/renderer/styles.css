@@ -443,6 +443,30 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    flex: 1 1 auto;
+}
+
+.network-status__refresh {
+    margin-left: 2px;
+    margin-right: 2px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    opacity: 0.85;
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+.network-status__refresh:hover {
+    background: color-mix(in oklab, var(--muted) 25%, transparent);
+    border-color: var(--border);
+}
+
+/* Header: User indicator pending-changes glow */
+.user-indicator__avatar[data-has-changes="true"] {
+    box-shadow:
+        0 0 0 2px color-mix(in oklab, var(--accent) 40%, transparent),
+        0 0 12px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 
 /* Settings: Network pane */

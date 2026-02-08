@@ -27,12 +27,33 @@ export function NetworkStatus() {
   const lastSeenSeqRef = useRef<number>(0)
   const lastSeqRef = useRef<number>(0)
 
+  const applyRefreshHint = useCallback(() => {
+    lastSeenSeqRef.current = lastSeqRef.current
+    setHasRemoteChanges(false)
+    try { window.dispatchEvent(new Event('data-changed')) } catch {}
+  }, [])
+
   useEffect(() => {
     loadStatus()
     // Poll status every 5 seconds
     const interval = setInterval(loadStatus, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const onChanged = () => {
+      // If the UI already refreshed its data, clear the hint.
+      lastSeenSeqRef.current = lastSeqRef.current
+      setHasRemoteChanges(false)
+    }
+    try { window.addEventListener('data-changed', onChanged) } catch {}
+    return () => { try { window.removeEventListener('data-changed', onChanged) } catch {} }
+  }, [])
+
+  useEffect(() => {
+    // Allow other components (e.g. user avatar) to indicate pending updates.
+    try { window.dispatchEvent(new CustomEvent('remote-changes', { detail: { hasRemoteChanges } })) } catch {}
+  }, [hasRemoteChanges])
 
   const loadStatus = async () => {
     try {
@@ -42,7 +63,24 @@ export function NetworkStatus() {
         const st = await window.api.server.getStatus()
         setStatus(st)
         setClientOk(null)
-        setHasRemoteChanges(false)
+
+        // Detect changes caused by connected clients.
+        if (st?.running) {
+          try {
+            const r = await (window as any).api?.meta?.getChangeSeq?.()
+            const seq = typeof r?.seq === 'number' ? r.seq : 0
+            lastSeqRef.current = seq
+            if (lastSeenSeqRef.current === 0) {
+              lastSeenSeqRef.current = seq
+            }
+            setHasRemoteChanges(seq > lastSeenSeqRef.current)
+          } catch {
+            // ignore
+            setHasRemoteChanges(false)
+          }
+        } else {
+          setHasRemoteChanges(false)
+        }
       } else {
         setStatus(null)
         if (cfg.mode === 'client') {
@@ -102,9 +140,10 @@ export function NetworkStatus() {
     }
     if (config.mode === 'server') {
       const running = !!status?.running
-      const detail = running
+      const detailBase = running
         ? `Port ${status?.port}${typeof status?.connectedClients === 'number' ? ` · Clients: ${status.connectedClients}` : ''}`
         : 'Gestoppt'
+      const detail = hasRemoteChanges ? `${detailBase} · Änderungen` : detailBase
       return {
         label: 'Server',
         detail,
@@ -136,9 +175,7 @@ export function NetworkStatus() {
 
     // Client: refresh hint
     if (config.mode === 'client' && hasRemoteChanges) {
-      lastSeenSeqRef.current = lastSeqRef.current
-      setHasRemoteChanges(false)
-      try { window.dispatchEvent(new Event('data-changed')) } catch {}
+      applyRefreshHint()
       return
     }
 
@@ -162,6 +199,7 @@ export function NetworkStatus() {
   if (!config || !display) return null
 
   const title = `Netzwerkmodus: ${display.label} – ${display.detail}${display.titleExtra ? ` (${display.titleExtra})` : ''}`
+  const refreshTitle = 'Änderungen verfügbar – klicken zum Aktualisieren'
 
   return (
     <div
@@ -186,6 +224,30 @@ export function NetworkStatus() {
       }}
     >
       <span className="network-status__dot" aria-hidden="true" />
+
+      {hasRemoteChanges ? (
+        <span
+          className="network-status__refresh"
+          role="button"
+          tabIndex={0}
+          title={refreshTitle}
+          aria-label={refreshTitle}
+          onClick={(e) => {
+            e.stopPropagation()
+            applyRefreshHint()
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              applyRefreshHint()
+            }
+          }}
+        >
+          ⟳
+        </span>
+      ) : null}
+
       <span className="network-status__label">{display.label}</span>
       <span className="network-status__sep" aria-hidden="true">·</span>
       <span className="network-status__detail">{display.detail}</span>
