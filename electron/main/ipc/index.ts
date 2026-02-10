@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsByCategoryInput, ReportsByCategoryOutput, ReportsBalanceAtInput, ReportsBalanceAtOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, YearEndPreCloseCheckInput, YearEndPreCloseCheckOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, MembersImportPreviewInput, MembersImportPreviewOutput, MembersImportExecuteInput, MembersImportExecuteOutput, MembersImportTemplateInput, MembersImportTemplateOutput, MembersImportTestDataInput, MembersImportTestDataOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsByCategoryInput, ReportsByCategoryOutput, ReportsBalanceAtInput, ReportsBalanceAtOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, YearEndPreCloseCheckInput, YearEndPreCloseCheckOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, MembersImportPreviewInput, MembersImportPreviewOutput, MembersImportExecuteInput, MembersImportExecuteOutput, MembersImportTemplateInput, MembersImportTemplateOutput, MembersImportTestDataInput, MembersImportTestDataOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsInput, CashChecksGetInspectorDefaultsOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, resetCurrentOrganizationData, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks, getUsedCategoryIds } from '../repositories/vouchers'
@@ -262,6 +262,94 @@ export function registerIpcHandlers() {
 
         const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any })
         return ReportsCashBalanceOutput.parse(res)
+    })
+
+    // Cash checks (Kassenprüfung)
+    ipcMain.handle('cashChecks.list', async (_e, payload) => {
+        const parsed = CashChecksListInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashChecksListOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.list', parsed))
+        }
+
+        const { listCashChecks } = await import('../repositories/cashChecks')
+        return CashChecksListOutput.parse(listCashChecks(parsed))
+    })
+
+    ipcMain.handle('cashChecks.create', async (_e, payload) => {
+        const parsed = CashChecksCreateInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashChecksCreateOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.create', parsed))
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
+        const { createCashCheck } = await import('../repositories/cashChecks')
+        const res = createCashCheck(parsed)
+        bumpChangeSeq()
+        return CashChecksCreateOutput.parse(res)
+    })
+
+    ipcMain.handle('cashChecks.setInspectors', async (_e, payload) => {
+        const parsed = CashChecksSetInspectorsInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashChecksSetInspectorsOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.setInspectors', parsed))
+        }
+
+        try {
+            const { getUserBySessionToken } = await import('../repositories/users')
+            const token = getClientAuthToken()
+            const u = token ? getUserBySessionToken(token) : null
+            if (u?.role === 'READONLY') throw new Error('Forbidden')
+        } catch (e: any) {
+            if (String(e?.message || e || '').toLowerCase().includes('forbidden')) throw e
+        }
+
+        const { setCashCheckInspectors } = await import('../repositories/cashChecks')
+        const res = setCashCheckInspectors(parsed)
+        bumpChangeSeq()
+        return CashChecksSetInspectorsOutput.parse(res)
+    })
+
+    ipcMain.handle('cashChecks.exportPdf', async (_e, payload) => {
+        const parsed = CashChecksExportPdfInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashChecksExportPdfOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.exportPdf', parsed))
+        }
+
+        const { generateCashCheckPDF } = await import('../services/cashCheckReport')
+        return CashChecksExportPdfOutput.parse(await generateCashCheckPDF({ cashCheckId: parsed.id }))
+    })
+
+    ipcMain.handle('cashChecks.getInspectorDefaults', async (_e, payload) => {
+        const _parsed = CashChecksGetInspectorDefaultsInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return CashChecksGetInspectorDefaultsOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.getInspectorDefaults', {}))
+        }
+
+        const { getCashCheckInspectorDefaults } = await import('../repositories/cashChecks')
+        return CashChecksGetInspectorDefaultsOutput.parse(getCashCheckInspectorDefaults())
     })
 
     // Distinct voucher years

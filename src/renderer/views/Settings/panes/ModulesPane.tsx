@@ -173,6 +173,7 @@ function getModuleEmoji(key: string): string {
     'budgets': '📊',
     'instructors': '👨‍🏫',
     'cash-advance': '💵',
+    'cash-check': '🔎',
     'excel-import': '📥',
     'members': '👥',
     'earmarks': '🏷️',

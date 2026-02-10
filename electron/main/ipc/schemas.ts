@@ -153,6 +153,57 @@ export type TYearEndReopenOutput = z.infer<typeof YearEndReopenOutput>
 export const YearEndStatusOutput = z.object({ closedUntil: z.string().nullable() })
 export type TYearEndStatusOutput = z.infer<typeof YearEndStatusOutput>
 
+// Cash checks (Kassenprüfung)
+export const CashChecksListInput = z.object({ year: z.number() })
+export const CashChecksListOutput = z.object({
+    rows: z.array(
+        z.object({
+            id: z.number(),
+            year: z.number(),
+            date: z.string(),
+            soll: z.number(),
+            ist: z.number(),
+            diff: z.number(),
+            voucherId: z.number().nullable(),
+            voucherNo: z.string().nullable(),
+            budgetId: z.number().nullable(),
+            budgetLabel: z.string().nullable(),
+            note: z.string().nullable(),
+            inspector1Name: z.string().nullable(),
+            inspector2Name: z.string().nullable(),
+            createdAt: z.string()
+        })
+    )
+})
+
+export const CashChecksCreateInput = z.object({
+    year: z.number(),
+    date: z.string(),
+    soll: z.number(),
+    ist: z.number(),
+    diff: z.number(),
+    voucherId: z.number().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    note: z.string().nullable().optional()
+})
+export const CashChecksCreateOutput = z.object({ id: z.number() })
+
+export const CashChecksSetInspectorsInput = z.object({
+    id: z.number(),
+    inspector1Name: z.string().nullable().optional(),
+    inspector2Name: z.string().nullable().optional()
+})
+export const CashChecksSetInspectorsOutput = z.object({ id: z.number() })
+
+export const CashChecksExportPdfInput = z.object({ id: z.number() })
+export const CashChecksExportPdfOutput = z.object({ filePath: z.string() })
+
+export const CashChecksGetInspectorDefaultsInput = z.object({}).optional()
+export const CashChecksGetInspectorDefaultsOutput = z.object({
+    inspector1Name: z.string().nullable(),
+    inspector2Name: z.string().nullable()
+})
+
 export const YearEndPreCloseCheckInput = z.object({ year: z.number() })
 export const YearEndPreCloseCheckOutput = z.object({
     year: z.number(),

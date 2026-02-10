@@ -625,6 +625,32 @@ function registerHandlers() {
     return { enabledModules: getEnabledModules() }
   })
 
+  // Cash checks (Kassenprüfung)
+  apiHandlers.set('cashChecks.list', async (body) => {
+    const { listCashChecks } = await import('../repositories/cashChecks')
+    return listCashChecks(body)
+  })
+
+  apiHandlers.set('cashChecks.create', async (body) => {
+    const { createCashCheck } = await import('../repositories/cashChecks')
+    return createCashCheck(body)
+  })
+
+  apiHandlers.set('cashChecks.setInspectors', async (body) => {
+    const { setCashCheckInspectors } = await import('../repositories/cashChecks')
+    return setCashCheckInspectors(body)
+  })
+
+  apiHandlers.set('cashChecks.exportPdf', async (body) => {
+    const { generateCashCheckPDF } = await import('./cashCheckReport')
+    return generateCashCheckPDF({ cashCheckId: body.id })
+  })
+
+  apiHandlers.set('cashChecks.getInspectorDefaults', async () => {
+    const { getCashCheckInspectorDefaults } = await import('../repositories/cashChecks')
+    return getCashCheckInspectorDefaults()
+  })
+
   // Attachments (Voucher files)
   apiHandlers.set('attachments.list', async (body) => {
     const { listFilesForVoucher } = await import('../repositories/vouchers')

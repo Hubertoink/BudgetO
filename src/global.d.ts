@@ -101,17 +101,54 @@ declare global {
             }
             budgets: {
                 upsert: (payload: { id?: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number | null; projectId?: number | null; earmarkId?: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: boolean; isArchived?: boolean }) => Promise<{ id: number }>
-                list: (payload?: { year?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; includeArchived?: boolean; archivedOnly?: boolean }) => Promise<{ rows: Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; isArchived?: number }> }>
-                delete: (payload: { id: number }) => Promise<{ id: number }>
-                usage: (payload: { budgetId: number; from?: string; to?: string }) => Promise<{ spent: number; inflow: number; count: number; lastDate: string | null }>
-            }
-            invoices: {
-                create: (payload: { date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: boolean; voucherType: 'IN' | 'OUT'; files?: { name: string; dataBase64: string; mime?: string }[]; tags?: string[] }) => Promise<{ id: number }>
-                update: (payload: { id: number; date?: string; dueDate?: string | null; invoiceNo?: string | null; party?: string; description?: string | null; grossAmount?: number; paymentMethod?: string | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: boolean; voucherType?: 'IN' | 'OUT'; tags?: string[] }) => Promise<{ id: number }>
-                delete: (payload: { id: number }) => Promise<{ id: number }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'due' | 'amount' | 'status'; status?: 'OPEN' | 'PARTIAL' | 'PAID' | 'ALL'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number; q?: string; dueFrom?: string; dueTo?: string; tag?: string }) => Promise<{ rows: Array<{ id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID'; fileCount?: number; tags?: string[] }>; total: number }>
-                summary: (payload?: { status?: 'OPEN' | 'PARTIAL' | 'PAID' | 'ALL'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number; q?: string; dueFrom?: string; dueTo?: string; tag?: string }) => Promise<{ count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number }>
-                get: (payload: { id: number }) => Promise<{ id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; payments: Array<{ id: number; date: string; amount: number }>; files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>; tags: string[]; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID' }>
+                        cashChecks: {
+                            list: (input: { year: number }) => Promise<{
+                                items: Array<{
+                                    id: number
+                                    year: number
+                                    date: string
+                                    soll: number
+                                    ist: number
+                                    diff: number
+                                    voucherId: number
+                                    voucherNo?: string
+                                    budgetId?: number
+                                    budgetLabel?: string
+                                        list: (input: { year: number }) => Promise<{
+                                            rows: Array<{
+                                                id: number
+                                                year: number
+                                                date: string
+                                                soll: number
+                                                ist: number
+                                                diff: number
+                                                voucherId: number | null
+                                                voucherNo: string | null
+                                                budgetId: number | null
+                                                budgetLabel: string | null
+                                                note: string | null
+                                                inspector1Name: string | null
+                                                inspector2Name: string | null
+                                                createdAt: string
+                                            }>
+                                        }>
+                                        create: (input: {
+                                            year: number
+                                            date: string
+                                            soll: number
+                                            ist: number
+                                            diff: number
+                                            voucherId?: number | null
+                                            budgetId?: number | null
+                                            note?: string | null
+                                        }) => Promise<{ id: number }>
+                                        setInspectors: (input: {
+                                            id: number
+                                            inspector1Name?: string | null
+                                            inspector2Name?: string | null
+                                        }) => Promise<{ id: number }>
+                                        exportPdf: (input: { id: number }) => Promise<{ filePath: string }>
+                                        getInspectorDefaults: () => Promise<{ inspector1Name: string | null; inspector2Name: string | null }>
                 addPayment: (payload: { invoiceId: number; date: string; amount: number }) => Promise<{ id: number; status: 'OPEN' | 'PARTIAL' | 'PAID'; paidSum: number; voucherId?: number | null }>
                 markPaid: (payload: { id: number }) => Promise<{ id: number; status: 'OPEN' | 'PARTIAL' | 'PAID'; paidSum?: number; voucherId?: number | null }>
             }

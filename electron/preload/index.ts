@@ -230,6 +230,14 @@ contextBridge.exposeInMainWorld('api', {
         setConfig: (payload: { moduleKey: string; configJson: string | null }) => ipcRenderer.invoke('modules.setConfig', payload),
         getEnabled: () => ipcRenderer.invoke('modules.getEnabled')
     },
+    // Cash checks (Kassenprüfung)
+    cashChecks: {
+        list: (payload: { year: number }) => ipcRenderer.invoke('cashChecks.list', payload),
+        create: (payload: any) => ipcRenderer.invoke('cashChecks.create', payload),
+        setInspectors: (payload: any) => ipcRenderer.invoke('cashChecks.setInspectors', payload),
+        exportPdf: (payload: { id: number }) => ipcRenderer.invoke('cashChecks.exportPdf', payload),
+        getInspectorDefaults: () => ipcRenderer.invoke('cashChecks.getInspectorDefaults')
+    },
     // BudgetO Phase 2: Authentication & Users
     auth: {
         login: (payload: { username: string; password: string }) => ipcRenderer.invoke('auth.login', payload),

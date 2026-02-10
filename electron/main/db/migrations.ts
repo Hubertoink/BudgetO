@@ -999,6 +999,41 @@ export const MIGRATIONS: Mig[] = [
       `)
     }
   }
+  ,
+  {
+    version: 38,
+    up(db: DB) {
+      // Cash checks (Kassenprüfung)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cash_checks (
+          id INTEGER PRIMARY KEY,
+          year INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          soll REAL NOT NULL,
+          ist REAL NOT NULL,
+          diff REAL NOT NULL,
+          voucher_id INTEGER,
+          budget_id INTEGER,
+          note TEXT,
+          inspector1_member_id INTEGER,
+          inspector1_name TEXT,
+          inspector2_member_id INTEGER,
+          inspector2_name TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+          FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+          FOREIGN KEY(inspector1_member_id) REFERENCES members(id) ON DELETE SET NULL,
+          FOREIGN KEY(inspector2_member_id) REFERENCES members(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cash_checks_year_date ON cash_checks(year, date);
+        CREATE INDEX IF NOT EXISTS idx_cash_checks_voucher ON cash_checks(voucher_id);
+
+        -- Ensure module_config row exists for the module toggle
+        INSERT OR IGNORE INTO module_config (module_key, enabled, display_order) VALUES
+          ('cash-check', 0, 8);
+      `)
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

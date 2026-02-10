@@ -2,6 +2,7 @@ export type ModuleKey =
   | 'budgets'
   | 'instructors'
   | 'cash-advance'
+  | 'cash-check'
   | 'excel-import'
   | 'members'
   | 'earmarks'

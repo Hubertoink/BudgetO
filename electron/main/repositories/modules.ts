@@ -9,6 +9,7 @@ export type ModuleKey =
   | 'budgets' 
   | 'instructors' 
   | 'cash-advance' 
+  | 'cash-check'
   | 'excel-import' 
   | 'members' 
   | 'earmarks' 
@@ -55,6 +56,13 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: 'Barvorschuss-Verwaltung mit Anordnungsnummern und Teil-Vorschüssen',
     icon: 'banknotes',
     navKey: 'Barvorschüsse'
+  },
+  {
+    key: 'cash-check',
+    name: 'Kassenprüfung',
+    description: 'Kassenprüfung erfassen (Soll/Ist), Ausgleichsbuchung erstellen und PDF-Bericht exportieren',
+    icon: 'clipboard-document-check',
+    navKey: undefined
   },
   {
     key: 'excel-import',

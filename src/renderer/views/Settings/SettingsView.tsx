@@ -9,6 +9,7 @@ import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
 import { CategoriesPane } from './panes/CategoriesPane'
 import { ModulesPane } from './panes/ModulesPane'
+import { CashCheckPane } from './panes/CashCheckPane'
 import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
@@ -26,6 +27,7 @@ export function SettingsView(props: SettingsProps) {
   const { isReadonly } = useAuth()
   const { isModuleEnabled, loading: modulesLoading } = useModules()
   const importEnabled = isModuleEnabled('excel-import')
+  const cashCheckEnabled = isModuleEnabled('cash-check')
   const [activeTile, setActiveTile] = useState<TileKey>(() => {
     try {
       const saved = sessionStorage.getItem('settingsActiveTile')
@@ -42,6 +44,7 @@ export function SettingsView(props: SettingsProps) {
       { key: 'general', icon: '🖼️', label: 'Darstellung' },
       { key: 'table', icon: '📋', label: 'Tabelle' },
       { key: 'modules', icon: '🧩', label: 'Module' },
+      { key: 'cashCheck', icon: '🔎', label: 'Kassenprüfung' },
       { key: 'users', icon: '👥', label: 'Benutzer' },
       { key: 'server', icon: '🌐', label: 'Netzwerk' },
       { key: 'storage', icon: '💾', label: 'Speicher & Backup' },
@@ -51,11 +54,15 @@ export function SettingsView(props: SettingsProps) {
       { key: 'categories', icon: '📁', label: 'Kategorien' },
       { key: 'yearEnd', icon: '📊', label: 'Jahresabschluss' },
     ]
-    const withModuleGates = modulesLoading ? all : all.filter(t => t.key !== 'import' || importEnabled)
+    const withModuleGates = modulesLoading
+      ? all
+      : all
+          .filter((t) => t.key !== 'import' || importEnabled)
+          .filter((t) => t.key !== 'cashCheck' || cashCheckEnabled)
     if (!isReadonly) return withModuleGates
-    const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import', 'yearEnd'])
+    const hidden = new Set<TileKey>(['users', 'server', 'storage', 'import', 'yearEnd', 'cashCheck'])
     return withModuleGates.filter(t => !hidden.has(t.key))
-  }, [importEnabled, isReadonly, modulesLoading])
+  }, [cashCheckEnabled, importEnabled, isReadonly, modulesLoading])
 
   useEffect(() => {
     if (modulesLoading) return
@@ -176,6 +183,10 @@ export function SettingsView(props: SettingsProps) {
 
         {activeTile === 'modules' && (
           <ModulesPane notify={props.notify} />
+        )}
+
+        {activeTile === 'cashCheck' && (
+          <CashCheckPane notify={props.notify} bumpDataVersion={props.bumpDataVersion} />
         )}
 
         {activeTile === 'users' && (
