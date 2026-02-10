@@ -174,7 +174,22 @@ export function GeneralPane({
   openSetupWizard,
   glassModals,
   setGlassModals,
+  modalBackdropBlur,
+  setModalBackdropBlur,
 }: GeneralPaneProps) {
+  const themeOptions: ReadonlyArray<{ value: typeof colorTheme; label: string }> = [
+    { value: 'default', label: 'Standard' },
+    { value: 'fiery-ocean', label: 'Fiery Ocean' },
+    { value: 'peachy-delight', label: 'Peachy Delight' },
+    { value: 'pastel-dreamland', label: 'Pastel Dreamland' },
+    { value: 'ocean-breeze', label: 'Earthy Palette' },
+    { value: 'earthy-tones', label: 'Earthy Tones' },
+    { value: 'monochrome-harmony', label: 'Monochrome Harmony' },
+    { value: 'vintage-charm', label: 'Vintage Charm' },
+    { value: 'soft-blush', label: 'Soft Blush' },
+    { value: 'professional-light', label: 'Professional' },
+  ]
+
   // Date format examples
   const sample = '2025-01-15'
   const pretty = '15. Jan 2025'
@@ -372,32 +387,52 @@ export function GeneralPane({
         {/* Theme and Glass effect */}
         <div className="settings-row-2col" style={{ marginTop: 12 }}>
           <div className="field">
-            <label htmlFor="select-color-theme">Farb-Theme</label>
-            <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
-              <option value="default">Standard ◐</option>
-              <option value="fiery-ocean">Fiery Ocean ●</option>
-              <option value="peachy-delight">Peachy Delight ●</option>
-              <option value="pastel-dreamland">Pastel Dreamland ●</option>
-              <option value="ocean-breeze">Earthy Palette ●</option>
-              <option value="earthy-tones">Earthy Tones ●</option>
-              <option value="monochrome-harmony">Monochrome Harmony ●</option>
-              <option value="vintage-charm">Vintage Charm ●</option>
-              <option value="soft-blush">Soft Blush ○</option>
-              <option value="professional-light">Professional Light ○</option>
-            </select>
-            <div className="helper">● = Dark | ○ = Light</div>
+            <label>Farb-Theme</label>
+            <div className="theme-picker" role="radiogroup" aria-label="Farb-Theme">
+              {themeOptions.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={colorTheme === t.value}
+                  className={`theme-chip ${colorTheme === t.value ? 'active' : ''}`}
+                  onClick={() => setColorTheme(t.value)}
+                  data-theme={t.value}
+                >
+                  <span className="theme-swatch" data-theme={t.value} aria-hidden="true" />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="settings-inline-toggle" style={{ alignSelf: 'flex-start', marginTop: 24 }}>
-            <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
-            <input
-              id="toggle-glass-modals"
-              role="switch"
-              aria-checked={glassModals}
-              className="toggle"
-              type="checkbox"
-              checked={glassModals}
-              onChange={(e) => setGlassModals(e.target.checked)}
-            />
+          <div style={{ display: 'grid', gap: 8, alignContent: 'start', marginTop: 24 }}>
+            <div className="settings-inline-toggle" style={{ padding: 0 }}>
+              <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
+              <input
+                id="toggle-glass-modals"
+                role="switch"
+                aria-checked={glassModals}
+                className="toggle"
+                type="checkbox"
+                checked={glassModals}
+                onChange={(e) => setGlassModals(e.target.checked)}
+              />
+            </div>
+            <div className="settings-inline-toggle" style={{ padding: 0 }}>
+              <label htmlFor="toggle-modal-backdrop-blur">Modal-Hintergrund blur</label>
+              <input
+                id="toggle-modal-backdrop-blur"
+                role="switch"
+                aria-checked={modalBackdropBlur}
+                className="toggle"
+                type="checkbox"
+                checked={modalBackdropBlur}
+                onChange={(e) => setModalBackdropBlur(e.target.checked)}
+              />
+            </div>
+            <div className="helper" style={{ marginTop: -2 }}>
+              Weichzeichnet den Hintergrund hinter Modalen (z.B. Buchung anlegen, PDF Export).
+            </div>
           </div>
         </div>
 

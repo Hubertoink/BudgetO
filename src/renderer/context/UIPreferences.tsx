@@ -15,7 +15,7 @@ const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'mountain-clouds', 'snowy-
 
 // Glassmorphism: transparent modals with blur
 
-const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 'pastel-dreamland', 'ocean-breeze', 'earthy-tones', 'monochrome-harmony', 'vintage-charm']
+const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 'pastel-dreamland', 'ocean-breeze', 'earthy-tones', 'monochrome-harmony', 'vintage-charm', 'soft-blush', 'professional-light']
 
 function isValidTheme(theme: string | null | undefined): theme is ColorTheme {
   return !!theme && VALID_THEMES.includes(theme as ColorTheme)
@@ -61,6 +61,13 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   })
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
+  const [modalBackdropBlur, setModalBackdropBlurState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ui.modalBackdropBlur') === 'true'
+    } catch {
+      return false
+    }
+  })
   
   // Track current org ID for appearance persistence
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null)
@@ -128,6 +135,13 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         const storedGlass = localStorage.getItem('ui.glassModals')
         setGlassModalsState(storedGlass === 'true')
         document.documentElement.setAttribute('data-glass-modals', storedGlass === 'true' ? 'true' : 'false')
+
+        const storedBackdropBlur = localStorage.getItem('ui.modalBackdropBlur')
+        setModalBackdropBlurState(storedBackdropBlur === 'true')
+        document.documentElement.setAttribute(
+          'data-modal-backdrop-blur',
+          storedBackdropBlur === 'true' ? 'true' : 'false'
+        )
         appearanceInitializedRef.current = true
       } catch (e) {
         console.warn('Failed to load org appearance:', e)
@@ -136,6 +150,16 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         if (isValidTheme(storedTheme)) {
           setColorThemeState(storedTheme)
           document.documentElement.setAttribute('data-color-theme', storedTheme)
+        }
+        try {
+          const storedBackdropBlur = localStorage.getItem('ui.modalBackdropBlur')
+          setModalBackdropBlurState(storedBackdropBlur === 'true')
+          document.documentElement.setAttribute(
+            'data-modal-backdrop-blur',
+            storedBackdropBlur === 'true' ? 'true' : 'false'
+          )
+        } catch {
+          // ignore
         }
         appearanceInitializedRef.current = true
       }
@@ -216,6 +240,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     saveAppearanceToOrg({ glassModals: val })
   }
 
+  const setModalBackdropBlur = (val: boolean) => {
+    setModalBackdropBlurState(val)
+  }
+
   const [navIconColorMode, setNavIconColorMode] = useState<NavIconColorMode>(() => {
     const stored = localStorage.getItem('navIconColorMode')
     return stored === 'mono' ? 'mono' : 'color'
@@ -284,6 +312,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     document.documentElement.setAttribute('data-glass-modals', String(glassModals))
   }, [glassModals])
 
+  useEffect(() => {
+    localStorage.setItem('ui.modalBackdropBlur', String(modalBackdropBlur))
+    document.documentElement.setAttribute('data-modal-backdrop-blur', String(modalBackdropBlur))
+  }, [modalBackdropBlur])
+
   return (
     <UIPreferencesContext.Provider
       value={{
@@ -306,7 +339,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         customBackgroundImage,
         setCustomBackgroundImage,
         glassModals,
-        setGlassModals
+        setGlassModals,
+        modalBackdropBlur,
+        setModalBackdropBlur
       }}
     >
       {children}

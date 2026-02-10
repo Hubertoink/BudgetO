@@ -431,9 +431,17 @@ export default function JournalView({
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void; color?: string | null }> = []
         if (activeFrom || activeTo) {
+            const rangeLabel = (() => {
+                if (activeFrom && activeTo) {
+                    const fy = activeFrom.slice(0, 4)
+                    const ty = activeTo.slice(0, 4)
+                    if (activeFrom === `${fy}-01-01` && activeTo === `${fy}-12-31` && fy === ty) return fy
+                }
+                return `${activeFrom || '…'} – ${activeTo || '…'}`
+            })()
             list.push({
                 key: 'range',
-                label: `${activeFrom || '…'} – ${activeTo || '…'}`,
+                label: rangeLabel,
                 clear: () => {
                     if (clearTimeFilter) {
                         clearTimeFilter()

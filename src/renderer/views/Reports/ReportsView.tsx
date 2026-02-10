@@ -5,6 +5,7 @@ import ReportsSummary from '../../components/reports/ReportsSummary'
 import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsCategoryDonut from '../../components/reports/ReportsCategoryDonut'
 import ReportsPaymentMethodBars from '../../components/reports/ReportsPaymentMethodBars'
+import { ReportsFilterDropdown } from '../../components/dropdowns'
 
 export default function ReportsView(props: {
   from: string
@@ -24,7 +25,32 @@ export default function ReportsView(props: {
 }) {
   const { from, to, setFrom, setTo, yearsAvail, filterType, setFilterType, filterPM, setFilterPM, onOpenExport, refreshKey, activateKey } = props
 
-  const hasActiveFilters = filterType || filterPM || from || to
+  const rangeChipLabel = useMemo(() => {
+    if (!from && !to) return null
+    if (from && to) {
+      const fy = from.slice(0, 4)
+      const ty = to.slice(0, 4)
+      if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) return fy
+    }
+    return `${from || '…'} – ${to || '…'}`
+  }, [from, to])
+
+  const chips = useMemo(() => {
+    const list: Array<{ key: string; label: string; clear: () => void }> = []
+    if (rangeChipLabel) {
+      list.push({
+        key: 'range',
+        label: rangeChipLabel,
+        clear: () => {
+          setFrom('')
+          setTo('')
+        }
+      })
+    }
+    if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
+    if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
+    return list
+  }, [rangeChipLabel, filterType, filterPM, setFrom, setTo, setFilterType, setFilterPM])
 
   // Derive selected year from date filters (only when full year is selected)
   const selectedYear = useMemo(() => {
@@ -39,45 +65,89 @@ export default function ReportsView(props: {
 
   return (
     <>
-      <div className="card" style={{ padding: 12 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--text-dim)' }}>Zeitraum:</span>
-          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 140 }} />
-          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 140 }} />
-          <span style={{ color: 'var(--text-dim)' }}>Jahr:</span>
-          <select className="input" value={selectedYear?.toString() ?? ''} onChange={(e) => {
-            const y = e.target.value
-            if (!y) return
-            const yr = Number(y)
-            const f = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-            const t = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-            setFrom(f); setTo(t)
-          }} style={{ width: 100 }}>
-            <option value="">—</option>
-            {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-          <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as VoucherType | any) || null)} style={{ width: 120 }}>
-            <option value="">Alle</option>
-            <option value="IN">IN</option>
-            <option value="OUT">OUT</option>
-            <option value="TRANSFER">TRANSFER</option>
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-          <select className="input" value={filterPM ?? ''} onChange={(e) => { const v = e.target.value as PaymentMethod | any; props.setFilterPM(v || null) }} style={{ width: 100 }}>
-            <option value="">Alle</option>
-            <option value="BAR">Bar</option>
-            <option value="BANK">Bank</option>
-          </select>
-          {hasActiveFilters && (
-            <button className="btn danger" title="Filter zurücksetzen" onClick={() => { setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }} style={{ width: 32, height: 32, padding: 0, display: 'grid', placeContent: 'center' }}>
-              ✕
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
+        {chips.map((c) => (
+          <span key={c.key} className="chip">
+            {c.label}
+            <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>
+              ×
             </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <button className="btn" title="Exportieren" onClick={() => onOpenExport()} style={{ width: 32, height: 32, padding: 0, display: 'grid', placeContent: 'center', background: '#c62828', color: '#fff' }}>
-            📄
+          </span>
+        ))}
+
+        {(filterType || filterPM || from || to) && (
+          <div className="journal-toolbar__group">
+            <button
+              className="btn ghost filter-dropdown__trigger has-tooltip"
+              data-tooltip="Alle Filter zurücksetzen"
+              aria-label="Alle Filter zurücksetzen"
+              title="Alle Filter zurücksetzen"
+              onClick={() => {
+                setFilterType(null)
+                setFilterPM(null)
+                setFrom('')
+                setTo('')
+              }}
+              style={{ color: 'var(--accent)' }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        <div className="journal-toolbar__group">
+          <button
+            className="btn ghost filter-dropdown__trigger has-tooltip tooltip-left"
+            data-tooltip="PDF Export"
+            aria-label="PDF Export"
+            title="PDF Export"
+            onClick={() => onOpenExport()}
+            style={{ color: 'var(--danger-strong)' }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+            </svg>
           </button>
+
+          <ReportsFilterDropdown
+            yearsAvail={yearsAvail}
+            from={from}
+            to={to}
+            filterType={filterType}
+            filterPM={filterPM}
+            onApply={({ from: nf, to: nt, filterType: ft, filterPM: fpm }) => {
+              setFrom(nf)
+              setTo(nt)
+              setFilterType(ft)
+              setFilterPM(fpm)
+            }}
+          />
         </div>
       </div>
 

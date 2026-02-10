@@ -19,16 +19,36 @@ function contrastText(bg?: string | null) {
 // LocalStorage key for column widths
 const COLUMN_WIDTHS_KEY = 'journal-column-widths'
 
+const FIXED_COL_WIDTHS: Record<string, number> = {
+    // Fixed widths for columns with predictable content
+    actions: 50,
+    type: 35,
+    date: 80,
+}
+
+const FIXED_COL_KEYS = new Set(Object.keys(FIXED_COL_WIDTHS))
+
+function sanitizeColumnWidths(widths: Record<string, number>): Record<string, number> {
+    const out: Record<string, number> = {}
+    for (const [k, v] of Object.entries(widths || {})) {
+        if (FIXED_COL_KEYS.has(k)) continue
+        if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) continue
+        out[k] = v
+    }
+    return out
+}
+
 function loadColumnWidths(): Record<string, number> {
     try {
         const stored = localStorage.getItem(COLUMN_WIDTHS_KEY)
-        return stored ? JSON.parse(stored) : {}
+        const parsed = stored ? JSON.parse(stored) : {}
+        return sanitizeColumnWidths(parsed)
     } catch { return {} }
 }
 
 function saveColumnWidths(widths: Record<string, number>) {
     try {
-        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths))
+        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(sanitizeColumnWidths(widths)))
     } catch { /* ignore */ }
 }
 
@@ -305,8 +325,8 @@ export default function JournalTable({
         resizingCol.current = colKey
         resizeStartX.current = e.clientX
 
-        // Get current column width
-        const th = (e.target as HTMLElement).closest('th')
+        // Get current column width (use currentTarget for consistent behavior)
+        const th = (e.currentTarget as HTMLElement).closest('th')
         resizeStartWidth.current = th?.offsetWidth || 100
 
         document.addEventListener('mousemove', handleResizeMove)
@@ -377,9 +397,16 @@ export default function JournalTable({
 
     // Get column width (user-defined only; otherwise let table auto-fit)
     const getColWidth = (k: string): string | undefined => {
+        // Fixed widths win over persisted widths
+        const fixed = FIXED_COL_WIDTHS[k]
+        if (fixed) return `${fixed}px`
+
         if (columnWidths[k]) return `${columnWidths[k]}px`
+
         return undefined
     }
+
+    const isResizableCol = (k: string) => !FIXED_COL_KEYS.has(k)
 
     // Render resize handle
     const ResizeHandle = ({ colKey }: { colKey: string }) => (
@@ -387,6 +414,12 @@ export default function JournalTable({
             className="col-resize-handle"
             onMouseDown={(e) => handleResizeStart(e, colKey)}
             onClick={(e) => e.stopPropagation()}
+            draggable={false}
+            aria-hidden="true"
+            onDragStart={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+            }}
         />
     )
 
@@ -969,7 +1002,7 @@ export default function JournalTable({
                             children: (
                                 <>
                                     {th.props.children}
-                                        <ResizeHandle colKey={k} />
+                                    {isResizableCol(k) ? <ResizeHandle colKey={k} /> : null}
                                 </>
                             )
                         })

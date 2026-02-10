@@ -1,6 +1,7 @@
 export { default as FilterDropdown } from './FilterDropdown'
 export { default as TimeFilterDropdown } from './TimeFilterDropdown'
 export { default as MetaFilterDropdown } from './MetaFilterDropdown'
+export { default as ReportsFilterDropdown } from './ReportsFilterDropdown'
 export { default as BatchAssignDropdown } from './BatchAssignDropdown'
 export { default as ColumnSelectDropdown } from './ColumnSelectDropdown'
 export { default as InvoiceFilterDropdown } from './InvoiceFilterDropdown'

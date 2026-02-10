@@ -8,6 +8,8 @@ export type ColorTheme =
   | 'earthy-tones'
   | 'monochrome-harmony'
   | 'vintage-charm'
+  | 'soft-blush'
+  | 'professional-light'
 export type NavIconColorMode = 'color' | 'mono'
 export type DateFormat = 'de' | 'iso'
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
@@ -35,4 +37,6 @@ export interface UIPreferencesContextValue {
   setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean
   setGlassModals: (val: boolean) => void
+  modalBackdropBlur: boolean
+  setModalBackdropBlur: (val: boolean) => void
 }

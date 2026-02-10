@@ -375,7 +375,9 @@ function AppInner() {
         customBackgroundImage,
         setCustomBackgroundImage,
         glassModals,
-        setGlassModals
+        setGlassModals,
+        modalBackdropBlur,
+        setModalBackdropBlur
     } = useUIPreferences()
     
     // Open invoices count for nav badge
@@ -1263,22 +1265,25 @@ function AppInner() {
             <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
                     
                     {activePage === 'Reports' && (
-                        <ReportsView
-                            from={reportsFrom}
-                            to={reportsTo}
-                            setFrom={setReportsFrom}
-                            setTo={setReportsTo}
-                            yearsAvail={yearsAvail}
-                            filterSphere={reportsFilterSphere}
-                            setFilterSphere={setReportsFilterSphere}
-                            filterType={reportsFilterType}
-                            setFilterType={setReportsFilterType}
-                            filterPM={reportsFilterPM}
-                            setFilterPM={setReportsFilterPM}
-                            onOpenExport={() => setShowExportOptions(true)}
-                            refreshKey={refreshKey}
-                            activateKey={reportsActivateKey}
-                        />
+                        <>
+                            <h1>Reports</h1>
+                            <ReportsView
+                                from={reportsFrom}
+                                to={reportsTo}
+                                setFrom={setReportsFrom}
+                                setTo={setReportsTo}
+                                yearsAvail={yearsAvail}
+                                filterSphere={reportsFilterSphere}
+                                setFilterSphere={setReportsFilterSphere}
+                                filterType={reportsFilterType}
+                                setFilterType={setReportsFilterType}
+                                filterPM={reportsFilterPM}
+                                setFilterPM={setReportsFilterPM}
+                                onOpenExport={() => setShowExportOptions(true)}
+                                refreshKey={refreshKey}
+                                activateKey={reportsActivateKey}
+                            />
+                        </>
                     )}
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
@@ -1375,6 +1380,8 @@ function AppInner() {
                             setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
+                            modalBackdropBlur={modalBackdropBlur}
+                            setModalBackdropBlur={setModalBackdropBlur}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}

@@ -37,6 +37,8 @@ export type ColorTheme =
   | 'earthy-tones' 
   | 'monochrome-harmony' 
   | 'vintage-charm'
+  | 'soft-blush'
+  | 'professional-light'
 
 export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses' | 'custom'
 
@@ -139,6 +141,8 @@ export interface SettingsProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  modalBackdropBlur: boolean
+  setModalBackdropBlur: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -174,6 +178,8 @@ export interface GeneralPaneProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  modalBackdropBlur: boolean
+  setModalBackdropBlur: (v: boolean) => void
   dateFmt: DateFmt
   setDateFmt: (v: DateFmt) => void
   journalLimit: number

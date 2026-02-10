@@ -132,6 +132,8 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowDensity={props.setJournalRowDensity}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
+            modalBackdropBlur={props.modalBackdropBlur}
+            setModalBackdropBlur={props.setModalBackdropBlur}
             dateFmt={props.dateFmt}
             setDateFmt={props.setDateFmt}
             journalLimit={props.journalLimit}
