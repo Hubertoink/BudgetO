@@ -1288,7 +1288,41 @@ function AppInner() {
                     {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
                     {activePage === 'Budgets' && <h1>Budgets</h1>}
                     {activePage === 'Dashboard' && (
-                        <DashboardView today={today} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} />
+                        <DashboardView
+                            today={today}
+                            onGoToInvoices={() => setActivePage('Verbindlichkeiten')}
+                            onGoToVoucher={({ voucherId, recordDate }) => {
+                                // Reset filters so the voucher can be found reliably
+                                setFilterEarmark(null)
+                                setFilterBudgetId(null)
+                                setFilterTag(null)
+                                setFilterType(null)
+                                setFilterPM(null)
+                                setFilterSphere(null)
+                                setFilterCategoryId(null)
+                                setQ(voucherId ? `#${voucherId}` : '')
+
+                                // Pin to the voucher date to avoid archive workYear filtering
+                                if (recordDate) {
+                                    setFrom(recordDate)
+                                    setTo(recordDate)
+                                } else {
+                                    setFrom('')
+                                    setTo('')
+                                }
+
+                                setFlashId(voucherId)
+                                window.setTimeout(() => {
+                                    setFlashId((cur) => (cur === voucherId ? null : cur))
+                                }, 5000)
+
+                                // Use setTimeout to ensure state updates before navigation
+                                setTimeout(() => {
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                }, 0)
+                            }}
+                        />
                     )}
                     {activePage === 'Buchungen' && (
                         <JournalView

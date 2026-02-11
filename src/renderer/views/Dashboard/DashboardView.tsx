@@ -5,7 +5,15 @@ import HonorariaWidget from './widgets/HonorariaWidget'
 import CashAdvancesWidget from './widgets/CashAdvancesWidget'
 import CategorySpendingWidget from './widgets/CategorySpendingWidget'
 
-export default function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
+export default function DashboardView({
+  today,
+  onGoToInvoices,
+  onGoToVoucher
+}: {
+  today: string
+  onGoToInvoices: () => void
+  onGoToVoucher?: (args: { voucherId: number; recordDate?: string | null }) => void
+}) {
   void onGoToInvoices
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -144,12 +152,16 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
         {cashAdvanceEnabled ? <CashAdvancesWidget /> : null}
       </div>
 
-      <DashboardRecentActivity />
+      <DashboardRecentActivity onGoToVoucher={onGoToVoucher} />
     </div>
   )
 }
 
-function DashboardRecentActivity() {
+function DashboardRecentActivity({
+  onGoToVoucher
+}: {
+  onGoToVoucher?: (args: { voucherId: number; recordDate?: string | null }) => void
+}) {
   const [rows, setRows] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(false)
   const [earmarks, setEarmarks] = React.useState<Array<{ id: number; code: string; name: string }>>([])
@@ -266,7 +278,13 @@ function DashboardRecentActivity() {
         if (addedTags.length) changes.push(`Tags hinzugefügt: ${addedTags.join(', ')}`)
         if (removedTags.length) changes.push(`Tags entfernt: ${removedTags.join(', ')}`)
         if (!changes.length) changes.push('Keine relevanten Änderungen')
-        return { title: `Beleg #${row.entityId} geändert`, details: changes.slice(0,3).join(' · '), tone: 'ok' }
+        const desc = String(d.after?.description ?? d.before?.description ?? '').trim()
+        const descShort = desc ? desc.slice(0, 80) : ''
+        return {
+          title: descShort ? `Beleg #${row.entityId} geändert · ${descShort}` : `Beleg #${row.entityId} geändert`,
+          details: changes.slice(0,3).join(' · '),
+          tone: 'ok'
+        }
       }
       if (a === 'DELETE') {
         const s = d.snapshot || {}
@@ -363,11 +381,25 @@ function DashboardRecentActivity() {
                     </span>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.title}</div>
                   </div>
-                  {recDateRaw ? (
-                    <div className="helper" style={{ whiteSpace: 'nowrap', marginLeft: 8 }}>
-                      Belegdatum: {recDateRaw}
-                    </div>
-                  ) : null}
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+                        {onGoToVoucher && (String(r.entity || '').toUpperCase() === 'VOUCHERS' || String(r.entity || '').toUpperCase() === 'VOUCHER') && Number(r.entityId) > 0 && String(r.action || '').toUpperCase() !== 'DELETE' ? (
+                          <button
+                            type="button"
+                            className="btn ghost icon-btn"
+                            title="Zum Beleg"
+                            aria-label="Zum Beleg"
+                            onClick={() => onGoToVoucher({ voucherId: Number(r.entityId), recordDate: recDateRaw })}
+                            style={{ padding: 6 }}
+                          >
+                            ↗
+                          </button>
+                        ) : null}
+                        {recDateRaw ? (
+                          <div className="helper" style={{ whiteSpace: 'nowrap' }}>
+                            Belegdatum: {recDateRaw}
+                          </div>
+                        ) : null}
+                      </div>
                 </div>
                 {info.details ? <div className="helper" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.details}</div> : null}
               </div>

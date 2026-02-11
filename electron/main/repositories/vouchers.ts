@@ -464,9 +464,16 @@ export function listVouchersAdvancedPaged(filters: {
         params.push(budgetId, budgetId)
     }
     if (q && q.trim()) {
-        const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like, like)
+        const qTrim = q.trim()
+        const like = `%${qTrim}%`
+        const idMatch = qTrim.match(/^#?(\d+)$/)
+        if (idMatch) {
+            wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+            params.push(Number(idMatch[1]), like, like, like, like)
+        } else {
+            wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+            params.push(like, like, like, like)
+        }
     }
 
     // Archive mode: when showArchived is false and no explicit date filter, limit to workYear
