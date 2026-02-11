@@ -3890,6 +3890,22 @@ label .req-asterisk {
             gap: 12px;
         }
 
+        /*
+           Dashboard in Electron/Chromium:
+           Backdrop-filter + translucent backgrounds inside a scroll container can
+           cause intermittent blank "gaps" during the first paint/scroll.
+           Disable backdrop-filter for dashboard cards to keep rendering stable.
+        */
+        .app-main .dashboard-card,
+        .app-main .dashboard-card .card {
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
+        }
+
+        .app-main .dashboard-card .card {
+            background: color-mix(in oklab, var(--surface) 92%, transparent);
+        }
+
         /* Dashboard: avoid Chromium paint glitches in scroll container */
         .dashboard-recent-activity {
             -webkit-backdrop-filter: none;
