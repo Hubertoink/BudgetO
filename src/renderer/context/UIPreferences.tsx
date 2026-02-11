@@ -15,7 +15,7 @@ const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'mountain-clouds', 'snowy-
 
 // Glassmorphism: transparent modals with blur
 
-const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 'pastel-dreamland', 'ocean-breeze', 'earthy-tones', 'monochrome-harmony', 'vintage-charm', 'soft-blush', 'professional-light']
+const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 'pastel-dreamland', 'ocean-breeze', 'earthy-tones', 'monochrome-harmony', 'vintage-charm', 'soft-blush', 'professional-light', 'wisteria-pastel']
 
 function isValidTheme(theme: string | null | undefined): theme is ColorTheme {
   return !!theme && VALID_THEMES.includes(theme as ColorTheme)

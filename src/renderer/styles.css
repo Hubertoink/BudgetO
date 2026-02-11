@@ -1251,6 +1251,54 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
     color-scheme: light;
 }
 
+/* Wisteria Pastel */
+:root[data-color-theme="wisteria-pastel"] {
+    /* Base palette (can be tweaked for contrast):
+       wisteria-blue  #809BCE
+       powder-blue    #95B8D1
+       pearl-aqua     #B8E0D2
+       honeydew       #D6EADF
+       pastel-petal   #EAC4D5
+    */
+    --wisteria-blue: #809bce;
+    --powder-blue: #95b8d1;
+    --pearl-aqua: #b8e0d2;
+    --honeydew: #d6eadf;
+    --pastel-petal: #eac4d5;
+
+    /* Keep it bright, but not glaring */
+    --text: #1B2430;
+    --bg: color-mix(in oklab, var(--honeydew) 62%, #ffffff 38%);
+    --surface: color-mix(in oklab, var(--honeydew) 28%, #ffffff 72%);
+    --muted: color-mix(in oklab, var(--pearl-aqua) 52%, #ffffff 48%);
+    --border: color-mix(in oklab, var(--powder-blue) 62%, #DDE2EA 38%);
+    --text-dim: color-mix(in oklab, var(--text) 74%, var(--powder-blue) 26%);
+
+    /* Accent slightly deepened for readable buttons */
+    --accent: color-mix(in oklab, var(--wisteria-blue) 84%, var(--text) 16%);
+    --accent-hover: color-mix(in oklab, var(--accent) 78%, var(--text) 22%);
+
+    /* Semantic colors: keep existing defaults for clear meaning */
+    --success: #4CC38A;
+    --warning: #F5C451;
+    --danger: #F06A6A;
+    --badge-in: #4CC38A;
+    --badge-out: #F06A6A;
+
+    /* Domain-specific swatches */
+    --sphere-ideell: var(--accent);
+    --sphere-zweck: color-mix(in oklab, var(--pastel-petal) 78%, var(--accent) 22%);
+    --sphere-vermoegen: var(--pearl-aqua);
+    --sphere-wgb: var(--powder-blue);
+    --pm-bar: color-mix(in oklab, var(--pearl-aqua) 70%, #ffffff 30%);
+    --pm-bank: color-mix(in oklab, var(--wisteria-blue) 70%, #ffffff 30%);
+
+    --shadow-1: 0 2px 10px rgba(0, 0, 0, 0.10);
+    --table-row-alt: color-mix(in oklab, var(--muted) 40%, transparent);
+    --table-row-sep: color-mix(in oklab, var(--border) 130%, transparent);
+    color-scheme: light;
+}
+
 /* Vintage Charm */
 :root[data-color-theme="vintage-charm"] {
     /* Provided palette:
@@ -3861,8 +3909,36 @@ label .req-asterisk {
             align-items: center;
         }
 
+        .dashboard-period-label {
+            margin-right: auto;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: calc(var(--radius) + 2px);
+            background: color-mix(in oklab, var(--surface) 80%, var(--text-dim));
+            color: var(--text);
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }
+
+        .dashboard-period-row .btn-group .btn.ghost {
+            background: color-mix(in oklab, var(--surface) 80%, var(--text-dim));
+        }
+
+        .dashboard-period-row .btn-group .btn.ghost:hover {
+            background: color-mix(in oklab, var(--accent) 12%, transparent);
+        }
+
         /* Button with active state */
         .btn-period-active {
+            background: color-mix(in oklab, var(--accent) 20%, transparent);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .dashboard-period-row .btn-group .btn.ghost.btn-period-active {
             background: color-mix(in oklab, var(--accent) 20%, transparent);
             color: var(--accent);
             font-weight: 600;
@@ -4771,6 +4847,7 @@ html[data-glass-modals="true"] .flyout-arrow {
 .theme-swatch[data-theme="vintage-charm"] { background: linear-gradient(135deg, #8E7CC3 50%, #F9CB9C 50%); }
 .theme-swatch[data-theme="soft-blush"] { background: linear-gradient(135deg, #F48FB1 50%, #FCE4EC 50%); }
 .theme-swatch[data-theme="professional-light"] { background: linear-gradient(135deg, #5C6BC0 50%, #E8EAF6 50%); }
+.theme-swatch[data-theme="wisteria-pastel"] { background: linear-gradient(135deg, #809BCE 50%, #EAC4D5 50%); }
 
 /* Background Image Picker */
 .background-picker {

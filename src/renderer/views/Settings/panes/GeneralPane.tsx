@@ -188,6 +188,7 @@ export function GeneralPane({
     { value: 'vintage-charm', label: 'Vintage Charm' },
     { value: 'soft-blush', label: 'Soft Blush' },
     { value: 'professional-light', label: 'Professional' },
+    { value: 'wisteria-pastel', label: 'Wisteria Pastel' },
   ]
 
   // Date format examples

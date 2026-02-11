@@ -27,6 +27,9 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
         <option value="earthy-tones">Earthy Tones</option>
         <option value="monochrome-harmony">Monochrome Harmony</option>
         <option value="vintage-charm">Vintage Charm</option>
+        <option value="soft-blush">Soft Blush</option>
+        <option value="professional-light">Professional</option>
+        <option value="wisteria-pastel">Wisteria Pastel</option>
       </select>
       
       <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen).</div>

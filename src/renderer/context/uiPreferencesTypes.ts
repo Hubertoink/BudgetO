@@ -10,6 +10,7 @@ export type ColorTheme =
   | 'vintage-charm'
   | 'soft-blush'
   | 'professional-light'
+  | 'wisteria-pastel'
 export type NavIconColorMode = 'color' | 'mono'
 export type DateFormat = 'de' | 'iso'
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'

@@ -68,6 +68,17 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     return { from: yearFrom, to: yearTo, selectedYear: y, periodLabel: 'Jahr' as const }
   }, [period, yearSel])
 
+  const monthLabel = useMemo(() => {
+    if (period !== 'MONAT') return null
+    // Use the computed range start to avoid local timezone edge cases
+    const y = Number(from.slice(0, 4))
+    const m = Number(from.slice(5, 7))
+    const d = new Date(Date.UTC(y, Math.max(0, Math.min(11, m - 1)), 1))
+    const fmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
+    const raw = fmt.format(d)
+    return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : raw
+  }, [period, from])
+
   const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   useEffect(() => {
@@ -103,6 +114,9 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       </div>
       <div className="dashboard-grid-auto">
         <div className="dashboard-period-row">
+          {period === 'MONAT' && monthLabel ? (
+            <div className="dashboard-period-label" aria-label="Aktueller Monat">{monthLabel}</div>
+          ) : null}
           <div className="btn-group" role="group" aria-label="Zeitraum">
             <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
             <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>

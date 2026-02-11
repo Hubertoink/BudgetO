@@ -39,6 +39,7 @@ export type ColorTheme =
   | 'vintage-charm'
   | 'soft-blush'
   | 'professional-light'
+  | 'wisteria-pastel'
 
 export type BackgroundImage = 'none' | 'mountain-clouds' | 'snowy-landscape' | 'snow-houses' | 'custom'
 
