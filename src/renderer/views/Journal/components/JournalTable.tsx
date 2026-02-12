@@ -264,6 +264,7 @@ export default function JournalTable({
     
     // Column resize state
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
+    const [activeResizeCol, setActiveResizeCol] = useState<string | null>(null)
     const resizingCol = useRef<string | null>(null)
     const resizeStartX = useRef<number>(0)
     const resizeStartWidth = useRef<number>(0)
@@ -276,34 +277,24 @@ export default function JournalTable({
         }
     }, [columnWidths])
 
+    const grossColumnWidth = useMemo(() => {
+        const maxFormattedLength = rows.reduce((maxLen, row) => {
+            const formatted = eurFmt.format(Number(row.grossAmount || 0))
+            return Math.max(maxLen, formatted.length)
+        }, 'Brutto'.length)
+
+        // Approximation: one character ~ 9px in this table font, plus padding.
+        // Keep it in a sensible range to avoid overly narrow/wide results.
+        const px = Math.round(maxFormattedLength * 9 + 26)
+        return Math.max(96, Math.min(170, px))
+    }, [rows, eurFmt])
+
     // Handle resize move
     const handleResizeMove = useCallback((e: MouseEvent) => {
         if (!resizingCol.current) return
-        if (!tableRef.current) return
 
         const delta = e.clientX - resizeStartX.current
-        const newWidth = Math.max(40, resizeStartWidth.current + delta)
-
-        // Get container width to limit total table width
-        const container = tableRef.current.parentElement
-        if (container) {
-            const containerWidth = container.clientWidth
-            const currentTableWidth = tableRef.current.offsetWidth
-            const currentColWidth = resizeStartWidth.current
-            const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
-
-            // If table would exceed container, limit the column width
-            if (projectedTableWidth > containerWidth && delta > 0) {
-                const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
-                if (maxNewWidth > 40) {
-                    setColumnWidths(prev => ({
-                        ...prev,
-                        [resizingCol.current!]: Math.max(40, maxNewWidth)
-                    }))
-                }
-                return
-            }
-        }
+        const newWidth = Math.max(56, resizeStartWidth.current + delta)
 
         setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
     }, [])
@@ -311,6 +302,7 @@ export default function JournalTable({
     // Handle resize end
     const handleResizeEnd = useCallback(() => {
         resizingCol.current = null
+        setActiveResizeCol(null)
         document.removeEventListener('mousemove', handleResizeMove)
         document.removeEventListener('mouseup', handleResizeEnd)
         document.body.style.cursor = ''
@@ -323,6 +315,7 @@ export default function JournalTable({
         e.stopPropagation()
 
         resizingCol.current = colKey
+        setActiveResizeCol(colKey)
         resizeStartX.current = e.clientX
 
         // Get current column width (use currentTarget for consistent behavior)
@@ -397,6 +390,8 @@ export default function JournalTable({
 
     // Get column width (user-defined only; otherwise let table auto-fit)
     const getColWidth = (k: string): string | undefined => {
+        if (k === 'gross') return `${grossColumnWidth}px`
+
         // Fixed widths win over persisted widths
         const fixed = FIXED_COL_WIDTHS[k]
         if (fixed) return `${fixed}px`
@@ -406,12 +401,12 @@ export default function JournalTable({
         return undefined
     }
 
-    const isResizableCol = (k: string) => !FIXED_COL_KEYS.has(k)
+    const isResizableCol = (k: string) => !FIXED_COL_KEYS.has(k) && k !== 'gross'
 
     // Render resize handle
     const ResizeHandle = ({ colKey }: { colKey: string }) => (
         <span
-            className="col-resize-handle"
+            className={`col-resize-handle ${activeResizeCol === colKey ? 'resizing' : ''}`.trim()}
             onMouseDown={(e) => handleResizeStart(e, colKey)}
             onClick={(e) => e.stopPropagation()}
             draggable={false}

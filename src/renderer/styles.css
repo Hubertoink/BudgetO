@@ -1484,6 +1484,24 @@ pre {
     background: color-mix(in oklab, var(--surface) 92%, transparent);
 }
 
+.categories-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 1400px) {
+    .categories-card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 860px) {
+    .categories-card-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Constrain dashboard mini-tables inside tiles */
 .card table {
     width: 100%;
@@ -1654,6 +1672,11 @@ td {
     border-bottom: 1px solid var(--table-row-sep);
 }
 
+.journal-table th:not(:last-child),
+.journal-table td:not(:last-child) {
+    border-right: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+}
+
 .journal-table tbody tr:nth-child(even) {
     background: var(--table-row-alt);
 }
@@ -1699,8 +1722,8 @@ tbody tr:nth-child(even):hover {
 /* Resizable table columns */
 .resizable-table {
     table-layout: fixed;
-    max-width: 100%;
     width: 100%;
+    max-width: 100%;
 }
 
 /* Table scroll wrapper for horizontal scrolling */
@@ -1720,17 +1743,17 @@ tbody tr:nth-child(even):hover {
 .resizable-th {
     position: relative;
     /* Keep header text away from the resize grab zone */
-    padding-right: 10px;
+    padding-right: 14px;
 }
 .col-resize-handle {
     position: absolute;
     right: 0;
     top: 0;
     /* Wider hitbox that straddles the column boundary */
-    width: 14px;
+    width: 16px;
     height: 100%;
     cursor: col-resize;
-    background: transparent;
+    background: color-mix(in oklab, var(--surface) 18%, transparent);
     z-index: 5;
     user-select: none;
     opacity: 1;
@@ -1746,7 +1769,7 @@ tbody tr:nth-child(even):hover {
     width: 1px;
     transform: translateX(-0.5px);
     background: var(--border);
-    opacity: 0.55;
+    opacity: 0.8;
     transition: background 0.15s, opacity 0.15s;
 }
 .col-resize-handle:hover,
@@ -3299,8 +3322,8 @@ textarea:focus {
 .nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; position: relative; }
 .nav-btn.active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
 
-/* Top navigation: subtle icon hover lift */
-.top-nav .nav-btn > span:first-child {
+/* Navigation icons: subtle hover lift (top + side menu) */
+.nav-btn > span:first-child {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3308,12 +3331,12 @@ textarea:focus {
     transition: transform 0.15s ease-out;
 }
 
-.top-nav .nav-btn:hover > span:first-child,
-.top-nav .nav-btn:focus-visible > span:first-child {
+.nav-btn:hover > span:first-child,
+.nav-btn:focus-visible > span:first-child {
     transform: translateY(-3px);
 }
 
-.top-nav .nav-btn:active > span:first-child {
+.nav-btn:active > span:first-child {
     transform: translateY(0) scale(0.96);
 }
 .nav-badge { 

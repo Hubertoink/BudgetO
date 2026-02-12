@@ -45,6 +45,45 @@ const PRESET_COLORS = [
 
 type TabType = 'categories' | number // 'categories' or taxonomy ID
 
+const iconButtonStyle: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  padding: 0,
+  display: 'grid',
+  placeItems: 'center',
+  color: 'var(--text-dim)'
+}
+
+function IconEye() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function IconEyeOff() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M2.5 12s3.5-6 9.5-6c2.35 0 4.28.7 5.84 1.64M21.5 12s-3.5 6-9.5 6c-2.35 0-4.28-.7-5.84-1.64" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconTrash() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 7h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 7V5.8c0-.99.81-1.8 1.8-1.8h2.4c.99 0 1.8.81 1.8 1.8V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7 7l.9 12.2c.07.99.9 1.8 1.9 1.8h4.4c1 0 1.83-.81 1.9-1.8L17 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 /**
  * CategoriesPane - Unified Category & Taxonomy Management
  * Uses a tabbed interface to manage categories and user-defined taxonomies
@@ -453,7 +492,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
               <div className="helper">Erstelle deine erste Kategorie mit dem Button oben.</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            <div className="categories-card-grid">
               {categories.map(cat => (
                 <CategoryCard
                   key={cat.id}
@@ -502,17 +541,20 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
                     className="btn ghost"
                     onClick={() => toggleTaxonomyActive(selectedTaxonomy)}
                     title={selectedTaxonomy.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                    aria-label={selectedTaxonomy.isActive ? 'Taxonomie deaktivieren' : 'Taxonomie aktivieren'}
+                    style={iconButtonStyle}
                   >
-                    {selectedTaxonomy.isActive ? '👁️' : '👁️‍🗨️'}
+                    {selectedTaxonomy.isActive ? <IconEye /> : <IconEyeOff />}
                   </button>
                   <button
                     type="button"
                     className="btn ghost"
                     onClick={() => setTaxonomyDelete({ id: selectedTaxonomy.id, name: selectedTaxonomy.name, usageCount: selectedTaxonomy.usageCount ?? 0 })}
                     title="Taxonomie löschen"
-                    style={{ color: 'var(--danger)' }}
+                    aria-label="Taxonomie löschen"
+                    style={iconButtonStyle}
                   >
-                    🗑️
+                    <IconTrash />
                   </button>
                 </>
               )}
@@ -551,7 +593,7 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
               <div className="helper">Füge Begriffe hinzu, um diese Taxonomie in Buchungen verwenden zu können.</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            <div className="categories-card-grid">
               {terms.map(term => (
                 <TermCard
                   key={term.id}
@@ -858,9 +900,10 @@ function CategoryCard({
       className="card"
       style={{
         padding: 14,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        display: 'grid',
+        gridTemplateColumns: canWrite ? '40px minmax(0, 1fr) auto' : '40px minmax(0, 1fr)',
+        alignItems: 'start',
+        columnGap: 12,
         background: bgColor,
         borderLeft: `4px solid ${borderColor}`,
         opacity: category.isActive ? 1 : 0.6
@@ -885,8 +928,8 @@ function CategoryCard({
         {category.name.charAt(0).toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>{category.name}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.3, wordBreak: 'break-word' }}>{category.name}</span>
           {!category.isActive && (
             <span style={{ fontSize: 10, padding: '2px 6px', background: 'var(--muted)', borderRadius: 4 }}>Deaktiviert</span>
           )}
@@ -899,12 +942,12 @@ function CategoryCard({
         </div>
       </div>
       {canWrite && (
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" className="btn ghost" onClick={onToggle} title={category.isActive ? 'Deaktivieren' : 'Aktivieren'} style={{ padding: '6px 8px', fontSize: 12 }}>
-            {category.isActive ? '👁️' : '👁️‍🗨️'}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignSelf: 'center' }}>
+          <button type="button" className="btn ghost" onClick={onToggle} title={category.isActive ? 'Deaktivieren' : 'Aktivieren'} aria-label={category.isActive ? 'Kategorie deaktivieren' : 'Kategorie aktivieren'} style={iconButtonStyle}>
+            {category.isActive ? <IconEye /> : <IconEyeOff />}
           </button>
-          <button type="button" className="btn btn-edit" onClick={onEdit} title="Bearbeiten">✎</button>
-          <button type="button" className="btn ghost" onClick={onDelete} title="Löschen" style={{ padding: '6px 8px', fontSize: 12 }}>🗑️</button>
+          <button type="button" className="btn btn-edit" onClick={onEdit} title="Bearbeiten" aria-label="Kategorie bearbeiten">✎</button>
+          <button type="button" className="btn ghost" onClick={onDelete} title="Löschen" aria-label="Kategorie löschen" style={iconButtonStyle}><IconTrash /></button>
         </div>
       )}
     </div>
@@ -932,9 +975,10 @@ function TermCard({
       className="card"
       style={{
         padding: 14,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        display: 'grid',
+        gridTemplateColumns: canWrite ? '36px minmax(0, 1fr) auto' : '36px minmax(0, 1fr)',
+        alignItems: 'start',
+        columnGap: 12,
         background: bgColor,
         borderLeft: `4px solid ${borderColor}`,
         opacity: term.isActive ? 1 : 0.6
@@ -959,8 +1003,8 @@ function TermCard({
         {term.name.charAt(0).toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{term.name}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, wordBreak: 'break-word' }}>{term.name}</span>
           {!term.isActive && (
             <span style={{ fontSize: 10, padding: '2px 6px', background: 'var(--muted)', borderRadius: 4 }}>Deaktiviert</span>
           )}
@@ -973,12 +1017,12 @@ function TermCard({
         </div>
       </div>
       {canWrite && (
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" className="btn ghost" onClick={onToggle} title={term.isActive ? 'Deaktivieren' : 'Aktivieren'} style={{ padding: '6px 8px', fontSize: 12 }}>
-            {term.isActive ? '👁️' : '👁️‍🗨️'}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignSelf: 'center' }}>
+          <button type="button" className="btn ghost" onClick={onToggle} title={term.isActive ? 'Deaktivieren' : 'Aktivieren'} aria-label={term.isActive ? 'Begriff deaktivieren' : 'Begriff aktivieren'} style={iconButtonStyle}>
+            {term.isActive ? <IconEye /> : <IconEyeOff />}
           </button>
-          <button type="button" className="btn btn-edit" onClick={onEdit} title="Bearbeiten">✎</button>
-          <button type="button" className="btn ghost" onClick={onDelete} title="Löschen" style={{ padding: '6px 8px', fontSize: 12 }}>🗑️</button>
+          <button type="button" className="btn btn-edit" onClick={onEdit} title="Bearbeiten" aria-label="Begriff bearbeiten">✎</button>
+          <button type="button" className="btn ghost" onClick={onDelete} title="Löschen" aria-label="Begriff löschen" style={iconButtonStyle}><IconTrash /></button>
         </div>
       )}
     </div>
