@@ -1211,6 +1211,7 @@ function AppInner() {
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
                     <TopHeaderOrg notify={notify} />
                     <WorkYearIndicator
+                        yearsAvail={yearsAvail}
                         disabled={serverMode === 'client'}
                         onNavigateToSettings={() => {
                             try {
