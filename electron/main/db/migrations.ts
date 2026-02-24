@@ -545,17 +545,21 @@ export const MIGRATIONS: Mig[] = [
         CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
       `)
 
-      // Migrate legacy single budget/earmark assignments into junction tables (idempotent via UNIQUE + OR IGNORE)
+      // Migrate legacy single budget/earmark assignments into junction tables.
+      // Guard against legacy inconsistent data where vouchers.budget_id / earmark_id
+      // points to missing rows, which would otherwise fail FK checks.
       db.exec(`
         INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
-        SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
-        FROM vouchers
-        WHERE budget_id IS NOT NULL;
+        SELECT v.id, v.budget_id, COALESCE(v.budget_amount, v.gross_amount)
+        FROM vouchers v
+        INNER JOIN budgets b ON b.id = v.budget_id
+        WHERE v.budget_id IS NOT NULL;
 
         INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
-        SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
-        FROM vouchers
-        WHERE earmark_id IS NOT NULL;
+        SELECT v.id, v.earmark_id, COALESCE(v.earmark_amount, v.gross_amount)
+        FROM vouchers v
+        INNER JOIN earmarks e ON e.id = v.earmark_id
+        WHERE v.earmark_id IS NOT NULL;
       `)
 
       // Ensure tags.description exists
@@ -1086,9 +1090,9 @@ export function applyMigrations(db: DB) {
       console.log(`[Migration ${mig.version}] Applied successfully`)
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
-      // For migration 20 specifically, try to continue anyway if it's a duplicate column error
-      if (mig.version === 20 && error.message?.includes('duplicate column')) {
-        console.log('[Migration 20] Column already exists, marking as applied')
+      // For migrations that add known columns, continue on duplicate-column errors.
+      if ((mig.version === 20 || mig.version === 25) && error.message?.includes('duplicate column')) {
+        console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {
         throw error

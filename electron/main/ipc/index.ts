@@ -26,6 +26,34 @@ import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 
+function isMissingTableError(error: unknown, tableNames: string[]): boolean {
+    const message = String((error as any)?.message ?? '')
+    if (!message.includes('no such table:')) return false
+    return tableNames.some((table) => message.includes(`no such table: ${table}`))
+}
+
+async function withSchemaHealRetry<T>(run: () => T, tableNames: string[]): Promise<T> {
+    try {
+        return run()
+    } catch (error) {
+        if (!isMissingTableError(error, tableNames)) throw error
+        try {
+            const db = getDb()
+            applyMigrations(db)
+        } catch {
+        }
+
+        try {
+            return run()
+        } catch (retryError) {
+            if (isMissingTableError(retryError, tableNames)) {
+                throw new Error('Die Datenbankstruktur war unvollständig und konnte nicht automatisch repariert werden. Bitte App neu starten und erneut versuchen.')
+            }
+            throw retryError
+        }
+    }
+}
+
 export function registerIpcHandlers() {
     // App info
     ipcMain.handle('app.version', async () => {
@@ -266,16 +294,18 @@ export function registerIpcHandlers() {
 
     // Cash checks (Kassenprüfung)
     ipcMain.handle('cashChecks.list', async (_e, payload) => {
-        const parsed = CashChecksListInput.parse(payload)
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
-        const cfg = getServerConfig()
-        if (cfg.mode === 'client') {
-            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
-            return CashChecksListOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.list', parsed))
-        }
+        return withSchemaHealRetry(async () => {
+            const parsed = CashChecksListInput.parse(payload)
+            const { getServerConfig, remoteCall } = await import('../services/apiServer')
+            const cfg = getServerConfig()
+            if (cfg.mode === 'client') {
+                if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+                return CashChecksListOutput.parse(await remoteCall(cfg.serverAddress, 'cashChecks.list', parsed))
+            }
 
-        const { listCashChecks } = await import('../repositories/cashChecks')
-        return CashChecksListOutput.parse(listCashChecks(parsed))
+            const { listCashChecks } = await import('../repositories/cashChecks')
+            return CashChecksListOutput.parse(listCashChecks(parsed))
+        }, ['cash_checks'])
     })
 
     ipcMain.handle('cashChecks.create', async (_e, payload) => {
@@ -927,45 +957,46 @@ export function registerIpcHandlers() {
     })
 
     ipcMain.handle('vouchers.list', async (_e, payload) => {
-        const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
+        return withSchemaHealRetry(async () => {
+            const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
-        const cfg = getServerConfig()
-        if (cfg.mode === 'client') {
-            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
-            return await remoteCall(cfg.serverAddress, 'vouchers.list', parsed)
-        }
+            const { getServerConfig, remoteCall } = await import('../services/apiServer')
+            const cfg = getServerConfig()
+            if (cfg.mode === 'client') {
+                if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+                return await remoteCall(cfg.serverAddress, 'vouchers.list', parsed)
+            }
 
-        const { rows, total } = listVouchersAdvancedPaged({
-            limit: parsed.limit,
-            offset: parsed.offset ?? 0,
-            sort: (parsed.sort as any) || 'DESC',
-            sortBy: (parsed as any).sortBy,
-            paymentMethod: parsed.paymentMethod as any,
-            sphere: parsed.sphere as any,
-            categoryId: (parsed as any).categoryId,
-            type: parsed.type as any,
-            from: parsed.from,
-            to: parsed.to,
-            earmarkId: parsed.earmarkId,
-            budgetId: (parsed as any).budgetId,
-            q: parsed.q,
-            tag: (parsed as any).tag,
-            taxonomyTermId: (parsed as any).taxonomyTermId,
-            workYear: (parsed as any).workYear,
-            showArchived: (parsed as any).showArchived
-        })
-        // Enrich with budget/earmark assignments from junction tables
-        const { getVoucherTaxonomyTermsForVouchers } = await import('../repositories/vouchers')
-        const txByVoucher = getVoucherTaxonomyTermsForVouchers(rows.map((r: any) => Number(r.id)))
+            const { rows, total } = listVouchersAdvancedPaged({
+                limit: parsed.limit,
+                offset: parsed.offset ?? 0,
+                sort: (parsed.sort as any) || 'DESC',
+                sortBy: (parsed as any).sortBy,
+                paymentMethod: parsed.paymentMethod as any,
+                sphere: parsed.sphere as any,
+                categoryId: (parsed as any).categoryId,
+                type: parsed.type as any,
+                from: parsed.from,
+                to: parsed.to,
+                earmarkId: parsed.earmarkId,
+                budgetId: (parsed as any).budgetId,
+                q: parsed.q,
+                tag: (parsed as any).tag,
+                taxonomyTermId: (parsed as any).taxonomyTermId,
+                workYear: (parsed as any).workYear,
+                showArchived: (parsed as any).showArchived
+            })
+            const { getVoucherTaxonomyTermsForVouchers } = await import('../repositories/vouchers')
+            const txByVoucher = getVoucherTaxonomyTermsForVouchers(rows.map((r: any) => Number(r.id)))
 
-        const enrichedRows = rows.map((r: any) => ({
-            ...r,
-            budgets: getVoucherBudgets(r.id),
-            earmarksAssigned: getVoucherEarmarks(r.id),
-            taxonomyTerms: txByVoucher[Number(r.id)] || []
-        }))
-        return VouchersListOutput.parse({ rows: enrichedRows, total })
+            const enrichedRows = rows.map((r: any) => ({
+                ...r,
+                budgets: getVoucherBudgets(r.id),
+                earmarksAssigned: getVoucherEarmarks(r.id),
+                taxonomyTerms: txByVoucher[Number(r.id)] || []
+            }))
+            return VouchersListOutput.parse({ rows: enrichedRows, total })
+        }, ['cash_checks'])
     })
 
     ipcMain.handle('vouchers.update', async (_e, payload) => {
@@ -2502,7 +2533,29 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('organizations.delete', async (_e, payload: { orgId: string; deleteData?: boolean }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return deleteOrganization(payload.orgId, payload.deleteData ?? false)
+        const before = getActiveOrganization()
+        const beforeId = before?.id
+
+        const result = deleteOrganization(payload.orgId, payload.deleteData ?? false)
+
+        const after = getActiveOrganization()
+        const afterId = after?.id
+
+        if (afterId && afterId !== beforeId) {
+            try {
+                const db = getDb()
+                applyMigrations(db)
+            } catch (err) {
+                console.warn('[organizations.delete] post-switch migration failed:', err)
+            }
+
+            const win = BrowserWindow.getFocusedWindow()
+            if (win && after) {
+                win.webContents.send('organizations:switched', after)
+            }
+        }
+
+        return result
     })
     
     ipcMain.handle('organizations.getAppearance', async (_e, payload: { orgId: string }) => {
@@ -3089,19 +3142,21 @@ export function registerIpcHandlers() {
     // ─────────────────────────────────────────────────────────────────────────
 
     ipcMain.handle('cashAdvances.list', async (_e, payload) => {
-        const { CashAdvancesListInput, CashAdvancesListOutput } = await import('./schemas')
-        const parsed = CashAdvancesListInput.parse(payload || {})
+        return withSchemaHealRetry(async () => {
+            const { CashAdvancesListInput, CashAdvancesListOutput } = await import('./schemas')
+            const parsed = CashAdvancesListInput.parse(payload || {})
 
-        const { getServerConfig, remoteCall } = await import('../services/apiServer')
-        const cfg = getServerConfig()
-        if (cfg.mode === 'client') {
-            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
-            return CashAdvancesListOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.list', parsed))
-        }
+            const { getServerConfig, remoteCall } = await import('../services/apiServer')
+            const cfg = getServerConfig()
+            if (cfg.mode === 'client') {
+                if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+                return CashAdvancesListOutput.parse(await remoteCall(cfg.serverAddress, 'cashAdvances.list', parsed))
+            }
 
-        const { listCashAdvances } = await import('../repositories/cashAdvances')
-        const res = listCashAdvances(parsed)
-        return CashAdvancesListOutput.parse(res)
+            const { listCashAdvances } = await import('../repositories/cashAdvances')
+            const res = listCashAdvances(parsed)
+            return CashAdvancesListOutput.parse(res)
+        }, ['cash_advances'])
     })
 
     ipcMain.handle('cashAdvances.getById', async (_e, payload) => {

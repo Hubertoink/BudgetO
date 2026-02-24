@@ -9,6 +9,7 @@ interface TimeFilterDropdownProps {
 }
 
 export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: TimeFilterDropdownProps) {
+  const [open, setOpen] = useState(false)
   const [f, setF] = useState<string>(from)
   const [t, setT] = useState<string>(to)
 
@@ -22,6 +23,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
 
   const handleApply = () => {
     onApply({ from: f, to: t })
+    setOpen(false)
   }
 
   const handleReset = () => {
@@ -65,6 +67,8 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
       ariaLabel="Zeitraum wählen"
       buttonTitle="Zeitraum"
       colorVariant="time"
+      open={open}
+      onOpenChange={setOpen}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

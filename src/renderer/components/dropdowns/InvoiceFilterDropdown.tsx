@@ -44,6 +44,7 @@ export default function InvoiceFilterDropdown({
   const [dueFrom, setDueFrom] = useState(dueFromProp)
   const [dueTo, setDueTo] = useState(dueToProp)
   const [selectedYear, setSelectedYear] = useState<string>('')
+  const [open, setOpen] = useState(false)
 
   // Sync when props change
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function InvoiceFilterDropdown({
 
   function handleApply() {
     onApply({ status, sphere, budgetId, tag, dueFrom, dueTo })
+    setOpen(false)
   }
 
   function handleReset() {
@@ -97,6 +99,8 @@ export default function InvoiceFilterDropdown({
       ariaLabel="Filter"
       buttonTitle="Filter"
       colorVariant="filter"
+      open={open}
+      onOpenChange={setOpen}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

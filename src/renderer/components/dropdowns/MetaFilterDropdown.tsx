@@ -50,6 +50,7 @@ export default function MetaFilterDropdown({
   const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(filterType)
   const [pm, setPm] = useState<'BAR' | 'BANK' | null>(filterPM)
   const [tag, setTag] = useState<string | null>(filterTag)
+  const [open, setOpen] = useState(false)
   const [tagOpen, setTagOpen] = useState(false)
   const tagDropdownRef = useRef<HTMLDivElement>(null)
   const [c, setC] = useState<number | null>(categoryId)
@@ -96,6 +97,7 @@ export default function MetaFilterDropdown({
       earmarkId: e,
       budgetId: b
     })
+    setOpen(false)
   }
 
   const handleReset = () => {
@@ -129,6 +131,8 @@ export default function MetaFilterDropdown({
       ariaLabel="Filter"
       buttonTitle="Filter"
       colorVariant="filter"
+      open={open}
+      onOpenChange={setOpen}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

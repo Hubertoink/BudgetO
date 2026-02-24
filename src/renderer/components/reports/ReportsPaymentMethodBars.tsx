@@ -10,16 +10,25 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      (window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: 'IN' }),
-      (window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: 'OUT' })
-    ]).then(([sumIn, sumOut]) => {
+    const keys: Array<PaymentMethod> = ['BAR', 'BANK']
+    Promise.all(
+      keys.map(pm =>
+        (window as any).api?.reports.summary?.({
+          from: props.from,
+          to: props.to,
+          paymentMethod: pm
+        })
+      )
+    ).then((results) => {
       if (cancelled) return
-      const keys: Array<PaymentMethod> = ['BAR', 'BANK']
-      const map: Record<string, { inGross: number; outGross: number }> = { 'BAR': { inGross: 0, outGross: 0 }, 'BANK': { inGross: 0, outGross: 0 } }
-      sumIn?.byPaymentMethod.forEach((r: any) => { const k = r.key; if (k === 'BAR' || k === 'BANK') { map[k].inGross = r.gross } })
-      sumOut?.byPaymentMethod.forEach((r: any) => { const k = r.key; if (k === 'BAR' || k === 'BANK') { map[k].outGross = r.gross } })
-      setData(keys.map(k => ({ key: k, inGross: map[k].inGross || 0, outGross: map[k].outGross || 0 })))
+      const mapped = keys.map((pm, i) => {
+        const res = results[i]
+        const byType = (res?.byType || []) as Array<{ key: string; gross: number }>
+        const inGross = byType.find(t => t.key === 'IN')?.gross || 0
+        const outGross = byType.find(t => t.key === 'OUT')?.gross || 0
+        return { key: pm, inGross, outGross }
+      })
+      setData(mapped)
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [props.from, props.to, props.refreshKey])
