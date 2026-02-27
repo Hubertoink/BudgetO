@@ -46,6 +46,7 @@ import { UserIndicator } from './components/layout/UserIndicator'
 import { StatusFlyout } from './components/layout/StatusFlyout'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
+import { useWindowWidth } from './hooks/useWindowWidth'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../assets/Budget_Logo.ico', import.meta.url).href
 
@@ -1188,7 +1189,10 @@ function AppInner() {
         'Reports': '#F50057',
         'Einstellungen': '#9C27B0'
     }
-    const isTopNav = navLayout === 'top'
+    // Responsive: force left-sidebar when window is too narrow, but respect user preference otherwise
+    const NAV_COLLAPSE_BREAKPOINT = 1100
+    const windowWidth = useWindowWidth()
+    const isTopNav = navLayout === 'top' && windowWidth >= NAV_COLLAPSE_BREAKPOINT
     return (
         <>
             <LoginModal

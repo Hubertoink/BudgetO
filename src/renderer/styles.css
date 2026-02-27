@@ -1735,9 +1735,30 @@ tbody tr:nth-child(even):hover {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Journal: avoid inner vertical scrollbar; let the main content area scroll */
+/* Journal: allow horizontal scroll, but no inner vertical scrollbar */
 .journal-table-scroll {
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--text-dim) 30%, transparent) transparent;
+}
+
+.journal-table-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+.journal-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.journal-table-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text-dim) 30%, transparent);
+    border-radius: 3px;
+}
+
+/* Journal table: keep horizontal scroll on narrow layouts */
+.journal-table-scroll .journal-table,
+.journal-table-scroll .resizable-table {
+    min-width: 780px;
+    width: max(100%, 780px);
 }
 
 .resizable-th {
@@ -5128,7 +5149,7 @@ html[data-glass-modals="true"] .flyout-arrow {
 /* ==================== Journal Toolbar ==================== */
 .journal-view {
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: visible;
 }
 
 .journal-view > * {
