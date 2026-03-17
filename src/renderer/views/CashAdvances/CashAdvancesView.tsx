@@ -91,6 +91,7 @@ export default function CashAdvancesView() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [detail, setDetail] = useState<CashAdvanceWithDetails | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [purchasesExpanded, setPurchasesExpanded] = useState(true)
 
   const [categories, setCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
 
@@ -203,6 +204,9 @@ export default function CashAdvancesView() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (selectedId) loadDetail(selectedId) }, [loadDetail, selectedId])
+  useEffect(() => {
+    setPurchasesExpanded((detail?.purchases?.length ?? 0) <= 3)
+  }, [detail?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -297,6 +301,12 @@ export default function CashAdvancesView() {
     setDeleteCashAdvanceModal(null)
   }, [canWrite])
 
+  const getCategoryName = useCallback((categoryId: number | null) => {
+    if (!categoryId) return null
+    const category = (Array.isArray(categories) ? categories : []).find((entry) => entry.id === categoryId)
+    return category?.name || `Kategorie #${categoryId}`
+  }, [categories])
+
   const confirmDeleteCashAdvance = async () => {
     if (!canWrite) return
     if (!deleteCashAdvanceModal) return
@@ -311,6 +321,9 @@ export default function CashAdvancesView() {
       notify('error', e?.message || String(e))
     }
   }
+
+  const purchaseCount = detail?.purchases?.length ?? 0
+  const purchaseTotal = (detail?.purchases || []).reduce((sum, purchase) => sum + (purchase.grossAmount || 0), 0)
 
   // ─────────────────────────────────────────────────────────────────────────
   // Create Cash Advance
@@ -868,49 +881,67 @@ export default function CashAdvancesView() {
             </div>
 
             {/* Käufe */}
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Käufe</div>
-              {(detail.purchases || []).length === 0 ? (
+            <div className="cash-advance-purchases">
+              <button
+                type="button"
+                className="cash-advance-purchases__toggle"
+                onClick={() => setPurchasesExpanded((prev) => !prev)}
+                aria-expanded={purchasesExpanded}
+                aria-controls="cash-advance-purchases-list"
+              >
+                <span className="cash-advance-purchases__summary">
+                  <span className="cash-advance-purchases__title">Käufe</span>
+                  <span className="chip">{purchaseCount} {purchaseCount === 1 ? 'Kauf' : 'Käufe'}</span>
+                  {purchaseCount > 0 ? <span className="helper">{eurFmt.format(purchaseTotal)}</span> : null}
+                </span>
+                <span className="cash-advance-purchases__meta">
+                  <span className="helper">{purchasesExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                  <span aria-hidden="true" className="cash-advance-purchases__chevron">{purchasesExpanded ? '▾' : '▸'}</span>
+                </span>
+              </button>
+              {purchaseCount === 0 ? (
                 <div className="helper">Noch keine Käufe erfasst.</div>
-              ) : (
-                <div style={{ display: 'grid', gap: 8 }}>
+              ) : purchasesExpanded ? (
+                <div id="cash-advance-purchases-list" className="cash-advance-purchases__list">
                   {(detail.purchases || []).map((k) => (
-                    <div key={k.id} className="card" style={{ padding: 12, background: 'var(--surface)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600 }}>
+                    <div key={k.id} className="cash-advance-purchase-row">
+                      <div className="cash-advance-purchase-row__main">
+                        <div className="cash-advance-purchase-row__title" title={k.description || 'Ohne Beschreibung'}>
                             {k.description || 'Ohne Beschreibung'}
-                          </div>
-                          <div className="helper" style={{ marginTop: 4 }}>
-                            {k.date} · {k.sphere}
-                            {k.categoryId ? (() => {
-                              const cat = (Array.isArray(categories) ? categories : []).find((c) => c.id === k.categoryId)
-                              return ` · ${cat?.name || `Kategorie #${k.categoryId}`}`
-                            })() : ''}
-                            {k.vatRate ? ` · ${k.vatRate}% MwSt.` : ''}
-                          </div>
-                          {k.postedVoucherId ? (
-                            <div className="helper" style={{ marginTop: 4 }}>Gebucht (Beleg-ID: {k.postedVoucherId})</div>
-                          ) : null}
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 800, fontSize: 16 }}>{eurFmt.format(k.grossAmount)}</div>
-                          {canWrite && detail.status !== 'RESOLVED' && !k.postedVoucherId ? (
-                            <div style={{ marginTop: 8 }}>
-                              <button
-                                className="btn ghost danger"
-                                style={{ fontSize: 12, padding: '4px 8px' }}
-                                onClick={() => deletePurchase(k.id)}
-                                title="Löschen"
-                              >
-                                🗑
-                              </button>
-                            </div>
-                          ) : null}
+                        <div className="cash-advance-purchase-row__details helper">
+                            {fmtDate(k.date)}
+                            <span>{k.sphere}</span>
+                            {getCategoryName(k.categoryId) ? <span>{getCategoryName(k.categoryId)}</span> : null}
+                            {k.vatRate ? ` · ${k.vatRate}% MwSt.` : ''}
+                            {k.postedVoucherId ? <span>Beleg #{k.postedVoucherId}</span> : null}
                         </div>
                       </div>
+                      <div className="cash-advance-purchase-row__amount">
+                        {eurFmt.format(k.grossAmount)}
+                      </div>
+                      {canWrite && detail.status !== 'RESOLVED' && !k.postedVoucherId ? (
+                        <button
+                          className="btn ghost danger cash-advance-purchase-row__delete"
+                          onClick={() => deletePurchase(k.id)}
+                          title="Löschen"
+                          aria-label={`Kauf ${k.description || 'ohne Beschreibung'} löschen`}
+                        >
+                          🗑
+                        </button>
+                      ) : (
+                        <div className="cash-advance-purchase-row__status">
+                          {k.postedVoucherId ? (
+                            <div className="helper">Gebucht</div>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ))}
+                </div>
+              ) : (
+                <div id="cash-advance-purchases-list" className="helper">
+                  {purchaseCount} {purchaseCount === 1 ? 'Kauf ist eingeklappt.' : 'Käufe sind eingeklappt.'}
                 </div>
               )}
               <div className="helper" style={{ marginTop: 8 }}>

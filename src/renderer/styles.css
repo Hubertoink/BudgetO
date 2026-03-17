@@ -2571,6 +2571,142 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+.cash-advance-purchases {
+    display: grid;
+    gap: 8px;
+}
+
+.cash-advance-purchases__toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--surface-alt) 82%, var(--surface));
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.cash-advance-purchases__toggle:hover {
+    border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+    background: color-mix(in oklab, var(--surface-alt) 72%, var(--surface));
+}
+
+.cash-advance-purchases__summary,
+.cash-advance-purchases__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.cash-advance-purchases__title {
+    font-weight: 700;
+}
+
+.cash-advance-purchases__chevron {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.cash-advance-purchases__list {
+    display: grid;
+    gap: 6px;
+}
+
+.cash-advance-purchase-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.cash-advance-purchase-row__main {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.cash-advance-purchase-row__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.cash-advance-purchase-row__details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.cash-advance-purchase-row__details > span::before {
+    content: '•';
+    margin-right: 6px;
+    color: var(--text-dim);
+}
+
+.cash-advance-purchase-row__amount {
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.cash-advance-purchase-row__delete {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 4px 6px;
+    display: inline-grid;
+    place-items: center;
+}
+
+.cash-advance-purchase-row__status {
+    min-width: 28px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+    .cash-advance-purchases__toggle {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .cash-advance-purchase-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'main amount'
+            'main action';
+        align-items: start;
+    }
+
+    .cash-advance-purchase-row__main {
+        grid-area: main;
+    }
+
+    .cash-advance-purchase-row__amount {
+        grid-area: amount;
+    }
+
+    .cash-advance-purchase-row__delete,
+    .cash-advance-purchase-row__status {
+        grid-area: action;
+        justify-self: end;
+    }
+}
+
 .chip .chip-x,
 .chip-x {
     border: 0;
