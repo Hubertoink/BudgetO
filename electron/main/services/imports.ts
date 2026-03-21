@@ -1,8 +1,8 @@
 import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
-import { createVoucher } from '../repositories/vouchers'
+import { createVoucher, createVoucherTx, deleteVoucherTx, type CreateVoucherInput } from '../repositories/vouchers'
 import { createCustomCategory } from '../repositories/customCategories'
-import { getDb } from '../db/database'
+import { getDb, withTransaction } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
 import { ensureExportsBaseDir } from './exportsDir'
@@ -10,6 +10,9 @@ import { ensureExportsBaseDir } from './exportsDir'
 export type ImportPreview = {
     headers: string[]
     sample: any[]
+    sampleRowNumbers: number[]
+    allRowNumbers: number[]
+    totalRows: number
     suggestedMapping: Record<string, string | null>
     headerRowIndex: number
 }
@@ -21,6 +24,7 @@ export type ImportExecuteResult = {
     skipped: number
     errors: Array<{ row: number; message: string }>
     rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
+    createdVoucherIds?: number[]
 }
 
 export type ImportExecuteOptions = {
@@ -28,12 +32,103 @@ export type ImportExecuteOptions = {
     selectedRows?: number[]
 }
 
+export type ImportAnalyzeResult = {
+    rows: Array<{
+        row: number
+        status: 'ready' | 'skip' | 'error'
+        message?: string
+        entries: Array<{
+            date: string
+            type: 'IN' | 'OUT' | 'TRANSFER'
+            paymentMethod?: 'BAR' | 'BANK' | null
+            description?: string
+            grossAmount: number
+            signedGrossAmount: number
+        }>
+    }>
+    summary: {
+        totalRows: number
+        readyRows: number
+        plannedEntries: number
+        skippedRows: number
+        errorRows: number
+    }
+}
+
 const FIELD_KEYS = ['date', 'type', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'category', 'bankIn', 'bankOut', 'cashIn', 'cashOut'] as const
 export type FieldKey = typeof FIELD_KEYS[number]
+const CONST_MAPPING_PREFIX = '__CONST__:'
+
+type WorksheetDataRow = {
+    rowNumber: number
+    values: Record<string, any>
+}
+
+type ImportPlanEntry = {
+    payload: CreateVoucherInput
+    preview: {
+        date: string
+        type: 'IN' | 'OUT' | 'TRANSFER'
+        paymentMethod?: 'BAR' | 'BANK' | null
+        description?: string
+        grossAmount: number
+        signedGrossAmount: number
+    }
+}
+
+type ImportPlanRow = {
+    row: number
+    status: 'ready' | 'skip' | 'error'
+    message?: string
+    entries: ImportPlanEntry[]
+}
+
+type ImportLookupCaches = {
+    earmarkIdByCode: Map<string, number>
+    categoryIdByKey: Map<string, number>
+}
 
 function normalizeHeader(h: string) {
     const s = (h || '').toString().trim().toLowerCase()
     return s
+}
+
+function getConstantMappingValue(value?: string | null) {
+    if (!value || typeof value !== 'string') return null
+    if (!value.startsWith(CONST_MAPPING_PREFIX)) return null
+    return value.slice(CONST_MAPPING_PREFIX.length)
+}
+
+function hasMeaningfulValue(value: any) {
+    if (value == null) return false
+    if (typeof value === 'string') return value.trim() !== ''
+    return true
+}
+
+function getWorksheetMaxRow(ws: ExcelJS.Worksheet) {
+    return Math.max(ws.lastRow?.number || 0, ws.rowCount || 0, ws.actualRowCount || 0)
+}
+
+function readWorksheetDataRows(
+    ws: ExcelJS.Worksheet,
+    headerRowIdx: number,
+    headers: string[],
+    idxByHeader: Record<string, number>
+): WorksheetDataRow[] {
+    const rows: WorksheetDataRow[] = []
+    const maxRow = getWorksheetMaxRow(ws)
+    for (let r = headerRowIdx + 1; r <= maxRow; r++) {
+        const rowObj: Record<string, any> = {}
+        let hasAnyValue = false
+        headers.forEach((h, i) => {
+            const col = idxByHeader[h] || (i + 1)
+            const value = normalizeCellValue(ws.getRow(r).getCell(col).value)
+            rowObj[h || `col${i + 1}`] = value
+            if (!hasAnyValue && hasMeaningfulValue(value)) hasAnyValue = true
+        })
+        if (hasAnyValue) rows.push({ rowNumber: r, values: rowObj })
+    }
+    return rows
 }
 
 function suggestMapping(headers: string[]): Record<string, string | null> {
@@ -69,23 +164,39 @@ export async function previewXlsx(base64: string): Promise<ImportPreview> {
     const pick = pickWorksheet(wb)
     if (!pick) throw new Error('Keine Tabelle gefunden')
     const { ws, headerRowIdx, headers, idxByHeader } = pick
-    const sample: any[] = []
-    const maxR = Math.min(ws.actualRowCount, headerRowIdx + 50)
-    for (let r = headerRowIdx + 1; r <= maxR; r++) {
-        const rowObj: any = {}
-        headers.forEach((h, i) => {
-            const col = idxByHeader[h] || (i + 1)
-            rowObj[h || `col${i + 1}`] = normalizeCellValue(ws.getRow(r).getCell(col).value)
-        })
-        sample.push(rowObj)
-    }
+    const dataRows = readWorksheetDataRows(ws, headerRowIdx, headers, idxByHeader)
+    const sampleRows = dataRows.slice(0, 50)
     const suggestedMapping = suggestMapping(headers)
-    return { headers, sample, suggestedMapping, headerRowIndex: headerRowIdx }
+    return {
+        headers,
+        sample: sampleRows.map((row) => row.values),
+        sampleRowNumbers: sampleRows.map((row) => row.rowNumber),
+        allRowNumbers: dataRows.map((row) => row.rowNumber),
+        totalRows: dataRows.length,
+        suggestedMapping,
+        headerRowIndex: headerRowIdx
+    }
 }
 
 function duplicateKey(date: string, grossAmount: number): string {
     const rounded = Math.round((grossAmount + Number.EPSILON) * 100) / 100
     return `${date}|${rounded.toFixed(2)}`
+}
+
+type DuplicateJournalMatch = {
+    id: number
+    voucherNo?: string | null
+    date: string
+    type: 'IN' | 'OUT' | 'TRANSFER'
+    paymentMethod?: 'BAR' | 'BANK' | null
+    description?: string | null
+    counterparty?: string | null
+    categoryName?: string | null
+    netAmount?: number | null
+    vatRate?: number | null
+    grossAmount: number
+    earmarkCode?: string | null
+    budgetLabel?: string | null
 }
 
 export async function getDuplicateCountsByKey(pairs: DuplicatePair[]): Promise<{ countsByKey: Record<string, number> }> {
@@ -123,6 +234,77 @@ export async function getDuplicateCountsByKey(pairs: DuplicatePair[]): Promise<{
         countsByKey[key] = existing.get(key) || 0
     }
     return { countsByKey }
+}
+
+export async function getDuplicateDetailsByKey(
+    pairs: DuplicatePair[]
+): Promise<{ matchesByKey: Record<string, DuplicateJournalMatch[]> }> {
+    const matchesByKey: Record<string, DuplicateJournalMatch[]> = {}
+    if (!pairs.length) return { matchesByKey }
+
+    const normalized = pairs
+        .map(p => ({
+            date: String(p.date).slice(0, 10),
+            grossAmount: Math.round((Number(p.grossAmount) + Number.EPSILON) * 100) / 100
+        }))
+        .filter(p => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && isFinite(p.grossAmount))
+
+    if (!normalized.length) return { matchesByKey }
+
+    const unique = Array.from(new Map(normalized.map(p => [duplicateKey(p.date, p.grossAmount), p])).values())
+    const where = unique.map(() => '(v.date = ? AND ROUND(v.gross_amount, 2) = ?)').join(' OR ')
+    const params: Array<string | number> = []
+    for (const pair of unique) {
+        params.push(pair.date, pair.grossAmount)
+    }
+
+    const db = getDb()
+    const rows = db.prepare(
+        `SELECT v.id,
+                v.voucher_no as voucherNo,
+                v.date,
+                v.type,
+                v.payment_method as paymentMethod,
+                v.description,
+                v.counterparty,
+                ROUND(v.net_amount, 2) as netAmount,
+                v.vat_rate as vatRate,
+                ROUND(v.gross_amount, 2) as grossAmount,
+                (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
+                (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
+                (
+                    SELECT CASE
+                        WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
+                        WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
+                        WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
+                        ELSE printf('%04d-%s-%s', v.year, v.sphere, COALESCE(b.category_id, COALESCE(b.project_id, COALESCE(b.earmark_id, ''))))
+                    END
+                    FROM budgets b
+                    WHERE b.id = v.budget_id
+                ) as budgetLabel
+         FROM vouchers v
+         WHERE v.gross_amount IS NOT NULL
+           AND (${where})
+         ORDER BY v.date DESC, v.id DESC`
+    ).all(...params) as DuplicateJournalMatch[]
+
+    for (const row of rows) {
+        const key = duplicateKey(String(row.date).slice(0, 10), Number(row.grossAmount))
+        if (!matchesByKey[key]) matchesByKey[key] = []
+        matchesByKey[key].push({
+            ...row,
+            grossAmount: Number(row.grossAmount),
+            netAmount: row.netAmount == null ? null : Number(row.netAmount),
+            vatRate: row.vatRate == null ? null : Number(row.vatRate)
+        })
+    }
+
+    for (const pair of unique) {
+        const key = duplicateKey(pair.date, pair.grossAmount)
+        if (!matchesByKey[key]) matchesByKey[key] = []
+    }
+
+    return { matchesByKey }
 }
 
 // --- CAMT.053 (ISO 20022) support ---
@@ -243,7 +425,15 @@ export async function previewCamt(base64: string): Promise<ImportPreview> {
         date: 'Datum', type: null, description: 'Text', paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null, category: null,
         bankIn: 'Bank +', bankOut: 'Bank -', cashIn: null, cashOut: null
     }
-    return { headers, sample, suggestedMapping, headerRowIndex: 1 }
+    return {
+        headers,
+        sample,
+        sampleRowNumbers: sample.map((_, index) => index + 2),
+        allRowNumbers: entries.map((_, index) => index + 2),
+        totalRows: entries.length,
+        suggestedMapping,
+        headerRowIndex: 1
+    }
 }
 
 export async function executeCamt(base64: string, mapping: Record<FieldKey, string | null>): Promise<ImportExecuteResult & { errorFilePath?: string }> {
@@ -253,6 +443,7 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
     const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
+    const createdVoucherIds: number[] = []
     const track = (row: number, ok: boolean, message?: string) => { if (rowStatuses.length < 1000) rowStatuses.push({ row, ok, message }) }
     void mapping
     const sphere = 'IDEELL' as const
@@ -268,7 +459,8 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
             const descKey = description.slice(0, 120)
             const dup = d.prepare("SELECT id FROM vouchers WHERE date = ? AND payment_method = 'BANK' AND ROUND(gross_amount, 2) = ROUND(?, 2) AND COALESCE(description,'') LIKE ? LIMIT 1").get(e.date, amount, descKey + '%') as any
             if (dup?.id) { skipped++; track(row, false, 'Duplikat erkannt'); row++; continue }
-            await Promise.resolve(createVoucher({ date: e.date, type: type as any, sphere, description, paymentMethod: 'BANK', vatRate: 0, grossAmount: amount }))
+            const created = await Promise.resolve(createVoucher({ date: e.date, type: type as any, sphere, description, paymentMethod: 'BANK', vatRate: 0, grossAmount: amount }))
+            createdVoucherIds.push(created.id)
             imported++
             track(row, true)
         } catch (err: any) {
@@ -279,7 +471,287 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
         }
         row++
     }
-    return { imported, skipped, errors, rowStatuses }
+    return { imported, skipped, errors, rowStatuses, createdVoucherIds }
+}
+
+function getMappedValue(
+    rowNumber: number,
+    ws: ExcelJS.Worksheet,
+    idxByHeader: Record<string, number>,
+    mapping: Record<FieldKey, string | null>,
+    key: FieldKey
+) {
+    const mapped = mapping[key]
+    const constantValue = getConstantMappingValue(mapped)
+    if (constantValue != null) return constantValue
+    if (!mapped) return undefined
+    const col = idxByHeader[mapped]
+    const raw = col ? ws.getRow(rowNumber).getCell(col).value : undefined
+    return normalizeCellValue(raw)
+}
+
+function isSummaryLikeText(value: string) {
+    return /ergebnis|summe|saldo|sap abgleich/.test(value)
+}
+
+async function planXlsxRow(params: {
+    rowNumber: number
+    ws: ExcelJS.Worksheet
+    idxByHeader: Record<string, number>
+    mapping: Record<FieldKey, string | null>
+    db: ReturnType<typeof getDb>
+    caches: ImportLookupCaches
+    createMissingCategories?: boolean
+}): Promise<ImportPlanRow> {
+    const { rowNumber, ws, idxByHeader, mapping, db, caches, createMissingCategories } = params
+    const get = (key: FieldKey) => getMappedValue(rowNumber, ws, idxByHeader, mapping, key)
+    const rawDate = get('date')
+    const description = get('description') != null ? String(get('description')) : undefined
+    const amountHints = [get('grossAmount'), get('netAmount'), get('inGross'), get('outGross'), get('bankIn'), get('bankOut'), get('cashIn'), get('cashOut')]
+    const hasAmountHint = amountHints.some((value) => {
+        const n = parseNumber(value)
+        return n != null && n !== 0
+    })
+
+    const date = parseDate(rawDate)
+    if (!date) {
+        const txt = [rawDate, description].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
+        if (isSummaryLikeText(txt)) return { row: rowNumber, status: 'skip', message: 'Summen-/Saldozeile übersprungen', entries: [] }
+        if (!hasAmountHint && !hasMeaningfulValue(description)) return { row: rowNumber, status: 'skip', message: 'Leer-/Hinweiszeile übersprungen', entries: [] }
+        return { row: rowNumber, status: 'error', message: 'Datum fehlt/ungültig', entries: [] }
+    }
+
+    const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
+    const sphere = 'IDEELL' as const
+    const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
+    let netAmount = parseNumber(get('netAmount'))
+    let vatRate = parseNumber(get('vatRate')) ?? 19
+    let grossAmount = parseNumber(get('grossAmount'))
+    const inGross = parseNumber(get('inGross'))
+    const outGross = parseNumber(get('outGross'))
+    const bankIn = parseNumber(get('bankIn'))
+    const bankOut = parseNumber(get('bankOut'))
+    const cashIn = parseNumber(get('cashIn'))
+    const cashOut = parseNumber(get('cashOut'))
+
+    type Op = { pm: 'BAR' | 'BANK'; t: 'IN' | 'OUT'; amount: number }
+    const ops: Op[] = []
+    if (bankIn != null && bankIn !== 0) ops.push({ pm: 'BANK', t: 'IN', amount: Math.abs(bankIn) })
+    if (bankOut != null && bankOut !== 0) ops.push({ pm: 'BANK', t: 'OUT', amount: Math.abs(bankOut) })
+    if (cashIn != null && cashIn !== 0) ops.push({ pm: 'BAR', t: 'IN', amount: Math.abs(cashIn) })
+    if (cashOut != null && cashOut !== 0) ops.push({ pm: 'BAR', t: 'OUT', amount: Math.abs(cashOut) })
+    if ((inGross != null && inGross !== 0) || (outGross != null && outGross !== 0)) {
+        const pm = paymentMethod || 'BANK'
+        if (inGross != null && inGross !== 0) ops.push({ pm, t: 'IN', amount: Math.abs(inGross) })
+        if (outGross != null && outGross !== 0) ops.push({ pm, t: 'OUT', amount: Math.abs(outGross) })
+    }
+
+    const signSource = grossAmount ?? netAmount
+    let resolvedType: 'IN' | 'OUT' | 'TRANSFER' = (type as any) || 'IN'
+    if (!type && signSource != null) {
+        if (signSource < 0) resolvedType = 'OUT'
+        else if (signSource > 0) resolvedType = 'IN'
+    }
+    if (grossAmount != null) grossAmount = Math.abs(grossAmount)
+    if (netAmount != null) netAmount = Math.abs(netAmount)
+
+    let earmarkId: number | undefined
+    const earmarkCodeVal = get('earmarkCode')
+    if (earmarkCodeVal != null && String(earmarkCodeVal).trim()) {
+        const code = String(earmarkCodeVal).trim()
+        if (caches.earmarkIdByCode.has(code)) earmarkId = caches.earmarkIdByCode.get(code)
+        else {
+            const row = db.prepare('SELECT id FROM earmarks WHERE code = ?').get(code) as any
+            if (row?.id) {
+                caches.earmarkIdByCode.set(code, row.id)
+                earmarkId = row.id
+            } else {
+                return { row: rowNumber, status: 'error', message: `Zweckbindung nicht gefunden: ${code}`, entries: [] }
+            }
+        }
+    }
+
+    let categoryId: number | undefined
+    const categoryVal = get('category')
+    if (categoryVal != null && String(categoryVal).trim()) {
+        const raw = String(categoryVal).trim()
+        const numeric = Number(raw)
+        if (Number.isFinite(numeric) && String(numeric) === raw) {
+            const existing = db.prepare('SELECT id FROM custom_categories WHERE id = ?').get(numeric) as any
+            if (!existing?.id) return { row: rowNumber, status: 'error', message: `Kategorie nicht gefunden (ID): ${raw}`, entries: [] }
+            categoryId = Number(existing.id)
+        } else {
+            const key = raw.toLowerCase()
+            if (caches.categoryIdByKey.has(key)) categoryId = caches.categoryIdByKey.get(key)
+            else {
+                const row = db.prepare('SELECT id FROM custom_categories WHERE LOWER(name) = LOWER(?) LIMIT 1').get(raw) as any
+                if (row?.id) {
+                    caches.categoryIdByKey.set(key, Number(row.id))
+                    categoryId = Number(row.id)
+                } else if (createMissingCategories) {
+                    const created = createCustomCategory({ name: raw })
+                    caches.categoryIdByKey.set(key, Number(created.id))
+                    categoryId = Number(created.id)
+                } else {
+                    return { row: rowNumber, status: 'error', message: `Kategorie nicht gefunden (Name): ${raw}`, entries: [] }
+                }
+            }
+        }
+    }
+
+    const entries: ImportPlanEntry[] = []
+    if (ops.length > 0) {
+        for (const op of ops) {
+            const payload: CreateVoucherInput = {
+                date,
+                type: op.t,
+                sphere,
+                description,
+                paymentMethod: op.pm,
+                vatRate: 0,
+                grossAmount: op.amount
+            }
+            if (earmarkId != null) payload.earmarkId = earmarkId
+            if (categoryId != null) payload.categoryId = categoryId
+            entries.push({
+                payload,
+                preview: {
+                    date,
+                    type: op.t,
+                    paymentMethod: op.pm,
+                    description,
+                    grossAmount: op.amount,
+                    signedGrossAmount: op.t === 'OUT' ? -Math.abs(op.amount) : Math.abs(op.amount)
+                }
+            })
+        }
+    } else {
+        if (grossAmount == null && netAmount == null) {
+            return { row: rowNumber, status: 'skip', message: 'Kein Betrag (Netto/Brutto)', entries: [] }
+        }
+        const payload: CreateVoucherInput = { date, type: resolvedType, sphere, description, paymentMethod, vatRate }
+        const displayAmount = Math.abs(grossAmount ?? netAmount ?? 0)
+        if (grossAmount != null) payload.grossAmount = grossAmount
+        else if (netAmount != null) payload.netAmount = netAmount
+        if (earmarkId != null) payload.earmarkId = earmarkId
+        if (categoryId != null) payload.categoryId = categoryId
+        entries.push({
+            payload,
+            preview: {
+                date,
+                type: resolvedType,
+                paymentMethod,
+                description,
+                grossAmount: displayAmount,
+                signedGrossAmount: resolvedType === 'OUT' ? -displayAmount : displayAmount
+            }
+        })
+    }
+
+    return { row: rowNumber, status: 'ready', entries }
+}
+
+async function analyzeXlsxInternal(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    options?: ImportExecuteOptions
+) {
+    const wb = new ExcelJS.Workbook()
+    const buf = NodeBuffer.from(base64, 'base64')
+    await (wb as any).xlsx.load(buf as any)
+    const pick = pickWorksheet(wb)
+    if (!pick) throw new Error('Keine Tabelle gefunden')
+    const { ws, headerRowIdx, headers, idxByHeader } = pick
+    const db = getDb()
+    const caches: ImportLookupCaches = {
+        earmarkIdByCode: new Map<string, number>(),
+        categoryIdByKey: new Map<string, number>()
+    }
+    const selectedRowsSet = options?.selectedRows?.length ? new Set(options.selectedRows) : null
+    const rows: ImportPlanRow[] = []
+    const maxRow = getWorksheetMaxRow(ws)
+    for (let r = headerRowIdx + 1; r <= maxRow; r++) {
+        if (selectedRowsSet && !selectedRowsSet.has(r)) continue
+        rows.push(await planXlsxRow({
+            rowNumber: r,
+            ws,
+            idxByHeader,
+            mapping,
+            db,
+            caches,
+            createMissingCategories: options?.createMissingCategories
+        }))
+    }
+    return { ws, headers, idxByHeader, rows }
+}
+
+export async function analyzeFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    options?: ImportExecuteOptions
+): Promise<ImportAnalyzeResult> {
+    const t = detectFileType(base64)
+    if (t === 'CAMT') {
+        const xml = NodeBuffer.from(base64, 'base64').toString('utf8')
+        const entries = parseCamtXml(xml)
+        const selectedRowsSet = options?.selectedRows?.length ? new Set(options.selectedRows) : null
+        const rows = entries
+            .map((entry, index) => ({ entry, row: index + 2 }))
+            .filter(({ row }) => !selectedRowsSet || selectedRowsSet.has(row))
+            .map(({ entry, row }) => {
+                if (!entry.date || !isFinite(entry.amount)) {
+                    return { row, status: 'error' as const, message: 'Kein Datum oder Betrag', entries: [] }
+                }
+                const amount = Math.abs(Number(entry.amount))
+                const type = entry.creditDebit === 'CR' ? 'IN' as const : 'OUT' as const
+                const description = [entry.purpose, entry.name, entry.endToEndId].filter(Boolean).join(' · ').slice(0, 255)
+                return {
+                    row,
+                    status: 'ready' as const,
+                    entries: [{
+                        date: entry.date,
+                        type,
+                        paymentMethod: 'BANK' as const,
+                        description,
+                        grossAmount: amount,
+                        signedGrossAmount: type === 'OUT' ? -amount : amount
+                    }]
+                }
+            })
+        const readyRows = rows.filter((row) => row.status === 'ready')
+        const skippedRows = rows.filter((row) => row.status === 'skip')
+        const errorRows = rows.filter((row) => row.status === 'error')
+        return {
+            rows,
+            summary: {
+                totalRows: rows.length,
+                readyRows: readyRows.length,
+                plannedEntries: readyRows.reduce((sum, row) => sum + row.entries.length, 0),
+                skippedRows: skippedRows.length,
+                errorRows: errorRows.length
+            }
+        }
+    }
+
+    const analyzed = await analyzeXlsxInternal(base64, mapping, options)
+    const readyRows = analyzed.rows.filter((row) => row.status === 'ready')
+    const skippedRows = analyzed.rows.filter((row) => row.status === 'skip')
+    const errorRows = analyzed.rows.filter((row) => row.status === 'error')
+    return {
+        rows: analyzed.rows.map((row) => ({
+            row: row.row,
+            status: row.status,
+            message: row.message,
+            entries: row.entries.map((entry) => entry.preview)
+        })),
+        summary: {
+            totalRows: analyzed.rows.length,
+            readyRows: readyRows.length,
+            plannedEntries: readyRows.reduce((sum, row) => sum + row.entries.length, 0),
+            skippedRows: skippedRows.length,
+            errorRows: errorRows.length
+        }
+    }
 }
 
 export async function previewFile(base64: string): Promise<ImportPreview> {
@@ -318,10 +790,57 @@ export async function executeFile(
             skipped: res.skipped,
             errorCount: (res.errors?.length) || 0,
             errorFilePath: res.errorFilePath || null,
+            createdVoucherIds: res.createdVoucherIds || [],
+            undoable: (res.createdVoucherIds?.length || 0) > 0,
             when: new Date().toISOString()
         })
     } catch { /* ignore audit failures */ }
     return res
+}
+
+export async function undoImportExecution(auditId: number): Promise<{ deleted: number; missing: number }> {
+    return withTransaction((db) => {
+        const auditRow = db.prepare('SELECT id, entity, action, diff_json as diffJson FROM audit_log WHERE id = ?').get(auditId) as any
+        if (!auditRow?.id) throw new Error('Import-Logeintrag nicht gefunden')
+        if (auditRow.entity !== 'imports' || auditRow.action !== 'EXECUTE') throw new Error('Nur Buchungsimporte können rückgängig gemacht werden')
+
+        let diff: any = null
+        try { diff = auditRow.diffJson ? JSON.parse(String(auditRow.diffJson)) : null } catch { diff = null }
+        const ids = Array.isArray(diff?.createdVoucherIds)
+            ? diff.createdVoucherIds.map((value: unknown) => Number(value)).filter((value: number) => Number.isFinite(value) && value > 0)
+            : []
+        if (!ids.length) throw new Error('Für diesen Import sind keine rückgängig machbaren Buchungen gespeichert')
+
+        const existingUndo = db.prepare(`
+            SELECT id
+            FROM audit_log
+            WHERE entity = 'imports' AND action = 'UNDO'
+              AND json_extract(diff_json, '$.importAuditId') = ?
+            LIMIT 1
+        `).get(auditId) as any
+        if (existingUndo?.id) throw new Error('Dieser Import wurde bereits rückgängig gemacht')
+
+        let deleted = 0
+        let missing = 0
+        for (const id of ids) {
+            const exists = db.prepare('SELECT id FROM vouchers WHERE id = ?').get(id) as any
+            if (!exists?.id) {
+                missing++
+                continue
+            }
+            deleteVoucherTx(db as any, id)
+            deleted++
+        }
+
+        writeAudit(db as any, null, 'imports', auditId, 'UNDO', {
+            importAuditId: auditId,
+            deleted,
+            missing,
+            requestedIds: ids
+        })
+
+        return { deleted, missing }
+    })
 }
 
 export async function findMissingCategories(
@@ -332,7 +851,7 @@ export async function findMissingCategories(
     if (t !== 'XLSX') return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
 
     const categoryHeader = mapping?.category
-    if (!categoryHeader) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
+    if (!categoryHeader || getConstantMappingValue(categoryHeader) != null) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
 
     const wb = new ExcelJS.Workbook()
     const buf = NodeBuffer.from(base64, 'base64')
@@ -351,13 +870,13 @@ export async function findMissingCategories(
     const col = idxByHeader[categoryHeader]
     if (!col) return { missingNames: [], missingIds: [], missingNameCounts: {}, missingIdCounts: {} }
 
-    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+    for (let r = headerRowIdx + 1; r <= getWorksheetMaxRow(ws); r++) {
         const dateVal = normalizeCellValue(ws.getRow(r).getCell(idxByHeader[mapping.date || ''] || 1).value)
         const date = parseDate(dateVal)
         if (!date) {
             const descVal = normalizeCellValue(ws.getRow(r).getCell(idxByHeader[mapping.description || ''] || 1).value)
             const txt = [dateVal, descVal].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
-            if (/ergebnis|summe|saldo/.test(txt)) continue
+            if (isSummaryLikeText(txt)) continue
             continue
         }
         const raw = normalizeCellValue(ws.getRow(r).getCell(col).value)
@@ -446,161 +965,43 @@ export async function executeXlsx(
     mapping: Record<FieldKey, string | null>,
     options?: ImportExecuteOptions
 ): Promise<ImportExecuteResult & { errorFilePath?: string }> {
-    const wb = new ExcelJS.Workbook()
-    const buf = NodeBuffer.from(base64, 'base64')
-    await (wb as any).xlsx.load(buf as any)
-    const pick = pickWorksheet(wb)
-    if (!pick) throw new Error('Keine Tabelle gefunden')
-    const { ws, headerRowIdx, headers, idxByHeader } = pick
-
-    // Lookup caches
+    const analyzed = await analyzeXlsxInternal(base64, mapping, options)
+    const { ws, headers, idxByHeader, rows } = analyzed
     const d = getDb()
-    const earmarkIdByCode = new Map<string, number>()
-    const categoryIdByKey = new Map<string, number>()
-
-    const selectedRowsSet = options?.selectedRows?.length ? new Set(options.selectedRows) : null
 
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
     const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
+    const createdVoucherIds: number[] = []
     const track = (row: number, ok: boolean, message?: string) => {
         // Limit to first 1000 entries to avoid huge payloads
         if (rowStatuses.length < 1000) rowStatuses.push({ row, ok, message })
     }
 
-    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+    for (const plannedRow of rows) {
         try {
-            if (selectedRowsSet && !selectedRowsSet.has(r)) {
+            if (plannedRow.status === 'skip') {
                 skipped++
-                track(r, false, 'Vom Import abgewählt')
+                track(plannedRow.row, false, plannedRow.message)
+                continue
+            }
+            if (plannedRow.status === 'error') {
+                skipped++
+                errors.push({ row: plannedRow.row, message: plannedRow.message || 'Importfehler' })
+                track(plannedRow.row, false, plannedRow.message || 'Importfehler')
                 continue
             }
 
-            const get = (key: FieldKey): any => {
-                const h = mapping[key]
-                if (!h) return undefined
-                const col = idxByHeader[h]
-                const raw = col ? ws.getRow(r).getCell(col).value : undefined
-                return normalizeCellValue(raw)
-            }
-            const rawDate = get('date')
-            const date = parseDate(rawDate)
-            if (!date) {
-                const txt = [rawDate, get('description')].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
-                if (/ergebnis|summe|saldo/.test(txt)) { skipped++; track(r, false, 'Summen-/Saldozeile übersprungen'); continue }
-                throw new Error('Datum fehlt/ungültig')
-            }
-            const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
-            // BudgetO: Sphäre is no longer a user-facing concept.
-            // Keep a stable internal default to satisfy the vouchers schema.
-            const sphere = 'IDEELL' as const
-            const description = get('description') != null ? String(get('description')) : undefined
-            const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
-            let netAmount = parseNumber(get('netAmount'))
-            let vatRate = parseNumber(get('vatRate')) ?? 19
-            let grossAmount = parseNumber(get('grossAmount'))
-            const inGross = parseNumber(get('inGross'))
-            const outGross = parseNumber(get('outGross'))
-
-            // Special columns: bank/cash in/out
-            const bankIn = parseNumber(get('bankIn'))
-            const bankOut = parseNumber(get('bankOut'))
-            const cashIn = parseNumber(get('cashIn'))
-            const cashOut = parseNumber(get('cashOut'))
-            type Op = { pm: 'BAR' | 'BANK'; t: 'IN' | 'OUT'; amount: number }
-            const ops: Op[] = []
-            if (bankIn != null && bankIn !== 0) ops.push({ pm: 'BANK', t: 'IN', amount: Math.abs(bankIn) })
-            if (bankOut != null && bankOut !== 0) ops.push({ pm: 'BANK', t: 'OUT', amount: Math.abs(bankOut) })
-            if (cashIn != null && cashIn !== 0) ops.push({ pm: 'BAR', t: 'IN', amount: Math.abs(cashIn) })
-            if (cashOut != null && cashOut !== 0) ops.push({ pm: 'BAR', t: 'OUT', amount: Math.abs(cashOut) })
-            // If user supplied separate in/out columns (single paymentMethod), translate into ops
-            if ((inGross != null && inGross !== 0) || (outGross != null && outGross !== 0)) {
-                const pm = paymentMethod || 'BANK'
-                if (inGross != null && inGross !== 0) ops.push({ pm: pm as any, t: 'IN', amount: Math.abs(inGross) })
-                if (outGross != null && outGross !== 0) ops.push({ pm: pm as any, t: 'OUT', amount: Math.abs(outGross) })
-            }
-
-            // Infer type from sign if not provided
-            const signSource = grossAmount ?? netAmount
-            let t: 'IN' | 'OUT' | 'TRANSFER' = (type as any) || 'IN'
-            if (!type && signSource != null) {
-                if (signSource < 0) t = 'OUT'
-                else if (signSource > 0) t = 'IN'
-            }
-            // Normalize amounts: use absolute values
-            if (grossAmount != null) grossAmount = Math.abs(grossAmount)
-            if (netAmount != null) netAmount = Math.abs(netAmount)
-
-            // Earmark by code
-            let earmarkId: number | undefined
-            const earmarkCodeVal = get('earmarkCode')
-            if (earmarkCodeVal != null && String(earmarkCodeVal).trim()) {
-                const code = String(earmarkCodeVal).trim()
-                if (earmarkIdByCode.has(code)) earmarkId = earmarkIdByCode.get(code)
-                else {
-                    const row = d.prepare('SELECT id FROM earmarks WHERE code = ?').get(code) as any
-                    if (row?.id) { earmarkIdByCode.set(code, row.id); earmarkId = row.id }
-                    else throw new Error(`Zweckbindung nicht gefunden: ${code}`)
-                }
-            }
-
-            // Optional category: accept ID or name (custom_categories)
-            let categoryId: number | undefined
-            const categoryVal = get('category')
-            if (categoryVal != null && String(categoryVal).trim()) {
-                const raw = String(categoryVal).trim()
-                const numeric = Number(raw)
-                if (Number.isFinite(numeric) && String(numeric) === raw) {
-                    const existing = d.prepare('SELECT id FROM custom_categories WHERE id = ?').get(numeric) as any
-                    if (!existing?.id) throw new Error(`Kategorie nicht gefunden (ID): ${raw}`)
-                    categoryId = Number(existing.id)
-                } else {
-                    const key = raw.toLowerCase()
-                    if (categoryIdByKey.has(key)) categoryId = categoryIdByKey.get(key)
-                    else {
-                        const row = d.prepare('SELECT id FROM custom_categories WHERE LOWER(name) = LOWER(?) LIMIT 1').get(raw) as any
-                        if (row?.id) {
-                            categoryIdByKey.set(key, Number(row.id))
-                            categoryId = Number(row.id)
-                        } else {
-                            if (options?.createMissingCategories) {
-                                const created = createCustomCategory({ name: raw })
-                                categoryIdByKey.set(key, Number(created.id))
-                                categoryId = Number(created.id)
-                            } else {
-                                throw new Error(`Kategorie nicht gefunden (Name): ${raw}`)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (ops.length > 0) {
-                // From bank/cash columns; create one voucher per non-zero op
-                for (const op of ops) {
-                    const payload: any = { date, type: op.t, sphere, description, paymentMethod: op.pm, vatRate: 0, grossAmount: op.amount }
-                    if (earmarkId != null) payload.earmarkId = earmarkId
-                    if (categoryId != null) payload.categoryId = categoryId
-                    await Promise.resolve(createVoucher(payload))
-                    imported++
-                }
-                track(r, true)
-            } else {
-                // Build payload: prefer gross if present
-                const payload: any = { date, type: t, sphere, description, paymentMethod, vatRate }
-                if (grossAmount != null) payload.grossAmount = grossAmount
-                else if (netAmount != null) payload.netAmount = netAmount
-                else { skipped++; track(r, false, 'Kein Betrag (Netto/Brutto)'); continue }
-                if (earmarkId != null) payload.earmarkId = earmarkId
-                if (categoryId != null) payload.categoryId = categoryId
-                await Promise.resolve(createVoucher(payload))
+            for (const entry of plannedRow.entries) {
+                const created = createVoucherTx(d as any, entry.payload)
+                createdVoucherIds.push(created.id)
                 imported++
-                track(r, true)
             }
+            track(plannedRow.row, true)
         } catch (e: any) {
             skipped++
-            errors.push({ row: r, message: e?.message || String(e) })
-            track(r, false, e?.message || String(e))
+            errors.push({ row: plannedRow.row, message: e?.message || String(e) })
+            track(plannedRow.row, false, e?.message || String(e))
         }
     }
     // If there are errors, write an Excel file with the failed rows for easier correction
@@ -631,12 +1032,12 @@ export async function executeXlsx(
             await (errWb as any).xlsx.writeFile(errorFilePath)
         } catch { /* ignore file save errors */ }
     }
-    return { imported, skipped, errors, rowStatuses, errorFilePath }
+    return { imported, skipped, errors, rowStatuses, errorFilePath, createdVoucherIds }
 }
 
 // Heuristics: detect header row within first 20 rows
 function detectHeader(ws: ExcelJS.Worksheet): { headerRowIdx: number; headers: string[]; idxByHeader: Record<string, number>; score: number } {
-    const maxScan = Math.min(20, ws.actualRowCount)
+    const maxScan = Math.min(20, getWorksheetMaxRow(ws))
     let bestIdx = 1
     let bestScore = -1
     let bestHeaders: string[] = []

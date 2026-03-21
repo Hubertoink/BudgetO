@@ -98,6 +98,218 @@
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
 }
 
+.import-mapping-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.import-preset-flyout {
+    position: relative;
+    margin-left: auto;
+}
+
+.import-preset-flyout__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--border));
+    background:
+        linear-gradient(135deg, color-mix(in oklab, var(--accent) 10%, var(--surface)) 0%, color-mix(in oklab, var(--surface) 92%, transparent) 100%);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.import-preset-flyout__trigger:hover,
+.import-preset-flyout__trigger.is-open {
+    border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+    background:
+        linear-gradient(135deg, color-mix(in oklab, var(--accent) 16%, var(--surface)) 0%, color-mix(in oklab, var(--surface) 94%, transparent) 100%);
+}
+
+.import-preset-flyout__trigger-meta {
+    font-size: 12px;
+    color: var(--text-muted, var(--text-dim));
+    white-space: nowrap;
+}
+
+.import-preset-flyout__panel {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 30;
+    width: min(420px, calc(100vw - 48px));
+    padding: 18px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, color-mix(in oklab, var(--surface) 96%, transparent) 0%, color-mix(in oklab, var(--surface) 88%, var(--accent) 6%) 100%);
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.22),
+        0 8px 18px rgba(0, 0, 0, 0.10);
+}
+
+.import-preset-flyout__arrow {
+    right: 28px;
+}
+
+.import-preset-flyout__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.import-preset-flyout__title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.import-preset-flyout__subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted, var(--text-dim));
+}
+
+.import-preset-flyout__close {
+    white-space: nowrap;
+}
+
+.import-preset-flyout__section {
+    margin-top: 16px;
+    display: grid;
+    gap: 8px;
+}
+
+.import-preset-flyout__section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--accent) 70%, var(--text));
+}
+
+.import-preset-flyout__list {
+    display: grid;
+    gap: 8px;
+    max-height: 220px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.import-preset-flyout__list-item {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 11px 12px;
+    text-align: left;
+    border-radius: 14px;
+    border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+}
+
+.import-preset-flyout__list-item:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in oklab, var(--accent) 26%, var(--border));
+    background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+
+.import-preset-flyout__list-item.is-active {
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 16%, transparent);
+}
+
+.import-preset-flyout__list-name {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.import-preset-flyout__list-meta,
+.import-preset-flyout__hint,
+.import-preset-flyout__empty {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted, var(--text-dim));
+}
+
+.import-preset-flyout__empty {
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px dashed color-mix(in oklab, var(--accent) 22%, var(--border));
+    background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+
+.import-preset-flyout__field {
+    gap: 6px;
+}
+
+.import-preset-flyout__toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in oklab, var(--accent) 16%, var(--border));
+    background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+}
+
+.import-preset-flyout__toggle input {
+    margin-top: 2px;
+}
+
+.import-preset-flyout__toggle-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted, var(--text-dim));
+}
+
+.import-preset-flyout__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.import-preset-flyout__delete.is-armed {
+    border-color: color-mix(in oklab, var(--danger) 55%, var(--border));
+    background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+    color: var(--danger);
+}
+
+@media (max-width: 900px) {
+    .import-mapping-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .import-preset-flyout {
+        margin-left: 0;
+    }
+
+    .import-preset-flyout__trigger {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .import-preset-flyout__panel {
+        width: min(100%, calc(100vw - 32px));
+        left: 0;
+        right: auto;
+    }
+
+    .import-preset-flyout__arrow {
+        left: 24px;
+        right: auto;
+    }
+}
+
 /* Global status flyout (bottom-left) – compact design */
 .status-flyout {
     position: fixed;
@@ -2936,6 +3148,7 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     padding: 1px 6px;
     border-radius: 999px;
     border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
@@ -2943,6 +3156,209 @@ textarea:focus {
     color: var(--danger);
     font-weight: 700;
     line-height: 1.2;
+    cursor: pointer;
+}
+
+.import-preview-table-wrap {
+    border: 1px solid color-mix(in oklab, var(--border) 90%, transparent);
+    border-radius: 12px;
+    overflow: auto;
+    background: color-mix(in oklab, var(--surface) 95%, transparent);
+}
+
+.import-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+    vertical-align: middle;
+}
+
+.import-preview-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: color-mix(in oklab, var(--surface) 98%, transparent);
+}
+
+.import-preview-table__head-cell {
+    min-width: 132px;
+}
+
+.import-preview-table__head-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 700;
+}
+
+.import-preview-table__mapping-select {
+    min-width: 120px;
+    font-size: 12px;
+    padding: 5px 8px;
+    min-height: 30px;
+    border-radius: 9px;
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+}
+
+.import-preview-table td {
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.import-preview-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.import-preview-table .inline-field {
+    gap: 6px;
+    font-size: 12px;
+}
+
+.import-dup-hint:hover {
+    background: color-mix(in oklab, var(--danger) 22%, transparent);
+}
+
+.import-duplicate-modal {
+    width: min(1080px, calc(100vw - 48px));
+}
+
+.import-duplicate-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.import-duplicate-modal__content {
+    display: grid;
+    gap: 16px;
+}
+
+.import-duplicate-modal__import-card,
+.import-duplicate-modal__match-group {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--surface) 94%, transparent);
+    padding: 14px;
+}
+
+.import-duplicate-modal__section-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: color-mix(in oklab, var(--accent) 72%, var(--text));
+}
+
+.import-duplicate-modal__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.import-duplicate-modal__grid .pair--wide {
+    grid-column: 1 / -1;
+}
+
+.import-duplicate-modal__grid .pair {
+    display: grid;
+    gap: 5px;
+    align-content: start;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--surface) 88%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+}
+
+.import-duplicate-modal__grid .k {
+    display: block;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.import-duplicate-modal__grid .v {
+    display: block;
+    font-size: 15px;
+    line-height: 1.45;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-word;
+}
+
+.import-duplicate-modal__candidate-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.import-duplicate-modal__candidate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--border));
+}
+
+.import-duplicate-modal__match-list {
+    display: grid;
+    gap: 10px;
+}
+
+.import-duplicate-modal__match-card {
+    border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+    border-radius: 12px;
+    padding: 14px;
+    background: color-mix(in oklab, var(--surface) 98%, transparent);
+}
+
+.import-duplicate-modal__match-topline {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+}
+
+.import-duplicate-modal__match-topline strong {
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.import-duplicate-modal__match-topline span {
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.import-duplicate-modal__empty {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px dashed color-mix(in oklab, var(--border) 85%, transparent);
+    color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+    .import-duplicate-modal__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .import-duplicate-modal__header,
+    .import-duplicate-modal__match-topline {
+        flex-direction: column;
+    }
 }
 
 .module-toggle-card {
@@ -6237,6 +6653,14 @@ html[data-glass-modals="true"] .flyout-arrow {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
     z-index: 10050;
     pointer-events: none;
+}
+
+.tooltip-portal--card {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    max-width: min(360px, calc(100vw - 24px));
 }
 
 /* Rich tooltip modal (used for FilterTotals hover cards) */

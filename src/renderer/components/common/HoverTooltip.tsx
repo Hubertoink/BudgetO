@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState
 import { createPortal } from 'react-dom'
 
 export type TooltipPlacement = 'bottom' | 'top'
+export type TooltipAlign = 'start' | 'center' | 'end'
 
 export type HoverTooltipRenderArgs<TElement extends HTMLElement> = {
   ref: (el: TElement | null) => void
@@ -16,8 +17,10 @@ export interface HoverTooltipProps<TElement extends HTMLElement = HTMLElement> {
   children: (args: HoverTooltipRenderArgs<TElement>) => React.ReactNode
   className?: string
   preferredPlacement?: TooltipPlacement
+  align?: TooltipAlign
   gap?: number
   margin?: number
+  openDelay?: number
 }
 
 export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>({
@@ -25,13 +28,16 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
   children,
   className,
   preferredPlacement = 'bottom',
+  align = 'center',
   gap = 8,
-  margin = 8
+  margin = 8,
+  openDelay = 0
 }: HoverTooltipProps<TElement>) {
   const tooltipId = useId()
   const [open, setOpen] = useState(false)
   const [anchorEl, setAnchorEl] = useState<TElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const openTimerRef = useRef<number | null>(null)
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({ left: 0, top: 0 })
   const [placement, setPlacement] = useState<TooltipPlacement>(preferredPlacement)
 
@@ -43,6 +49,11 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
     const tip = tooltipRef.current.getBoundingClientRect()
 
     let left = anchor.left + anchor.width / 2 - tip.width / 2
+    if (align === 'start') {
+      left = anchor.left
+    } else if (align === 'end') {
+      left = anchor.right - tip.width
+    }
     left = Math.min(Math.max(left, margin), window.innerWidth - tip.width - margin)
 
     const bottomTop = anchor.bottom + gap
@@ -59,7 +70,31 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
 
     setPlacement(nextPlacement)
     setTooltipStyle({ left, top })
-  }, [anchorEl, content, gap, margin, open, preferredPlacement])
+  }, [align, anchorEl, content, gap, margin, open, preferredPlacement])
+
+  const clearOpenTimer = useCallback(() => {
+    if (openTimerRef.current != null) {
+      window.clearTimeout(openTimerRef.current)
+      openTimerRef.current = null
+    }
+  }, [])
+
+  const openTooltip = useCallback(() => {
+    clearOpenTimer()
+    if (openDelay <= 0) {
+      setOpen(true)
+      return
+    }
+    openTimerRef.current = window.setTimeout(() => {
+      setOpen(true)
+      openTimerRef.current = null
+    }, openDelay)
+  }, [clearOpenTimer, openDelay])
+
+  const closeTooltip = useCallback(() => {
+    clearOpenTimer()
+    setOpen(false)
+  }, [clearOpenTimer])
 
   useLayoutEffect(() => {
     if (!content || !open) return
@@ -92,6 +127,10 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
+  useEffect(() => {
+    return () => clearOpenTimer()
+  }, [clearOpenTimer])
+
   if (!content) {
     return <>{children({ ref: setAnchorEl, props: {} })}</>
   }
@@ -100,10 +139,10 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
     ref: setAnchorEl,
     props: {
       'aria-describedby': open ? tooltipId : undefined,
-      onMouseEnter: () => setOpen(true),
-      onMouseLeave: () => setOpen(false),
-      onFocus: () => setOpen(true),
-      onBlur: () => setOpen(false)
+      onMouseEnter: openTooltip,
+      onMouseLeave: closeTooltip,
+      onFocus: openTooltip,
+      onBlur: closeTooltip
     }
   }
 

@@ -10,7 +10,7 @@ import { MembersImportCard } from '../components/MembersImportCard'
  */
 export function ImportPane({ notify }: ImportPaneProps) {
   const [showLog, setShowLog] = React.useState(false)
-  const [logRows, setLogRows] = React.useState<Array<{ id: number; createdAt: string; entity: string; action: string; diff?: any | null }>>([])
+  const [logRows, setLogRows] = React.useState<Array<{ id: number; createdAt: string; entity: string; action: string; diff?: any | null; undone?: boolean }>>([])
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
   const [tab, setTab] = React.useState<'vouchers' | 'members'>('vouchers')
@@ -18,12 +18,37 @@ export function ImportPane({ notify }: ImportPaneProps) {
   async function loadLog() {
     setErr(''); setBusy(true)
     try {
-      const res = await window.api?.audit?.recent?.({ limit: 50 })
+      const res = await window.api?.audit?.recent?.({ limit: 100 })
       const all = res?.rows || []
-      const onlyImports = all.filter((r: any) => (r.entity === 'imports' || r.entity === 'members_import') && r.action === 'EXECUTE')
+      const undoneIds = new Set<number>(
+        all
+          .filter((r: any) => r.entity === 'imports' && r.action === 'UNDO')
+          .map((r: any) => Number(r.diff?.importAuditId))
+          .filter((value: number) => Number.isFinite(value) && value > 0)
+      )
+      const onlyImports = all
+        .filter((r: any) => (r.entity === 'imports' || r.entity === 'members_import') && r.action === 'EXECUTE')
+        .map((r: any) => ({ ...r, undone: undoneIds.has(Number(r.id)) }))
       setLogRows(onlyImports)
     } catch (e: any) { setErr(e?.message || String(e)) }
     finally { setBusy(false) }
+  }
+
+  async function undoImport(auditId: number) {
+    if (!window.confirm('Diesen Import wirklich rückgängig machen? Bereits angelegte Buchungen aus diesem Import werden gelöscht.')) return
+    setErr('')
+    setBusy(true)
+    try {
+      const res = await window.api?.imports?.undo?.({ auditId })
+      notify?.('success', `Import rückgängig gemacht: ${res?.deleted || 0} Buchung(en) gelöscht${(res?.missing || 0) > 0 ? `, ${(res?.missing || 0)} bereits nicht mehr vorhanden` : ''}`)
+      window.dispatchEvent(new Event('data-changed'))
+      await loadLog()
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+      notify?.('error', 'Import konnte nicht rückgängig gemacht werden: ' + (e?.message || String(e)))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -79,11 +104,13 @@ export function ImportPane({ notify }: ImportPaneProps) {
                     <tr>
                       <th align="left">Zeit</th>
                       <th align="left">Typ</th>
+                      <th align="left">Status</th>
                       <th align="right">Importiert</th>
                       <th align="right">Aktualisiert</th>
                       <th align="right">Übersprungen</th>
                       <th align="right">Fehler</th>
                       <th align="left">Fehler-Datei</th>
+                      <th align="left">Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -92,10 +119,12 @@ export function ImportPane({ notify }: ImportPaneProps) {
                       const fmt = r.entity === 'members_import' ? 'Mitglieder' : (d.format || 'XLSX')
                       const errCnt = Number(d.errorCount || 0)
                       const upd = d.updated
+                      const canUndo = r.entity === 'imports' && !r.undone && Array.isArray(d.createdVoucherIds) && d.createdVoucherIds.length > 0
                       return (
                         <tr key={r.id || i}>
                           <td>{new Date(r.createdAt || d.when || '').toLocaleString()}</td>
                           <td>{fmt}</td>
+                          <td>{r.undone ? 'Rückgängig' : 'Aktiv'}</td>
                           <td align="right">{d.imported ?? '—'}</td>
                           <td align="right">{upd ?? '—'}</td>
                           <td align="right">{d.skipped ?? '—'}</td>
@@ -103,11 +132,16 @@ export function ImportPane({ notify }: ImportPaneProps) {
                           <td>{d.errorFilePath ? (
                             <button className="btn" onClick={() => window.api?.shell?.showItemInFolder?.(d.errorFilePath)} title={String(d.errorFilePath)}>Öffnen</button>
                           ) : '—'}</td>
+                          <td>
+                            {canUndo ? (
+                              <button className="btn" onClick={() => undoImport(r.id)} disabled={busy}>Rückgängig</button>
+                            ) : '—'}
+                          </td>
                         </tr>
                       )
                     })}
                     {logRows.length === 0 && (
-                      <tr><td colSpan={7} className="helper">Keine Einträge vorhanden.</td></tr>
+                      <tr><td colSpan={9} className="helper">Keine Einträge vorhanden.</td></tr>
                     )}
                   </tbody>
                 </table>

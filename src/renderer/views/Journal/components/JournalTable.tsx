@@ -1,6 +1,7 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { IconBank, IconCash, IconArrow, TransferDisplay } from '../../../utils/icons'
 import { ICONS } from '../../../utils/icons.constants'
+import HoverTooltip from '../../../components/common/HoverTooltip'
 
 // Helper function for contrast text color
 function contrastText(bg?: string | null) {
@@ -162,34 +163,6 @@ export default function JournalTable({
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
-    const [hoverBudgetKey, setHoverBudgetKey] = useState<string | null>(null)
-    const [hoverEarmarkKey, setHoverEarmarkKey] = useState<string | null>(null)
-    const [hoverCategoryKey, setHoverCategoryKey] = useState<string | null>(null)
-    const [hoverTagKey, setHoverTagKey] = useState<string | null>(null)
-
-    const hoverCategoryTimer = useRef<number | null>(null)
-    const hoverTagTimer = useRef<number | null>(null)
-
-    const clearHoverCategoryTimer = useCallback(() => {
-        if (hoverCategoryTimer.current != null) {
-            window.clearTimeout(hoverCategoryTimer.current)
-            hoverCategoryTimer.current = null
-        }
-    }, [])
-
-    const clearHoverTagTimer = useCallback(() => {
-        if (hoverTagTimer.current != null) {
-            window.clearTimeout(hoverTagTimer.current)
-            hoverTagTimer.current = null
-        }
-    }, [])
-
-    useEffect(() => {
-        return () => {
-            clearHoverCategoryTimer()
-            clearHoverTagTimer()
-        }
-    }, [clearHoverCategoryTimer, clearHoverTagTimer])
 
     const categoryUsage = useMemo(() => {
         type Usage = {
@@ -450,89 +423,70 @@ export default function JournalTable({
                         (() => {
                             const key = `cat:${r.categoryId}`
                             const usage = categoryUsage.byKey[key]
-                            const hoverKey = `${r.id}:cat:${r.categoryId}`
-                            const hoverActive = hoverCategoryKey === hoverKey
                             const saldo = usage ? (usage.inGross - usage.outGross) : 0
 
                             return (
-                                <div
-                                    style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}
-                                    onMouseEnter={() => {
-                                        clearHoverCategoryTimer()
-                                        hoverCategoryTimer.current = window.setTimeout(() => setHoverCategoryKey(hoverKey), 800)
-                                    }}
-                                    onMouseLeave={() => {
-                                        clearHoverCategoryTimer()
-                                        setHoverCategoryKey(null)
-                                    }}
-                                >
-                                    <button
-                                        type="button"
-                                        className="badge"
-                                        style={{
-                                            background: r.categoryColor || 'var(--surface-alt)',
-                                            color: contrastText(r.categoryColor || undefined),
-                                            border: r.categoryColor ? `1px solid ${r.categoryColor}` : undefined,
-                                            cursor: onCategoryClick ? 'pointer' : undefined,
-                                            maxWidth: 180,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                        aria-label={r.categoryName ? `Nach Kategorie ${r.categoryName} filtern` : 'Nach Kategorie filtern'}
-                                        onClick={(e) => { e.stopPropagation(); onCategoryClick?.({ categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null }) }}
-                                    >
-                                        {r.categoryName || 'Kategorie'}
-                                    </button>
-
-                                    <div
-                                        className="category-usage-tooltip"
-                                        style={{
-                                            position: 'absolute',
-                                            top: '110%',
-                                            right: 0,
-                                            minWidth: 260,
-                                            maxWidth: 'min(360px, calc(100vw - 32px))',
-                                            opacity: hoverActive ? 0.92 : 0,
-                                            pointerEvents: hoverActive ? 'auto' : 'none',
-                                            transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                            transformOrigin: 'top',
-                                            zIndex: 9999,
-                                            transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
-                                        }}
-                                        role="tooltip"
-                                    >
-                                        <div className="category-usage-tooltip__body">
-                                            {usage ? (
-                                                <>
-                                                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {usage.label}
-                                                    </div>
-                                                    <div className="category-usage-tooltip__stats">
-                                                        <div>
-                                                            <div className="category-usage-tooltip__statLabel">Buchungen</div>
-                                                            <div className="category-usage-tooltip__statValue">{usage.count}</div>
+                                <HoverTooltip
+                                    align="end"
+                                    openDelay={800}
+                                    className="tooltip-portal--card"
+                                    content={
+                                        <div className="category-usage-tooltip" role="tooltip">
+                                            <div className="category-usage-tooltip__body">
+                                                {usage ? (
+                                                    <>
+                                                        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {usage.label}
                                                         </div>
-                                                        <div>
-                                                            <div className="category-usage-tooltip__statLabel">Saldo (IN−OUT)</div>
-                                                            <div className="category-usage-tooltip__statValue" style={{ color: saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(saldo)}</div>
+                                                        <div className="category-usage-tooltip__stats">
+                                                            <div>
+                                                                <div className="category-usage-tooltip__statLabel">Buchungen</div>
+                                                                <div className="category-usage-tooltip__statValue">{usage.count}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="category-usage-tooltip__statLabel">Saldo (IN−OUT)</div>
+                                                                <div className="category-usage-tooltip__statValue" style={{ color: saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(saldo)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="category-usage-tooltip__statLabel">Einnahmen (Brutto)</div>
+                                                                <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.inGross)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="category-usage-tooltip__statLabel">Ausgaben (Brutto)</div>
+                                                                <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.outGross)}</div>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <div className="category-usage-tooltip__statLabel">Einnahmen (Brutto)</div>
-                                                            <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.inGross)}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="category-usage-tooltip__statLabel">Ausgaben (Brutto)</div>
-                                                            <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.outGross)}</div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div className="helper" style={{ padding: 6 }}>Keine Daten.</div>
-                                            )}
+                                                    </>
+                                                ) : (
+                                                    <div className="helper" style={{ padding: 6 }}>Keine Daten.</div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    }
+                                >
+                                    {({ ref, props }) => (
+                                        <div ref={ref} {...props} style={{ display: 'inline-block', maxWidth: '100%' }}>
+                                            <button
+                                                type="button"
+                                                className="badge"
+                                                style={{
+                                                    background: r.categoryColor || 'var(--surface-alt)',
+                                                    color: contrastText(r.categoryColor || undefined),
+                                                    border: r.categoryColor ? `1px solid ${r.categoryColor}` : undefined,
+                                                    cursor: onCategoryClick ? 'pointer' : undefined,
+                                                    maxWidth: 180,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                                aria-label={r.categoryName ? `Nach Kategorie ${r.categoryName} filtern` : 'Nach Kategorie filtern'}
+                                                onClick={(e) => { e.stopPropagation(); onCategoryClick?.({ categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null }) }}
+                                            >
+                                                {r.categoryName || 'Kategorie'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </HoverTooltip>
                             )
                         })()
                     ) : useCategoriesModule ? (
@@ -549,8 +503,6 @@ export default function JournalTable({
                     {(r.tags || []).map((t: string) => {
                         const bg = colorFor(t) || undefined
                         const fg = contrastText(bg)
-                        const hoverKey = `${r.id}:tag:${String(t || '').toLowerCase()}`
-                        const hoverActive = hoverTagKey === hoverKey
                         const usage = tagUsage.byKey[`tag:${String(t || '').toLowerCase()}`]
                         const totalOut = tagUsage.totals.outGross
                         const base = totalOut > 0 ? totalOut : Math.max(1, (tagUsage.totals.inGross + tagUsage.totals.outGross))
@@ -558,90 +510,73 @@ export default function JournalTable({
                         const barColor = pct >= 80 ? 'var(--warning)' : 'var(--accent)'
                         const saldo = usage ? (usage.inGross - usage.outGross) : 0
                         return (
-                            <span
+                            <HoverTooltip
                                 key={t}
-                                style={{ position: 'relative', display: 'inline-block' }}
-                                onMouseEnter={() => {
-                                    clearHoverTagTimer()
-                                    hoverTagTimer.current = window.setTimeout(() => setHoverTagKey(hoverKey), 800)
-                                }}
-                                onMouseLeave={() => {
-                                    clearHoverTagTimer()
-                                    setHoverTagKey(null)
-                                }}
+                                align="start"
+                                openDelay={800}
+                                className="tooltip-portal--card"
+                                content={
+                                    <div className="tag-usage-tooltip" role="tooltip">
+                                        <div className="tag-usage-tooltip__list">
+                                            {tagUsage.list.slice(0, 3).map((x, i) => {
+                                                const active = x.tag.toLowerCase() === String(t || '').toLowerCase()
+                                                const localBase = (tagUsage.totals.outGross > 0 ? tagUsage.totals.outGross : Math.max(1, tagUsage.totals.inGross + tagUsage.totals.outGross))
+                                                const localPct = localBase > 0 ? (x.outGross / localBase) * 100 : 0
+                                                const pctColor = localPct >= 80 ? 'var(--warning)' : 'var(--text-dim)'
+                                                return (
+                                                    <div key={`${x.key}:${i}`} className={`tag-usage-tooltip__item ${active ? 'tag-usage-tooltip__item--active' : ''}`.trim()}>
+                                                        <div className="tag-usage-tooltip__itemLabel">{x.tag}</div>
+                                                        <div className="tag-usage-tooltip__itemPct" style={{ color: pctColor }}>{localPct.toFixed(1)}%</div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+
+                                        <div className="tag-usage-tooltip__body">
+                                            {usage ? (
+                                                <>
+                                                    <div className="tag-usage-tooltip__bar">
+                                                        <div className="tag-usage-tooltip__barFill" style={{ width: `${pct}%`, background: barColor }} />
+                                                    </div>
+                                                    <div className="tag-usage-tooltip__stats">
+                                                        <div>
+                                                            <div className="tag-usage-tooltip__statLabel">Buchungen</div>
+                                                            <div className="tag-usage-tooltip__statValue">{usage.count}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="tag-usage-tooltip__statLabel">Saldo (IN−OUT)</div>
+                                                            <div className="tag-usage-tooltip__statValue" style={{ color: saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(saldo)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="tag-usage-tooltip__statLabel">Einnahmen (Brutto)</div>
+                                                            <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.inGross)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="tag-usage-tooltip__statLabel">Ausgaben (Brutto)</div>
+                                                            <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.outGross)}</div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="helper" style={{ padding: 6 }}>Tagdaten werden geladen…</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                }
                             >
-                                <button
-                                    className="chip"
-                                    style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
-                                    aria-label={`Nach Tag ${t} filtern`}
-                                    onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
-                                >
-                                    {t}
-                                </button>
-
-                                <div
-                                    className="tag-usage-tooltip"
-                                    style={{
-                                        position: 'absolute',
-                                        top: '110%',
-                                        left: 0,
-                                        minWidth: 260,
-                                        maxWidth: 'min(360px, calc(100vw - 32px))',
-                                        opacity: hoverActive ? 0.92 : 0,
-                                        pointerEvents: hoverActive ? 'auto' : 'none',
-                                        transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                        transformOrigin: 'top',
-                                        zIndex: 9999,
-                                        transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
-                                    }}
-                                    role="tooltip"
-                                >
-                                    <div className="tag-usage-tooltip__list">
-                                        {tagUsage.list.slice(0, 3).map((x, i) => {
-                                            const active = x.tag.toLowerCase() === String(t || '').toLowerCase()
-                                            const localBase = (tagUsage.totals.outGross > 0 ? tagUsage.totals.outGross : Math.max(1, tagUsage.totals.inGross + tagUsage.totals.outGross))
-                                            const localPct = localBase > 0 ? (x.outGross / localBase) * 100 : 0
-                                            const pctColor = localPct >= 80 ? 'var(--warning)' : 'var(--text-dim)'
-                                            return (
-                                                <div key={`${x.key}:${i}`} className={`tag-usage-tooltip__item ${active ? 'tag-usage-tooltip__item--active' : ''}`.trim()}>
-                                                    <div className="tag-usage-tooltip__itemLabel">{x.tag}</div>
-                                                    <div className="tag-usage-tooltip__itemPct" style={{ color: pctColor }}>{localPct.toFixed(1)}%</div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    <div className="tag-usage-tooltip__body">
-                                        {usage ? (
-                                            <>
-                                                <div className="tag-usage-tooltip__bar">
-                                                    <div className="tag-usage-tooltip__barFill" style={{ width: `${pct}%`, background: barColor }} />
-                                                </div>
-                                                <div className="tag-usage-tooltip__stats">
-                                                    <div>
-                                                        <div className="tag-usage-tooltip__statLabel">Buchungen</div>
-                                                        <div className="tag-usage-tooltip__statValue">{usage.count}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="tag-usage-tooltip__statLabel">Saldo (IN−OUT)</div>
-                                                        <div className="tag-usage-tooltip__statValue" style={{ color: saldo < 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(saldo)}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="tag-usage-tooltip__statLabel">Einnahmen (Brutto)</div>
-                                                        <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.inGross)}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="tag-usage-tooltip__statLabel">Ausgaben (Brutto)</div>
-                                                        <div style={{ fontWeight: 600 }}>{eurFmt.format(usage.outGross)}</div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="helper" style={{ padding: 6 }}>Tagdaten werden geladen…</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </span>
+                                {({ ref, props }) => (
+                                    <span ref={ref} {...props} style={{ display: 'inline-block' }}>
+                                        <button
+                                            className="chip"
+                                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
+                                            aria-label={`Nach Tag ${t} filtern`}
+                                            onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
+                                        >
+                                            {t}
+                                        </button>
+                                    </span>
+                                )}
+                            </HoverTooltip>
                         )
                     })}
 
@@ -700,52 +635,16 @@ export default function JournalTable({
                                 const bg = meta?.color
                                 const fg = contrastText(bg)
                                 const usage = id ? earmarkUsage?.[id] : undefined
-                                const hoverKey = `${r.id}:earmark:${id ?? 'none'}:${idx}`
-                                const hoverActive = hoverEarmarkKey === hoverKey
                                 const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
                                 const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : bg || 'var(--accent)') : (bg || 'var(--accent)')
 
                                 return (
-                                    <div
+                                    <HoverTooltip
                                         key={`${id || code}:${idx}`}
-                                        style={{ position: 'relative', display: 'inline-block', maxWidth: 100 }}
-                                        onMouseEnter={() => setHoverEarmarkKey(hoverKey)}
-                                        onMouseLeave={() => setHoverEarmarkKey(null)}
-                                    >
-                                        <button
-                                            className="badge-earmark"
-                                            style={{
-                                                background: bg || undefined,
-                                                color: bg ? fg : undefined,
-                                                cursor: (onEarmarkClick && id != null) ? 'pointer' : 'default',
-                                                border: bg ? `1px solid ${bg}` : undefined,
-                                                maxWidth: 92,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
-                                            }}
-                                            onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
-                                        >
-                                            {code}
-                                        </button>
-
-                                        <div
-                                            className="earmark-usage-tooltip"
-                                            style={{
-                                                position: 'absolute',
-                                                top: '110%',
-                                                right: 0,
-                                                minWidth: 240,
-                                                maxWidth: 'min(320px, calc(100vw - 32px))',
-                                                opacity: hoverActive ? 1 : 0,
-                                                pointerEvents: hoverActive ? 'auto' : 'none',
-                                                transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                                transformOrigin: 'top',
-                                                zIndex: 9999,
-                                                transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
-                                            }}
-                                            role="tooltip"
-                                        >
+                                        align="end"
+                                        className="tooltip-portal--card"
+                                        content={
+                                            <div className="earmark-usage-tooltip" role="tooltip">
                                                 <div className="earmark-usage-tooltip__list">
                                                     {list.slice(0, 3).map((e: any, i: number) => {
                                                         const eid = Number(e?.earmarkId)
@@ -794,7 +693,29 @@ export default function JournalTable({
                                                     )}
                                                 </div>
                                             </div>
-                                    </div>
+                                        }
+                                    >
+                                        {({ ref, props }) => (
+                                            <div ref={ref} {...props} style={{ display: 'inline-block', maxWidth: 100 }}>
+                                                <button
+                                                    className="badge-earmark"
+                                                    style={{
+                                                        background: bg || undefined,
+                                                        color: bg ? fg : undefined,
+                                                        cursor: (onEarmarkClick && id != null) ? 'pointer' : 'default',
+                                                        border: bg ? `1px solid ${bg}` : undefined,
+                                                        maxWidth: 92,
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                    onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
+                                                >
+                                                    {code}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </HoverTooltip>
                                 )
                             })}
 
@@ -860,52 +781,16 @@ export default function JournalTable({
                                 const bg = (usage?.color || (id === singleId ? singleColor : undefined)) as string | undefined
                                 const fg = contrastText(bg)
                                 const label = (ba.label && String(ba.label).trim()) ? String(ba.label).trim() : (id ? `#${id}` : '—')
-                                const hoverKey = `${r.id}:budget:${id ?? 'none'}:${idx}`
-                                const hoverActive = hoverBudgetKey === hoverKey
                                 const barPct = usage ? Math.min(100, Math.max(0, usage.percent)) : 0
                                 const barColor = usage ? (usage.percent >= 100 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : usage.color || bg || 'var(--accent)') : (bg || 'var(--accent)')
 
                                 return (
-                                    <div
+                                    <HoverTooltip
                                         key={`${id}:${idx}`}
-                                        style={{ position: 'relative', display: 'inline-block', maxWidth: 120 }}
-                                        onMouseEnter={() => setHoverBudgetKey(hoverKey)}
-                                        onMouseLeave={() => setHoverBudgetKey(null)}
-                                    >
-                                        <button
-                                            className="badge-budget"
-                                            style={{
-                                                background: bg,
-                                                color: bg ? fg : undefined,
-                                                cursor: (onBudgetClick && id != null) ? 'pointer' : 'default',
-                                                border: bg ? `1px solid ${bg}` : undefined,
-                                                maxWidth: 120,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
-                                            }}
-                                            onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
-                                        >
-                                            {label}
-                                        </button>
-
-                                        <div
-                                            className="budget-usage-tooltip"
-                                            style={{
-                                                position: 'absolute',
-                                                top: '110%',
-                                                right: 0,
-                                                minWidth: 260,
-                                                maxWidth: 'min(340px, calc(100vw - 32px))',
-                                                opacity: hoverActive ? 1 : 0,
-                                                pointerEvents: hoverActive ? 'auto' : 'none',
-                                                transition: 'opacity 0.15s ease, transform 0.15s ease',
-                                                transformOrigin: 'top',
-                                                zIndex: 9999,
-                                                transform: hoverActive ? 'translate(0, 0)' : 'translate(0, -6px)'
-                                            }}
-                                            role="tooltip"
-                                        >
+                                        align="end"
+                                        className="tooltip-portal--card"
+                                        content={
+                                            <div className="budget-usage-tooltip" role="tooltip">
                                                 <div className="budget-usage-tooltip__list">
                                                     {list.slice(0, 3).map((b: any, i: number) => {
                                                         const bid = Number(b?.budgetId)
@@ -954,7 +839,29 @@ export default function JournalTable({
                                                     )}
                                                 </div>
                                             </div>
-                                    </div>
+                                        }
+                                    >
+                                        {({ ref, props }) => (
+                                            <div ref={ref} {...props} style={{ display: 'inline-block', maxWidth: 120 }}>
+                                                <button
+                                                    className="badge-budget"
+                                                    style={{
+                                                        background: bg,
+                                                        color: bg ? fg : undefined,
+                                                        cursor: (onBudgetClick && id != null) ? 'pointer' : 'default',
+                                                        border: bg ? `1px solid ${bg}` : undefined,
+                                                        maxWidth: 120,
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                    onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
+                                                >
+                                                    {label}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </HoverTooltip>
                                 )
                             })}
 

@@ -226,8 +226,12 @@ declare global {
                 onCloseRequest: (cb: (payload: { running: boolean; port?: number; connectedClients?: number }) => void) => () => void
             }
             imports: {
-                preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
-                execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; errorFilePath?: string }>
+                preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; sampleRowNumbers: number[]; allRowNumbers: number[]; totalRows: number; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
+                analyze: (payload: { fileBase64: string; mapping: Record<string, string | null>; options?: { createMissingCategories?: boolean; selectedRows?: number[] } }) => Promise<{ rows: Array<{ row: number; status: 'ready' | 'skip' | 'error'; message?: string; entries: Array<{ date: string; type: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' | null; description?: string; grossAmount: number; signedGrossAmount: number }> }>; summary: { totalRows: number; readyRows: number; plannedEntries: number; skippedRows: number; errorRows: number } }>
+                execute: (payload: { fileBase64: string; mapping: Record<string, string | null>; options?: { createMissingCategories?: boolean; selectedRows?: number[] } }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; errorFilePath?: string; createdVoucherIds?: number[] }>
+                undo: (payload: { auditId: number }) => Promise<{ deleted: number; missing: number }>
+                duplicates: (payload: { pairs: Array<{ date: string; grossAmount: number }> }) => Promise<{ countsByKey: Record<string, number> }>
+                duplicateDetails: (payload: { pairs: Array<{ date: string; grossAmount: number }> }) => Promise<{ matchesByKey: Record<string, Array<{ id: number; voucherNo?: string | null; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' | null; description?: string | null; counterparty?: string | null; categoryName?: string | null; netAmount?: number | null; vatRate?: number | null; grossAmount: number; earmarkCode?: string | null; budgetLabel?: string | null }>> }>
                 template: () => Promise<{ filePath: string }>
                 testdata: () => Promise<{ filePath: string }>
             }

@@ -926,8 +926,43 @@ export const ImportPreviewInput = z.object({ fileBase64: z.string() })
 export const ImportPreviewOutput = z.object({
     headers: z.array(z.string()),
     sample: z.array(z.record(z.any())),
+    sampleRowNumbers: z.array(z.number()),
+    allRowNumbers: z.array(z.number()),
+    totalRows: z.number(),
     suggestedMapping: z.record(z.string().nullable()),
     headerRowIndex: z.number()
+})
+export const ImportAnalyzeInput = z.object({
+    fileBase64: z.string(),
+    mapping: z.record(z.string().nullable()),
+    options: z
+        .object({
+            createMissingCategories: z.boolean().optional(),
+            selectedRows: z.array(z.number()).optional()
+        })
+        .optional()
+})
+export const ImportAnalyzeOutput = z.object({
+    rows: z.array(z.object({
+        row: z.number(),
+        status: z.enum(['ready', 'skip', 'error']),
+        message: z.string().optional(),
+        entries: z.array(z.object({
+            date: z.string(),
+            type: z.enum(['IN', 'OUT', 'TRANSFER']),
+            paymentMethod: z.enum(['BAR', 'BANK']).nullable().optional(),
+            description: z.string().optional(),
+            grossAmount: z.number(),
+            signedGrossAmount: z.number()
+        }))
+    })),
+    summary: z.object({
+        totalRows: z.number(),
+        readyRows: z.number(),
+        plannedEntries: z.number(),
+        skippedRows: z.number(),
+        errorRows: z.number()
+    })
 })
 export const ImportExecuteInput = z.object({
     fileBase64: z.string(),
@@ -944,8 +979,11 @@ export const ImportExecuteOutput = z.object({
     skipped: z.number(),
     errors: z.array(z.object({ row: z.number(), message: z.string() })),
     rowStatuses: z.array(z.object({ row: z.number(), ok: z.boolean(), message: z.string().optional() })).optional(),
-    errorFilePath: z.string().optional()
+    errorFilePath: z.string().optional(),
+    createdVoucherIds: z.array(z.number()).optional()
 })
+export const ImportUndoInput = z.object({ auditId: z.number() })
+export const ImportUndoOutput = z.object({ deleted: z.number(), missing: z.number() })
 
 export const ImportDuplicatesInput = z.object({
     pairs: z.array(z.object({ date: z.string(), grossAmount: z.number() }))
@@ -953,6 +991,32 @@ export const ImportDuplicatesInput = z.object({
 
 export const ImportDuplicatesOutput = z.object({
     countsByKey: z.record(z.number())
+})
+
+export const ImportDuplicateDetailsInput = z.object({
+    pairs: z.array(z.object({ date: z.string(), grossAmount: z.number() }))
+})
+
+export const ImportDuplicateDetailsOutput = z.object({
+    matchesByKey: z.record(
+        z.array(
+            z.object({
+                id: z.number(),
+                voucherNo: z.string().nullable().optional(),
+                date: z.string(),
+                type: z.enum(['IN', 'OUT', 'TRANSFER']),
+                paymentMethod: z.enum(['BAR', 'BANK']).nullable().optional(),
+                description: z.string().nullable().optional(),
+                counterparty: z.string().nullable().optional(),
+                categoryName: z.string().nullable().optional(),
+                netAmount: z.number().nullable().optional(),
+                vatRate: z.number().nullable().optional(),
+                grossAmount: z.number(),
+                earmarkCode: z.string().nullable().optional(),
+                budgetLabel: z.string().nullable().optional()
+            })
+        )
+    )
 })
 
 // Imports: detect missing categories (from mapped category column)

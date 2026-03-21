@@ -212,9 +212,12 @@ contextBridge.exposeInMainWorld('api', {
     },
     imports: {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
+        analyze: (payload: any) => ipcRenderer.invoke('imports.analyze', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),
+        undo: (payload: any) => ipcRenderer.invoke('imports.undo', payload),
         missingCategories: (payload: any) => ipcRenderer.invoke('imports.missingCategories', payload),
         duplicates: (payload: any) => ipcRenderer.invoke('imports.duplicates', payload),
+        duplicateDetails: (payload: any) => ipcRenderer.invoke('imports.duplicateDetails', payload),
         template: () => ipcRenderer.invoke('imports.template'),
         testdata: () => ipcRenderer.invoke('imports.testdata')
     },
