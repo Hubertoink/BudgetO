@@ -64,6 +64,20 @@ type CashAdvanceWithDetails = CashAdvance & {
   coverage: number
 }
 
+type ProgressBarProps = {
+  label: string
+  value: number
+  max: number
+  color: string
+  subLabel?: string
+  marker?: {
+    value: number
+    color: string
+    label: string
+    trackColor?: string
+  }
+}
+
 export default function CashAdvancesView() {
   const { notify } = useToast()
   const { canWrite } = useAuth()
@@ -580,21 +594,62 @@ export default function CashAdvancesView() {
   // ─────────────────────────────────────────────────────────────────────────
   // Helper: Progress Bar Component
   // ─────────────────────────────────────────────────────────────────────────
-  const ProgressBar = ({ label, value, max, color, subLabel }: { label: string; value: number; max: number; color: string; subLabel?: string }) => {
+  const ProgressBar = ({ label, value, max, color, subLabel, marker }: ProgressBarProps) => {
     const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0
+    const markerPct = marker && max > 0 ? Math.min(100, Math.max(0, (marker.value / max) * 100)) : null
     return (
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="helper">{label}</span>
           <span style={{ fontWeight: 600, color }}>{eurFmt.format(value)}</span>
         </div>
-        <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ position: 'relative', height: 10, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.3s ease' }} />
+          {markerPct !== null ? (
+            <>
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  height: 4,
+                  width: `${markerPct}%`,
+                  background: marker.trackColor || `color-mix(in oklab, ${marker.color} 72%, white 8%)`,
+                  borderRadius: 999,
+                  boxShadow: `0 0 0 1px color-mix(in oklab, ${marker.color} 30%, transparent), 0 0 10px color-mix(in oklab, ${marker.color} 16%, transparent)`,
+                  transition: 'width 0.3s ease'
+                }}
+              />
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: 1,
+                  bottom: 1,
+                  left: `calc(${markerPct}% - 2px)`,
+                  width: 4,
+                  background: marker.color,
+                  borderRadius: 999,
+                  boxShadow: `0 0 0 1px color-mix(in oklab, ${marker.color} 40%, transparent)`
+                }}
+              />
+            </>
+          ) : null}
         </div>
         {subLabel && <div className="helper" style={{ fontSize: 11, marginTop: 2 }}>{subLabel}</div>}
+        {marker ? <div className="helper" style={{ fontSize: 11, marginTop: 2, color: marker.color }}>{marker.label}</div> : null}
       </div>
     )
   }
+
+  const outstandingPartialTotal = detail
+    ? detail.partials.reduce((sum, partial) => sum + (partial.isSettled ? 0 : partial.amount), 0)
+    : 0
+
+  const committedAmount = detail ? detail.totalSettled + outstandingPartialTotal : 0
+  const committedRemaining = detail ? detail.totalAmount - committedAmount : 0
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -827,6 +882,12 @@ export default function CashAdvancesView() {
                 max={detail.totalAmount}
                 color={detail.totalPlanned > detail.totalAmount ? '#F44336' : detail.totalPlanned >= detail.totalAmount * 0.9 ? '#FF9800' : '#2196F3'}
                 subLabel={`Noch verfügbar: ${eurFmt.format(detail.plannedRemaining)}`}
+                marker={{
+                  value: committedAmount,
+                  color: committedAmount > detail.totalAmount ? '#F44336' : '#4CAF50',
+                  trackColor: committedAmount > detail.totalAmount ? '#F44336' : '#8BE28F',
+                  label: `Tatsächlich + offene Vorschüsse: ${eurFmt.format(committedAmount)} · rechnerisch verfügbar: ${eurFmt.format(committedRemaining)}`
+                }}
               />
               
               <ProgressBar 
@@ -911,7 +972,6 @@ export default function CashAdvancesView() {
                         </div>
                         <div className="cash-advance-purchase-row__details helper">
                             {fmtDate(k.date)}
-                            <span>{k.sphere}</span>
                             {getCategoryName(k.categoryId) ? <span>{getCategoryName(k.categoryId)}</span> : null}
                             {k.vatRate ? ` · ${k.vatRate}% MwSt.` : ''}
                             {k.postedVoucherId ? <span>Beleg #{k.postedVoucherId}</span> : null}
