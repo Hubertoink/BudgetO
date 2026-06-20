@@ -994,7 +994,7 @@ export default function JournalView({
                 {/* Textsuche */}
                 <input
                     className="input"
-                    placeholder="Suche (#ID, Text, Betrag …)"
+                    placeholder='Suche (#ID, Text, Betrag, "exakt" …)'
                     value={activeQ}
                     onChange={(e) => { activeSetQ(e.target.value); activeSetPage(1); }}
                     style={{ flex: '1 1 300px' }}

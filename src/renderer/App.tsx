@@ -1174,7 +1174,7 @@ function AppInner() {
                 tags: booking.template.tags || [],
                 budgets: booking.template.budgetId ? [{ budgetId: booking.template.budgetId, amount }] : [],
                 earmarksAssigned: booking.template.earmarkId ? [{ earmarkId: booking.template.earmarkId, amount }] : [],
-                taxonomySelectionById: {},
+                taxonomySelectionById: booking.template.taxonomySelectionById || {},
                 recurringTemplateId: booking.id,
                 recurringDueDate: booking.nextDueDate
             },

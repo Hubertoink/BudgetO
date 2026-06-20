@@ -337,6 +337,131 @@ export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: nu
     return d.prepare(sql).all(...params) as any[]
 }
 
+function parseVoucherSearchAmount(raw: string): number | null {
+    const normalized = raw.replace(/\s+/g, '').replace(',', '.')
+    if (!/^-?\d+(?:\.\d+)?$/.test(normalized)) return null
+    const value = Number(normalized)
+    return Number.isFinite(value) ? value : null
+}
+
+function buildVoucherSearchClause(rawQuery: string, includeIdMatch: boolean): { clause: string; params: any[] } {
+    const qTrim = rawQuery.trim()
+    const exactQuoted = qTrim.match(/^"(.+)"$/)
+    const exact = !!exactQuoted
+    const needle = (exactQuoted ? exactQuoted[1] : qTrim).trim()
+    const amountValue = parseVoucherSearchAmount(needle)
+    const like = `%${needle}%`
+    const likeAmountDot = `%${needle.replace(',', '.')}%`
+    const likeAmountComma = `%${needle.replace('.', ',')}%`
+    const idMatch = includeIdMatch ? needle.match(/^#?(\d+)$/) : null
+
+    if (exact) {
+        const exactSql = `(
+            v.voucher_no = ? COLLATE NOCASE OR v.description = ? COLLATE NOCASE OR v.counterparty = ? COLLATE NOCASE OR v.date = ?
+            OR v.type = ? COLLATE NOCASE OR v.sphere = ? COLLATE NOCASE OR IFNULL(v.payment_method, '') = ? COLLATE NOCASE
+            OR (? IS NOT NULL AND ABS(v.gross_amount) = ?)
+            OR (? IS NOT NULL AND ABS(v.net_amount) = ?)
+            OR REPLACE(printf('%.2f', ABS(v.gross_amount)), '.', ',') = ?
+            OR REPLACE(printf('%.2f', ABS(v.net_amount)), '.', ',') = ?
+            OR EXISTS (SELECT 1 FROM custom_categories cc WHERE cc.id = v.category_id AND cc.name = ? COLLATE NOCASE)
+            OR EXISTS (
+                SELECT 1
+                FROM voucher_taxonomy_terms vtt
+                JOIN category_taxonomies ct ON ct.id = vtt.taxonomy_id
+                JOIN category_terms cterm ON cterm.id = vtt.term_id
+                WHERE vtt.voucher_id = v.id AND (ct.name = ? COLLATE NOCASE OR cterm.name = ? COLLATE NOCASE)
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM voucher_tags vtq
+                JOIN tags tq ON tq.id = vtq.tag_id
+                WHERE vtq.voucher_id = v.id AND tq.name = ? COLLATE NOCASE
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM budgets bq
+                WHERE bq.id = v.budget_id
+                  AND (
+                    IFNULL(bq.name, '') = ? COLLATE NOCASE
+                    OR IFNULL(bq.category_name, '') = ? COLLATE NOCASE
+                    OR IFNULL(bq.project_name, '') = ? COLLATE NOCASE
+                  )
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM earmarks eq
+                WHERE eq.id = v.earmark_id
+                  AND (IFNULL(eq.code, '') = ? COLLATE NOCASE OR IFNULL(eq.name, '') = ? COLLATE NOCASE)
+            )
+        )`
+        const exactParams = [
+            needle, needle, needle, needle,
+            needle, needle, needle,
+            amountValue, amountValue,
+            amountValue, amountValue,
+            needle, needle,
+            needle,
+            needle, needle,
+            needle,
+            needle, needle, needle,
+            needle, needle
+        ]
+        if (idMatch) return { clause: `(v.id = ? OR ${exactSql})`, params: [Number(idMatch[1]), ...exactParams] }
+        return { clause: exactSql, params: exactParams }
+    }
+
+    const fuzzySql = `(
+        v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?
+        OR v.type LIKE ? OR v.sphere LIKE ? OR IFNULL(v.payment_method, '') LIKE ?
+        OR CAST(v.gross_amount AS TEXT) LIKE ? OR CAST(v.net_amount AS TEXT) LIKE ?
+        OR REPLACE(printf('%.2f', ABS(v.gross_amount)), '.', ',') LIKE ?
+        OR REPLACE(printf('%.2f', ABS(v.net_amount)), '.', ',') LIKE ?
+        OR EXISTS (SELECT 1 FROM custom_categories cc WHERE cc.id = v.category_id AND cc.name LIKE ?)
+        OR EXISTS (
+            SELECT 1
+            FROM voucher_taxonomy_terms vtt
+            JOIN category_taxonomies ct ON ct.id = vtt.taxonomy_id
+            JOIN category_terms cterm ON cterm.id = vtt.term_id
+            WHERE vtt.voucher_id = v.id AND (ct.name LIKE ? OR cterm.name LIKE ?)
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM voucher_tags vtq
+            JOIN tags tq ON tq.id = vtq.tag_id
+            WHERE vtq.voucher_id = v.id AND tq.name LIKE ?
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM budgets bq
+            WHERE bq.id = v.budget_id
+              AND (
+                IFNULL(bq.name, '') LIKE ?
+                OR IFNULL(bq.category_name, '') LIKE ?
+                OR IFNULL(bq.project_name, '') LIKE ?
+              )
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM earmarks eq
+            WHERE eq.id = v.earmark_id
+              AND (IFNULL(eq.code, '') LIKE ? OR IFNULL(eq.name, '') LIKE ?)
+        )
+    )`
+    const fuzzyParams = [
+        like, like, like, like,
+        like, like, like,
+        likeAmountDot, likeAmountDot,
+        likeAmountComma, likeAmountComma,
+        like,
+        like, like,
+        like,
+        like, like, like,
+        like, like
+    ]
+    if (idMatch) return { clause: `(v.id = ? OR ${fuzzySql})`, params: [Number(idMatch[1]), ...fuzzyParams] }
+    return { clause: fuzzySql, params: fuzzyParams }
+}
+
 export function listVouchersAdvanced(filters: {
     limit?: number
     offset?: number
@@ -401,9 +526,9 @@ export function listVouchersAdvanced(filters: {
         params.push(budgetId, budgetId)
     }
     if (q && q.trim()) {
-        const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like, like)
+        const search = buildVoucherSearchClause(q, false)
+        wh.push(search.clause)
+        params.push(...search.params)
     }
     if (tag) {
         sql += ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
@@ -474,16 +599,9 @@ export function listVouchersAdvancedPaged(filters: {
         params.push(budgetId, budgetId)
     }
     if (q && q.trim()) {
-        const qTrim = q.trim()
-        const like = `%${qTrim}%`
-        const idMatch = qTrim.match(/^#?(\d+)$/)
-        if (idMatch) {
-            wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-            params.push(Number(idMatch[1]), like, like, like, like)
-        } else {
-            wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-            params.push(like, like, like, like)
-        }
+        const search = buildVoucherSearchClause(q, true)
+        wh.push(search.clause)
+        params.push(...search.params)
     }
 
     // Archive mode: when showArchived is false and no explicit date filter, limit to workYear

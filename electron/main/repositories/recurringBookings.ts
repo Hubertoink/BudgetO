@@ -15,6 +15,7 @@ export type RecurringBookingTemplateData = {
   budgetId?: number | null
   earmarkId?: number | null
   tags?: string[]
+  taxonomySelectionById?: Record<string, number>
 }
 
 export type RecurringBookingUpsertInput = {

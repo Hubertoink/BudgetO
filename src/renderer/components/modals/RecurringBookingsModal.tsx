@@ -26,6 +26,7 @@ export type RecurringBooking = {
     budgetId?: number | null
     earmarkId?: number | null
     tags?: string[]
+    taxonomySelectionById?: Record<string, number>
   }
   createdAt: string
 }
@@ -45,6 +46,7 @@ type FormState = {
   paymentMethod: 'BAR' | 'BANK'
   categoryId: number | null
   tags: string[]
+  taxonomySelectionById: Record<string, number>
 }
 
 type Props = {
@@ -81,7 +83,8 @@ function emptyForm(): FormState {
     grossAmount: 0,
     paymentMethod: 'BANK',
     categoryId: null,
-    tags: []
+    tags: [],
+    taxonomySelectionById: {}
   }
 }
 
@@ -100,7 +103,8 @@ function formFromBooking(booking: RecurringBooking): FormState {
     grossAmount: booking.template.grossAmount,
     paymentMethod: booking.template.paymentMethod,
     categoryId: booking.template.categoryId ?? null,
-    tags: booking.template.tags || []
+    tags: booking.template.tags || [],
+    taxonomySelectionById: booking.template.taxonomySelectionById || {}
   }
 }
 
@@ -109,6 +113,9 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<FormState | null>(null)
   const [saving, setSaving] = useState(false)
+  const [taxonomies, setTaxonomies] = useState<Array<{ id: number; name: string }>>([])
+  const [taxonomyTermsById, setTaxonomyTermsById] = useState<Record<number, Array<{ id: number; name: string }>>>({})
+  const [loadingTaxonomies, setLoadingTaxonomies] = useState(true)
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const load = useCallback(async () => {
@@ -124,6 +131,34 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
   }, [notify])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingTaxonomies(true)
+      try {
+        const taxonomyResult = await window.api?.taxonomies?.list?.({ includeInactive: false })
+        const activeTaxonomies = ((taxonomyResult?.taxonomies || []) as Array<{ id: number; name: string }>)
+          .map((taxonomy) => ({ id: Number(taxonomy.id), name: taxonomy.name }))
+        const termResults = await Promise.all(activeTaxonomies.map(async (taxonomy) => {
+          const result = await window.api?.taxonomies?.terms?.list?.({ taxonomyId: taxonomy.id, includeInactive: false })
+          return [taxonomy.id, ((result?.terms || []) as Array<{ id: number; name: string }>).map((term) => ({ id: Number(term.id), name: term.name }))] as const
+        }))
+        if (cancelled) return
+        const termsById = Object.fromEntries(termResults) as Record<number, Array<{ id: number; name: string }>>
+        setTaxonomyTermsById(termsById)
+        setTaxonomies(activeTaxonomies.filter((taxonomy) => (termsById[taxonomy.id] || []).length > 0))
+      } catch {
+        if (!cancelled) {
+          setTaxonomies([])
+          setTaxonomyTermsById({})
+        }
+      } finally {
+        if (!cancelled) setLoadingTaxonomies(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -162,7 +197,8 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
           vatRate: 0,
           paymentMethod: form.paymentMethod,
           categoryId: form.categoryId,
-          tags: form.tags
+          tags: form.tags,
+          taxonomySelectionById: form.taxonomySelectionById
         }
       })
       notify('success', form.id ? 'Wiederholung aktualisiert.' : 'Wiederholung angelegt.')
@@ -287,7 +323,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
             <header className="modal-header-flex recurring-editor-header">
               <div className="recurring-editor-title-row">
                 <h2>{form.id ? 'Wiederholung bearbeiten' : '+ Wiederholung'}</h2>
-                <div className="inline-flex items-center gap-8">
+                <div className="recurring-editor-actions inline-flex items-center gap-8">
                   <span className="helper">Ctrl+S</span>
                   <button type="button" className="btn primary" disabled={saving} onClick={() => { void save() }}>{saving ? 'Speichert …' : 'Speichern'}</button>
                   <button type="button" className="btn ghost icon-btn" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
@@ -333,6 +369,32 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
                 <div className="helper">Beschreibung & Tags</div>
                 <label className="field"><span className="recurring-field-label">Beschreibung <span className="req-asterisk">*</span></span><input className="input" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="z. B. Creative Cloud Monatsabo" /></label>
                 <TagsEditor label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} tagDefs={tagDefs} className="tags-editor" />
+                {loadingTaxonomies ? <div className="helper">Lade Taxonomien …</div> : null}
+                {taxonomies.length > 0 ? (
+                  <div className="recurring-taxonomy-fields">
+                    <div className="helper recurring-taxonomy-heading">Eigene Taxonomie</div>
+                    <div className="recurring-taxonomy-grid">
+                      {taxonomies.map((taxonomy) => (
+                        <label className="field" key={taxonomy.id}>
+                          <span>{taxonomy.name}</span>
+                          <select
+                            className="input"
+                            value={form.taxonomySelectionById[String(taxonomy.id)] ?? ''}
+                            onChange={(event) => {
+                              const nextSelections = { ...form.taxonomySelectionById }
+                              if (event.target.value) nextSelections[String(taxonomy.id)] = Number(event.target.value)
+                              else delete nextSelections[String(taxonomy.id)]
+                              setForm({ ...form, taxonomySelectionById: nextSelections })
+                            }}
+                          >
+                            <option value="">— keine —</option>
+                            {(taxonomyTermsById[taxonomy.id] || []).map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </section>
             </form>
           </div>

@@ -163,9 +163,9 @@ Die erstellten Dateien findest du im `release/` Ordner:
 
 | Plattform | Datei                     |
 | --------- | ------------------------- |
-| Windows   | `BudgetO-Setup-1.0.0.exe` |
-| macOS     | `BudgetO-1.0.0.dmg`       |
-| Linux     | `BudgetO-1.0.0.AppImage`  |
+| Windows   | `BudgetO-Setup-2.0.0.exe` |
+| macOS     | `BudgetO-2.0.0.dmg`       |
+| Linux     | `BudgetO-2.0.0.AppImage`  |
 
 ---
 

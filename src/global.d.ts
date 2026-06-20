@@ -114,6 +114,7 @@ declare global {
                         budgetId?: number | null
                         earmarkId?: number | null
                         tags?: string[]
+                        taxonomySelectionById?: Record<string, number>
                     }
                     createdAt: string
                 }> }>
@@ -126,6 +127,12 @@ declare global {
                 list: (payload?: { q?: string; includeUsage?: boolean }) => Promise<{ rows: Array<{ id: number; name: string; color?: string | null; usage?: number }> }>
                 upsert: (payload: { id?: number; name: string; color?: string | null }) => Promise<{ id: number }>
                 delete: (payload: { id: number }) => Promise<{ id: number }>
+            }
+            taxonomies?: {
+                list: (payload?: { includeInactive?: boolean }) => Promise<{ taxonomies: Array<{ id: number; name: string }> }>
+                terms: {
+                    list: (payload: { taxonomyId: number; includeInactive?: boolean }) => Promise<{ terms: Array<{ id: number; name: string }> }>
+                }
             }
             audit: {
                 recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; userId?: number | null; entity: string; entityId: number; action: string; createdAt: string; diff?: any | null }> }>

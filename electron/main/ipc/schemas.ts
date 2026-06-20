@@ -73,7 +73,8 @@ export const RecurringBookingTemplateData = z.object({
     categoryId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
     earmarkId: z.number().nullable().optional(),
-    tags: z.array(z.string()).optional()
+    tags: z.array(z.string()).optional(),
+    taxonomySelectionById: z.record(z.string(), z.number().int().positive()).optional()
 })
 export const RecurringBookingSchema = z.object({
     id: z.number(),
