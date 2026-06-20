@@ -264,6 +264,22 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
+  const [showBookingDraftTabs, setShowBookingDraftTabs] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ui.showBookingDraftTabs') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const [showBookingEditTabs, setShowBookingEditTabs] = useState<boolean>(() => {
+    try { return localStorage.getItem('ui.showBookingEditTabs') === 'true' } catch { return false }
+  })
+
+  const [bookingsOpenDetached, setBookingsOpenDetached] = useState<boolean>(() => {
+    try { return localStorage.getItem('ui.bookingsOpenDetached') === 'true' } catch { return false }
+  })
+
 
   useEffect(() => {
     localStorage.setItem('ui.navLayout', navLayout)
@@ -295,6 +311,18 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem('ui.journalRowDensity', journalRowDensity)
     document.documentElement.setAttribute('data-journal-row-density', journalRowDensity)
   }, [journalRowDensity])
+
+  useEffect(() => {
+    localStorage.setItem('ui.showBookingDraftTabs', String(showBookingDraftTabs))
+  }, [showBookingDraftTabs])
+
+  useEffect(() => {
+    localStorage.setItem('ui.showBookingEditTabs', String(showBookingEditTabs))
+  }, [showBookingEditTabs])
+
+  useEffect(() => {
+    localStorage.setItem('ui.bookingsOpenDetached', String(bookingsOpenDetached))
+  }, [bookingsOpenDetached])
 
   useEffect(() => {
     localStorage.setItem('ui.backgroundImage', backgroundImage)
@@ -341,7 +369,13 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         glassModals,
         setGlassModals,
         modalBackdropBlur,
-        setModalBackdropBlur
+        setModalBackdropBlur,
+        showBookingDraftTabs,
+        setShowBookingDraftTabs,
+        showBookingEditTabs,
+        setShowBookingEditTabs,
+        bookingsOpenDetached,
+        setBookingsOpenDetached
       }}
     >
       {children}

@@ -26,7 +26,7 @@ import SetupWizardModal from './components/modals/SetupWizardModal'
 import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
 import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
-import { useQuickAdd } from './hooks/useQuickAdd'
+import { useQuickAdd, type QA } from './hooks/useQuickAdd'
 import { useArchiveSettings } from './hooks/useArchiveSettings'
 import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/toastHooks'
@@ -148,13 +148,15 @@ function AboutModal({ onClose }: { onClose: () => void }) {
     )
 }
 
-function CloseWhileServerRunningModal({
+function CloseApplicationModal({
     payload,
+    openDraftCount,
     onCancel,
     onQuit,
     onTray
 }: {
-    payload: { port?: number; connectedClients?: number }
+    payload: { running: boolean; port?: number; connectedClients?: number }
+    openDraftCount: number
     onCancel: () => void
     onQuit: () => void
     onTray: () => void
@@ -174,25 +176,45 @@ function CloseWhileServerRunningModal({
     if (typeof payload.port === 'number') detailParts.push(`Port ${payload.port}`)
     if (typeof payload.connectedClients === 'number') detailParts.push(`Clients: ${payload.connectedClients}`)
     const detail = detailParts.length ? detailParts.join(' · ') : ''
+    const hasDrafts = openDraftCount > 0
+    const title = hasDrafts && payload.running
+        ? 'Offene Entwürfe und aktiver Server'
+        : hasDrafts
+            ? 'Offene Buchungsentwürfe'
+            : 'Server läuft'
 
     return createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onCancel}>
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0 }}>Server läuft</h2>
+                    <h2 style={{ margin: 0 }}>{title}</h2>
                     <button className="btn ghost" onClick={onCancel} aria-label="Schließen">✕</button>
                 </header>
 
-                <div className="helper">
-                    Der BudgetO Server ist aktuell aktiv{detail ? ` (${detail})` : ''}. Wirklich beenden?
-                </div>
+                {hasDrafts && (
+                    <div className="helper">
+                        {openDraftCount === 1
+                            ? 'Ein Buchungsentwurf oder eine Bearbeitung ist noch geöffnet.'
+                            : `${openDraftCount} Buchungsentwürfe oder Bearbeitungen sind noch geöffnet.`}{' '}
+                        Beim Beenden werden diese offenen Vorgänge verworfen.
+                    </div>
+                )}
+                {payload.running && (
+                    <div className="helper">
+                        Der BudgetO Server ist aktuell aktiv{detail ? ` (${detail})` : ''}.
+                    </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn" onClick={onCancel}>Abbrechen</button>
-                    <button className="btn primary" onClick={onTray} style={{ whiteSpace: 'nowrap' }}>
-                        Im Tray weiterlaufen lassen
+                    {payload.running && (
+                        <button className="btn primary" onClick={onTray} style={{ whiteSpace: 'nowrap' }}>
+                            Im Tray weiterlaufen lassen
+                        </button>
+                    )}
+                    <button className="btn danger" onClick={onQuit}>
+                        {hasDrafts ? 'Offene Vorgänge verwerfen und schließen' : 'Schließen'}
                     </button>
-                    <button className="btn danger" onClick={onQuit}>Schließen</button>
                 </div>
             </div>
         </div>,
@@ -200,7 +222,10 @@ function CloseWhileServerRunningModal({
     )
 }
 
-function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
+function TopHeaderOrg({ notify, beforeOrgSwitch }: {
+    notify?: (type: 'success' | 'error' | 'info', text: string) => void
+    beforeOrgSwitch?: () => boolean
+}) {
     const [showAbout, setShowAbout] = useState(false)
     
     return (
@@ -213,9 +238,299 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
             >
                 <img src={appLogo} alt="BudgetO" width={24} height={24} style={{ borderRadius: 4, display: 'block' }} />
             </button>
-            <OrgSwitcher notify={notify} />
+            <OrgSwitcher notify={notify} beforeSwitch={beforeOrgSwitch} />
             {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
         </div>
+    )
+}
+
+function fileFromBase64(file: { name?: string; dataBase64?: string; mime?: string }) {
+    const binary = atob(String(file.dataBase64 || ''))
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+    return new File([bytes], String(file.name || 'Datei'), { type: file.mime || '' })
+}
+
+function serializeDetachedBooking(qa: any, files: File[]) {
+    return JSON.stringify({
+        qa: {
+            ...qa,
+            tags: Array.isArray(qa?.tags) ? [...qa.tags].sort() : [],
+            budgets: Array.isArray(qa?.budgets) ? qa.budgets : [],
+            earmarksAssigned: Array.isArray(qa?.earmarksAssigned) ? qa.earmarksAssigned : [],
+            taxonomySelectionById: qa?.taxonomySelectionById || {}
+        },
+        files: files.map((file) => ({ name: file.name, size: file.size, type: file.type }))
+    })
+}
+
+function buildDetachedEditPayload(qa: any) {
+    const budgets = Array.isArray(qa?.budgets)
+        ? qa.budgets.filter((item: any) => item.budgetId && Number(item.amount) > 0).map((item: any) => ({ budgetId: Number(item.budgetId), amount: Number(item.amount) }))
+        : []
+    const earmarks = Array.isArray(qa?.earmarksAssigned)
+        ? qa.earmarksAssigned.filter((item: any) => item.earmarkId && Number(item.amount) > 0).map((item: any) => ({ earmarkId: Number(item.earmarkId), amount: Number(item.amount) }))
+        : []
+    const payload: any = {
+        id: Number(qa.id),
+        date: qa.date,
+        description: qa.description ?? null,
+        type: qa.type,
+        sphere: qa.sphere,
+        categoryId: qa.categoryId ?? null,
+        paymentMethod: qa.type === 'TRANSFER' ? null : (qa.paymentMethod ?? null),
+        transferFrom: qa.type === 'TRANSFER' ? (qa.transferFrom ?? null) : null,
+        transferTo: qa.type === 'TRANSFER' ? (qa.transferTo ?? null) : null,
+        budgetId: budgets[0]?.budgetId ?? null,
+        budgetAmount: budgets[0]?.amount ?? null,
+        earmarkId: earmarks[0]?.earmarkId ?? null,
+        earmarkAmount: earmarks[0]?.amount ?? null,
+        budgets,
+        earmarks,
+        tags: Array.isArray(qa.tags) ? qa.tags : []
+    }
+    if (qa.type === 'TRANSFER' || qa.mode === 'GROSS') {
+        payload.grossAmount = Number(qa.grossAmount || 0)
+        payload.vatRate = 0
+    } else {
+        payload.netAmount = Number(qa.netAmount || 0)
+        payload.vatRate = Number(qa.vatRate || 0)
+    }
+    return payload
+}
+
+function DetachedBookingWindow() {
+    const { notify } = useToast()
+    const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+    const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
+    const draftIdRef = useRef('')
+    const initialSnapshotRef = useRef('')
+    const savedRef = useRef(false)
+    const [loaded, setLoaded] = useState(false)
+    const [mode, setMode] = useState<'create' | 'edit'>('create')
+    const [editQa, setEditQa] = useState<any | null>(null)
+    const [editFiles, setEditFiles] = useState<File[]>([])
+    const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
+    const [budgetsForEdit, setBudgetsForEdit] = useState<Array<{ id: number; label: string }>>([])
+    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    const [customCategories, setCustomCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    const [descSuggest, setDescSuggest] = useState<string[]>([])
+    const [existingFiles, setExistingFiles] = useState<Array<{ id: number; fileName: string }>>([])
+    const [existingFilesLoading, setExistingFilesLoading] = useState(false)
+
+    const {
+        quickAdd,
+        qa,
+        setQa,
+        onQuickSave,
+        files,
+        setFiles,
+        openFilePicker,
+        onDropFiles,
+        openQuickAdd,
+        activeDraftId,
+        reopenDraft
+    } = useQuickAdd(today, async (payload) => {
+        try {
+            const result = await window.api?.vouchers.create?.(payload)
+            if (result) {
+                savedRef.current = true
+                notify('success', `Beleg erstellt: #${result.voucherNo}`)
+                await window.api?.quickAdd?.notifySaved?.({ ...result, draftId: draftIdRef.current, mode: 'create' })
+            }
+            return result
+        } catch (error: any) {
+            notify('error', String(error?.message || error))
+            return null
+        }
+    }, () => fileInputRef.current?.click(), notify, true, () => {})
+
+    const refreshExistingFiles = useCallback(async (voucherId: number) => {
+        setExistingFilesLoading(true)
+        try {
+            const result = await window.api?.attachments.list?.({ voucherId })
+            setExistingFiles((result as any)?.files || (result as any)?.rows || [])
+        } catch {
+            setExistingFiles([])
+        } finally {
+            setExistingFilesLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const [bindingsResult, budgetsResult, tagsResult, categoriesResult, recentResult] = await Promise.all([
+                    window.api?.bindings?.list?.({ activeOnly: true }),
+                    window.api?.budgets?.list?.({ includeArchived: true } as any),
+                    window.api?.tags?.list?.({ includeUsage: true }),
+                    (window as any).api?.customCategories?.list?.(),
+                    window.api?.vouchers?.recent?.({ limit: 50 })
+                ])
+                if (cancelled) return
+                const bindingRows = (bindingsResult as any)?.rows || []
+                setEarmarks(bindingRows)
+                const bindingMap = new Map<number, any>(bindingRows.map((item: any) => [Number(item.id), item]))
+                setBudgetsForEdit(((budgetsResult as any)?.rows || []).map((budget: any) => ({
+                    id: Number(budget.id),
+                    label: String(budget.name || budget.categoryName || budget.projectName || (budget.earmarkId ? bindingMap.get(Number(budget.earmarkId))?.code : '') || budget.year || `Budget #${budget.id}`)
+                })))
+                setTagDefs((tagsResult as any)?.rows || [])
+                setCustomCategories(Array.isArray(categoriesResult) ? categoriesResult : (categoriesResult?.categories || categoriesResult?.rows || []))
+                setDescSuggest(Array.from(new Set(((recentResult as any)?.rows || []).map((item: any) => String(item.description || '').trim()).filter(Boolean))))
+            } catch (error: any) {
+                if (!cancelled) notify('error', 'Stammdaten konnten nicht geladen werden: ' + String(error?.message || error))
+            }
+        })()
+        return () => { cancelled = true }
+    }, [notify])
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            const token = new URLSearchParams(window.location.search).get('token') || ''
+            const result = token ? await window.api?.quickAdd?.detachedInitial?.({ token }) : null
+            const initial = result?.initial || {}
+            if (cancelled) return
+            draftIdRef.current = String(initial.draftId || token)
+            const initialFiles = Array.isArray(initial.files) ? initial.files.map(fileFromBase64) : []
+            if (initial.mode === 'edit') {
+                const form = {
+                    ...(initial.qa || {}),
+                    id: Number(initial.qa?.id || initial.voucherId),
+                    description: initial.qa?.description ?? '',
+                    mode: initial.qa?.mode || (Number(initial.qa?.netAmount || 0) > 0 ? 'NET' : 'GROSS'),
+                    budgets: initial.qa?.budgets || [],
+                    earmarksAssigned: initial.qa?.earmarksAssigned || [],
+                    tags: initial.qa?.tags || []
+                }
+                try {
+                    const assignmentsResult = await window.api?.vouchers?.taxonomyAssignments?.list?.({ voucherId: form.id })
+                    const selection: Record<number, number | ''> = {}
+                    for (const assignment of (assignmentsResult?.assignments || [])) selection[Number(assignment.taxonomyId)] = Number(assignment.termId)
+                    form.taxonomySelectionById = selection
+                } catch { /* optional */ }
+                setMode('edit')
+                setEditQa(form)
+                setEditFiles(initialFiles)
+                initialSnapshotRef.current = serializeDetachedBooking(form, initialFiles)
+                void refreshExistingFiles(form.id)
+            } else {
+                setMode('create')
+                openQuickAdd(initial.qa ? { qa: initial.qa as QA, files: initialFiles } : undefined)
+                initialSnapshotRef.current = serializeDetachedBooking(initial.qa || {
+                    date: today, type: 'OUT', sphere: 'IDEELL', mode: 'GROSS', grossAmount: 100, vatRate: 0, description: '', paymentMethod: 'BAR', budgets: [], earmarksAssigned: [], taxonomySelectionById: {}
+                }, initialFiles)
+            }
+            setLoaded(true)
+        })().catch((error) => notify('error', String(error?.message || error)))
+        return () => { cancelled = true }
+    }, [notify, openQuickAdd, refreshExistingFiles, today])
+
+    const activeQa = mode === 'edit' ? editQa : qa
+    const activeFiles = mode === 'edit' ? editFiles : files
+    const requestClose = useCallback(() => {
+        const dirty = activeQa && serializeDetachedBooking(activeQa, activeFiles) !== initialSnapshotRef.current
+        // Do not prompt when closing the window — tabs manage unsaved state.
+        // Always proceed with the close (unsaved changes will be discarded).
+        void window.api?.window?.confirmClose?.()
+    }, [activeDraftId, activeFiles, activeQa, mode, reopenDraft])
+
+    useEffect(() => window.api?.window?.onCloseRequested?.(requestClose), [requestClose])
+
+    useEffect(() => {
+        if (!loaded || !draftIdRef.current || !activeQa) return
+        const timer = window.setTimeout(() => {
+            void (async () => {
+                const encodedFiles = await Promise.all(activeFiles.map(async (file) => ({ name: file.name, dataBase64: bufferToBase64Safe(await file.arrayBuffer()), mime: file.type || undefined })))
+                await window.api?.quickAdd?.syncDraft?.({ draftId: draftIdRef.current, qa: activeQa, files: encodedFiles, mode })
+            })()
+        }, 200)
+        return () => window.clearTimeout(timer)
+    }, [activeFiles, activeQa, loaded, mode])
+
+    useEffect(() => {
+        if (loaded && mode === 'create' && savedRef.current && !quickAdd) void window.api?.window?.confirmClose?.()
+    }, [loaded, mode, quickAdd])
+
+    useEffect(() => {
+        if (loaded && mode === 'create' && !savedRef.current && !quickAdd) requestClose()
+    }, [loaded, mode, quickAdd, requestClose])
+
+    const saveEdit = useCallback(async () => {
+        if (!editQa?.id) return
+        try {
+            await window.api?.vouchers.update?.(buildDetachedEditPayload(editQa))
+            for (const file of editFiles) {
+                await window.api?.attachments.add?.({ voucherId: Number(editQa.id), fileName: file.name, dataBase64: bufferToBase64Safe(await file.arrayBuffer()), mimeType: file.type || undefined })
+            }
+            const selections = editQa.taxonomySelectionById || {}
+            for (const [taxonomyId, termId] of Object.entries(selections)) {
+                await window.api?.vouchers?.taxonomyAssignments?.set?.({ voucherId: Number(editQa.id), taxonomyId: Number(taxonomyId), termId: typeof termId === 'number' ? termId : null })
+            }
+            savedRef.current = true
+            notify('success', 'Buchung gespeichert')
+            await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: draftIdRef.current, mode: 'edit' })
+            void window.api?.window?.confirmClose?.()
+        } catch (error: any) {
+            notify('error', String(error?.message || error))
+        }
+    }, [editFiles, editQa, notify])
+
+    useEffect(() => {
+        if (mode !== 'edit') return
+        const onKeyDown = (event: KeyboardEvent) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                event.preventDefault()
+                void saveEdit()
+            } else if (event.key === 'Escape') {
+                event.preventDefault()
+                requestClose()
+            }
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [mode, requestClose, saveEdit])
+
+    if (!loaded || !activeQa) return <div className="detached-quick-add-loading">Buchungsfenster wird vorbereitet…</div>
+
+    return (
+        <QuickAddModal
+            qa={activeQa}
+            setQa={mode === 'edit' ? setEditQa : setQa}
+            onSave={mode === 'edit' ? saveEdit : onQuickSave}
+            onClose={requestClose}
+            windowMode
+            saveLabel={mode === 'edit' ? 'Änderungen speichern' : 'Speichern'}
+            files={activeFiles}
+            setFiles={mode === 'edit' ? setEditFiles : setFiles}
+            openFilePicker={() => fileInputRef.current?.click()}
+            onDropFiles={(fileList) => {
+                if (!fileList) return
+                const next = [...activeFiles, ...Array.from(fileList)]
+                if (mode === 'edit') setEditFiles(next)
+                else setFiles(next)
+            }}
+            fileInputRef={fileInputRef}
+            fmtDate={(value) => value}
+            eurFmt={eurFmt}
+            budgetsForEdit={budgetsForEdit}
+            earmarks={earmarks}
+            tagDefs={tagDefs}
+            descSuggest={descSuggest}
+            customCategories={customCategories}
+            useCategoriesModule
+            title={mode === 'edit' ? 'Buchung bearbeiten' : '+ Buchung'}
+            existingFiles={mode === 'edit' ? existingFiles : []}
+            existingFilesLoading={mode === 'edit' && existingFilesLoading}
+            onOpenExistingFile={mode === 'edit' ? (fileId) => { void window.api?.attachments.open?.({ fileId }) } : undefined}
+            onDownloadExistingFile={mode === 'edit' ? (fileId) => { void window.api?.attachments.saveAs?.({ fileId }) } : undefined}
+            onDeleteExistingFile={mode === 'edit' ? (file) => {
+                void window.api?.attachments.delete?.({ fileId: file.id }).then(() => refreshExistingFiles(Number(editQa.id)))
+            } : undefined}
+        />
     )
 }
 
@@ -224,11 +539,15 @@ function AppInner() {
     // Use toast context
     const { notify } = useToast()
 
-    const [closeServerPayload, setCloseServerPayload] = useState<null | { port?: number; connectedClients?: number }>(null)
+    const [closeServerPayload, setCloseServerPayload] = useState<null | { running: boolean; port?: number; connectedClients?: number }>(null)
+    const closeGuardHasDraftsRef = useRef(false)
     useEffect(() => {
         const off = window.api?.app?.onCloseRequest?.((p) => {
-            if (!p?.running) return
-            setCloseServerPayload({ port: p.port, connectedClients: p.connectedClients })
+            if (!p?.running && !closeGuardHasDraftsRef.current) {
+                void window.api?.app?.closeAction?.({ action: 'quit' })
+                return
+            }
+            setCloseServerPayload({ running: !!p?.running, port: p?.port, connectedClients: p?.connectedClients })
         })
         return () => {
             try { off?.() } catch { /* ignore */ }
@@ -378,7 +697,13 @@ function AppInner() {
         glassModals,
         setGlassModals,
         modalBackdropBlur,
-        setModalBackdropBlur
+        setModalBackdropBlur,
+        showBookingDraftTabs,
+        setShowBookingDraftTabs,
+        showBookingEditTabs,
+        setShowBookingEditTabs,
+        bookingsOpenDetached,
+        setBookingsOpenDetached
     } = useUIPreferences()
     
     // Open invoices count for nav badge
@@ -658,7 +983,29 @@ function AppInner() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, closeModal } = useQuickAdd(
+    const openNewBookingRef = useRef<() => void>(() => {})
+    const {
+        quickAdd,
+        qa,
+        setQa,
+        onQuickSave,
+        files,
+        setFiles,
+        openFilePicker,
+        onDropFiles,
+        openQuickAdd,
+        parkQuickAdd,
+        bookingDrafts,
+        activeDraftId,
+        reopenDraft,
+        closeDraft,
+        markDraftDetached,
+        markDraftDocked,
+        dockAndOpenDraft,
+        updateDraft,
+        clearDrafts,
+        hasOpenDrafts
+    } = useQuickAdd(
         today, 
         async (p: any) => {
         try {
@@ -681,7 +1028,145 @@ function AppInner() {
             notify('error', friendlyError(e))
             return null
         }
-    }, () => fileInputRef.current?.click(), notify)
+    }, () => fileInputRef.current?.click(), notify, showBookingDraftTabs, () => openNewBookingRef.current())
+    const [openEditTabCount, setOpenEditTabCount] = useState(0)
+    const [untrackedDetachedBookingIds, setUntrackedDetachedBookingIds] = useState<Set<string>>(() => new Set())
+    const registerDetachedEdit = useCallback((draftId: string) => {
+        setUntrackedDetachedBookingIds((ids) => new Set(ids).add(draftId))
+    }, [])
+    const hasOpenBookingWork = hasOpenDrafts || openEditTabCount > 0 || untrackedDetachedBookingIds.size > 0
+    closeGuardHasDraftsRef.current = hasOpenBookingWork
+
+    const bookingDraftTabs = useMemo(() => bookingDrafts.map((draft) => {
+        const description = draft.qa.description.trim()
+        const dateLabel = fmtDate(draft.qa.date) || draft.qa.date
+        return {
+            id: draft.id,
+            label: description || `Entwurf ${draft.sequence}`,
+            title: description ? `${description} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`,
+            isActive: draft.id === activeDraftId,
+            isDetached: !!draft.detached
+        }
+    }), [activeDraftId, bookingDrafts, fmtDate])
+
+    const encodeDraftFiles = useCallback(async (draftFiles: File[]) => Promise.all(draftFiles.map(async (file) => ({
+        name: file.name,
+        dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+        mime: file.type || undefined
+    }))), [])
+
+    const detachQuickAdd = useCallback(async () => {
+        if (!activeDraftId) return
+        try {
+            const result = await window.api?.quickAdd?.openDetached?.({
+                mode: 'create',
+                draftId: activeDraftId,
+                qa,
+                files: await encodeDraftFiles(files)
+            })
+            if (!result?.ok) throw new Error(result?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+            if (!showBookingDraftTabs) setUntrackedDetachedBookingIds((ids) => new Set(ids).add(activeDraftId))
+            markDraftDetached(activeDraftId)
+        } catch (error: any) {
+            notify('error', String(error?.message || error))
+        }
+    }, [activeDraftId, encodeDraftFiles, files, markDraftDetached, notify, qa, showBookingDraftTabs])
+
+    const openBookingDraftTab = useCallback(async (draftId: string) => {
+        const draft = bookingDrafts.find((item) => item.id === draftId)
+        if (!draft) return
+        if (draft.detached) {
+            const focused = await window.api?.quickAdd?.focusDetached?.({ draftId })
+            if (focused?.ok) return
+            markDraftDocked(draftId)
+        }
+        if (bookingsOpenDetached) {
+            try {
+                const result = await window.api?.quickAdd?.openDetached?.({
+                    mode: 'create',
+                    draftId,
+                    qa: draft.qa,
+                    files: await encodeDraftFiles(draft.files)
+                })
+                if (!result?.ok) throw new Error(result?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+                markDraftDetached(draftId)
+                return
+            } catch (error: any) {
+                notify('error', String(error?.message || error))
+            }
+        }
+        reopenDraft(draftId)
+    }, [bookingDrafts, bookingsOpenDetached, encodeDraftFiles, markDraftDetached, markDraftDocked, notify, reopenDraft])
+
+    const closeBookingDraftTab = useCallback((draftId: string) => {
+        const draft = bookingDrafts.find((item) => item.id === draftId)
+        if (draft?.detached) void window.api?.quickAdd?.closeDetached?.({ draftId })
+        closeDraft(draftId)
+    }, [bookingDrafts, closeDraft])
+
+    const openNewBooking = useCallback(async () => {
+        if (!bookingsOpenDetached) {
+            openQuickAdd()
+            return
+        }
+        const draft = showBookingDraftTabs
+            ? openQuickAdd(undefined, { detached: true, showModal: false })
+            : null
+        try {
+            const result = await window.api?.quickAdd?.openDetached?.({
+                mode: 'create',
+                draftId: draft?.id,
+                qa: draft?.qa,
+                files: []
+            })
+            if (!result?.ok) throw new Error(result?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+            if (!draft && result.token) setUntrackedDetachedBookingIds((ids) => new Set(ids).add(String(result.token)))
+        } catch (error: any) {
+            notify('error', String(error?.message || error))
+            if (draft) dockAndOpenDraft(draft.id)
+            else openQuickAdd()
+        }
+    }, [bookingsOpenDetached, dockAndOpenDraft, notify, openQuickAdd, showBookingDraftTabs])
+    openNewBookingRef.current = () => { void openNewBooking() }
+
+    useEffect(() => {
+        const offSync = window.api?.quickAdd?.onDetachedDraftSync?.((payload: any) => {
+            const draftId = String(payload?.draftId || '')
+            if (!draftId || draftId.startsWith('edit-')) return
+            const patch: any = {}
+            if (payload?.qa) patch.qa = payload.qa
+            if (Array.isArray(payload?.files)) {
+                patch.files = payload.files.map((file: any) => {
+                    const binary = atob(String(file.dataBase64 || ''))
+                    const bytes = new Uint8Array(binary.length)
+                    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+                    return new File([bytes], String(file.name || 'Datei'), { type: file.mime || '' })
+                })
+            }
+            updateDraft(draftId, patch)
+        })
+        const offClosed = window.api?.quickAdd?.onDetachedClosed?.((payload: any) => {
+            const draftId = String(payload?.draftId || '')
+            setUntrackedDetachedBookingIds((ids) => {
+                if (!ids.has(draftId)) return ids
+                const next = new Set(ids); next.delete(draftId); return next
+            })
+            if (draftId && !draftId.startsWith('edit-')) {
+                markDraftDocked(draftId)
+            }
+        })
+        const offSaved = window.api?.quickAdd?.onSaved?.((payload: any) => {
+            const draftId = String(payload?.draftId || '')
+            setUntrackedDetachedBookingIds((ids) => {
+                if (!ids.has(draftId)) return ids
+                const next = new Set(ids); next.delete(draftId); return next
+            })
+            if (!draftId || draftId.startsWith('edit-')) return
+            closeDraft(draftId)
+            bumpDataVersion()
+        })
+        return () => { offSync?.(); offClosed?.(); offSaved?.() }
+    }, [closeDraft, markDraftDocked, updateDraft])
 
     // Recent description suggestions for Quick-Add (autocomplete)
     const [descSuggest, setDescSuggest] = useState<string[]>([])
@@ -706,10 +1191,10 @@ function AppInner() {
 
     // Readonly UX: never show QuickAdd in readonly
     useEffect(() => {
-        if (quickAdd && !canWrite) {
-            try { closeModal() } catch { /* ignore */ }
+        if ((quickAdd || hasOpenDrafts) && !canWrite) {
+            try { clearDrafts() } catch { /* ignore */ }
         }
-    }, [quickAdd, canWrite, closeModal])
+    }, [canWrite, clearDrafts, hasOpenDrafts, quickAdd])
 
     async function createSampleVoucher() {
         try {
@@ -1213,7 +1698,12 @@ function AppInner() {
                 }}
             >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
-                    <TopHeaderOrg notify={notify} />
+                    <TopHeaderOrg
+                        notify={notify}
+                        beforeOrgSwitch={() => !hasOpenBookingWork || window.confirm(
+                            'Offene Buchungsentwürfe oder Bearbeitungen werden beim Wechsel des Sachgebiets verworfen. Trotzdem wechseln?'
+                        )}
+                    />
                     <WorkYearIndicator
                         yearsAvail={yearsAvail}
                         disabled={serverMode === 'client'}
@@ -1385,6 +1875,14 @@ function AppInner() {
                             workYear={uiWorkYear}
                             showArchived={uiShowArchived}
                             archiveSettingsReady={archiveSettingsReady}
+                            showBookingDraftTabs={showBookingDraftTabs}
+                            bookingDraftTabs={bookingDraftTabs}
+                            onOpenBookingDraft={openBookingDraftTab}
+                            onCloseBookingDraft={closeBookingDraftTab}
+                            showBookingEditTabs={showBookingEditTabs}
+                            bookingsOpenDetached={bookingsOpenDetached}
+                            onOpenEditTabsChange={setOpenEditTabCount}
+                            onDetachedEditOpened={registerDetachedEdit}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -1421,6 +1919,12 @@ function AppInner() {
                             setGlassModals={setGlassModals}
                             modalBackdropBlur={modalBackdropBlur}
                             setModalBackdropBlur={setModalBackdropBlur}
+                            showBookingDraftTabs={showBookingDraftTabs}
+                            setShowBookingDraftTabs={setShowBookingDraftTabs}
+                            showBookingEditTabs={showBookingEditTabs}
+                            setShowBookingEditTabs={setShowBookingEditTabs}
+                            bookingsOpenDetached={bookingsOpenDetached}
+                            setBookingsOpenDetached={setBookingsOpenDetached}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}
@@ -1508,7 +2012,8 @@ function AppInner() {
                     qa={qa}
                     setQa={setQa}
                     onSave={onQuickSave}
-                    onClose={closeModal}
+                    onClose={parkQuickAdd}
+                    onDetach={detachQuickAdd}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}
@@ -1527,7 +2032,7 @@ function AppInner() {
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {canWrite && activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
-                <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
+                <button className="fab fab-buchung" onClick={() => { void openNewBooking() }} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>
                 </button>
@@ -1673,8 +2178,9 @@ function AppInner() {
             )}
 
             {closeServerPayload && (
-                <CloseWhileServerRunningModal
+                <CloseApplicationModal
                     payload={closeServerPayload}
+                    openDraftCount={bookingDraftTabs.length + openEditTabCount + untrackedDetachedBookingIds.size}
                     onCancel={onCloseCancel}
                     onQuit={onCloseQuit}
                     onTray={onCloseTray}
@@ -2425,12 +2931,13 @@ function IconArrow({ size = 14 }: { size?: number }) {
 
 // Wrapper with context providers
 export default function App() {
+    const isDetachedBooking = new URLSearchParams(window.location.search).get('window') === 'booking'
     return (
         <UIPreferencesProvider>
             <ModuleProvider>
                 <AuthProvider>
                     <ToastProvider>
-                        <AppInner />
+                        {isDetachedBooking ? <DetachedBookingWindow /> : <AppInner />}
                     </ToastProvider>
                 </AuthProvider>
             </ModuleProvider>

@@ -40,4 +40,10 @@ export interface UIPreferencesContextValue {
   setGlassModals: (val: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (val: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (val: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (val: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (val: boolean) => void
 }

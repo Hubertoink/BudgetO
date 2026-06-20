@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
         toggleMaximize: () => ipcRenderer.invoke('window.toggleMaximize'),
         isMaximized: () => ipcRenderer.invoke('window.isMaximized').then(r => !!r?.isMaximized),
         close: () => ipcRenderer.invoke('window.close'),
+        confirmClose: () => ipcRenderer.invoke('window.confirmClose'),
         onMaximizeChanged: (cb: (isMax: boolean) => void) => {
             const handler = (_: any, v: boolean) => cb(!!v)
             ipcRenderer.on('window:maximized', handler)
@@ -27,12 +28,40 @@ contextBridge.exposeInMainWorld('api', {
                 ipcRenderer.removeListener('window:maximized', handler)
                 ipcRenderer.removeAllListeners('window:unmaximized')
             }
+        },
+        onCloseRequested: (cb: () => void) => {
+            const handler = () => cb()
+            ipcRenderer.on('window:close-requested', handler)
+            return () => ipcRenderer.removeListener('window:close-requested', handler)
         }
     },
     workQueue: {
         summary: () => ipcRenderer.invoke('workQueue.summary')
     },
     ping: () => 'pong',
+    quickAdd: {
+        openDetached: (payload?: any) => ipcRenderer.invoke('quickAdd.openDetached', payload),
+        detachedInitial: (payload: { token: string }) => ipcRenderer.invoke('quickAdd.detachedInitial', payload),
+        focusDetached: (payload: { draftId: string }) => ipcRenderer.invoke('quickAdd.focusDetached', payload),
+        closeDetached: (payload: { draftId: string }) => ipcRenderer.invoke('quickAdd.closeDetached', payload),
+        syncDraft: (payload: any) => ipcRenderer.invoke('quickAdd.syncDraft', payload),
+        notifySaved: (payload?: any) => ipcRenderer.invoke('quickAdd.notifySaved', payload),
+        onDetachedDraftSync: (cb: (payload: any) => void) => {
+            const handler = (_event: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:detachedDraftSync', handler)
+            return () => ipcRenderer.removeListener('quickAdd:detachedDraftSync', handler)
+        },
+        onDetachedClosed: (cb: (payload: any) => void) => {
+            const handler = (_event: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:detachedClosed', handler)
+            return () => ipcRenderer.removeListener('quickAdd:detachedClosed', handler)
+        },
+        onSaved: (cb: (payload: any) => void) => {
+            const handler = (_event: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:saved', handler)
+            return () => ipcRenderer.removeListener('quickAdd:saved', handler)
+        }
+    },
     vouchers: {
         create: (payload: any) => cleanInvoke('vouchers.create', payload),
         reverse: (payload: any) => cleanInvoke('vouchers.reverse', payload),

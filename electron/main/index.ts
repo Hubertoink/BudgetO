@@ -13,9 +13,96 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 const enableDevTools = isDev || process.env.BUDGETO_DEVTOOLS === '1'
+const detachedBookingInitials = new Map<string, any>()
+const detachedBookingWindows = new Map<string, BrowserWindow>()
 
 let tray: Tray | null = null
 let allowQuit = false
+
+function createWindowOpenHandler() {
+    return ({ url }: { url: string }) => {
+        void shell.openExternal(url)
+        return { action: 'deny' as const }
+    }
+}
+
+async function createDetachedBookingWindow(initialState?: any): Promise<{ ok: boolean; token: string }> {
+    const token = `booking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const draftId = String(initialState?.draftId || token)
+    const existing = detachedBookingWindows.get(draftId)
+    if (existing && !existing.isDestroyed()) {
+        if (existing.isMinimized()) existing.restore()
+        existing.show()
+        existing.focus()
+        return { ok: true, token }
+    }
+
+    detachedBookingInitials.set(token, initialState || null)
+    const win = new BrowserWindow({
+        width: 1180,
+        height: 780,
+        minWidth: 860,
+        minHeight: 620,
+        show: false,
+        autoHideMenuBar: true,
+        frame: true,
+        title: initialState?.mode === 'edit' ? 'BudgetO – Buchung bearbeiten' : 'BudgetO – Neue Buchung',
+        icon: getWindowsIconPath(),
+        webPreferences: {
+            preload: path.join(__dirname, '../preload/index.cjs'),
+            contextIsolation: true,
+            sandbox: true,
+            nodeIntegration: false,
+            webSecurity: true,
+            devTools: enableDevTools
+        }
+    })
+
+    let allowClose = false
+    ;(win as any).__allowRendererClose = () => { allowClose = true }
+    win.on('close', (event) => {
+        if (allowClose || win.webContents.isDestroyed()) return
+        event.preventDefault()
+        try { win.webContents.send('window:close-requested') } catch { allowClose = true; win.close() }
+    })
+    win.on('ready-to-show', () => win.show())
+    detachedBookingWindows.set(draftId, win)
+    win.on('closed', () => {
+        detachedBookingInitials.delete(token)
+        detachedBookingWindows.delete(draftId)
+        for (const browserWindow of BrowserWindow.getAllWindows()) {
+            try { browserWindow.webContents.send('quickAdd:detachedClosed', { draftId }) } catch { /* ignore */ }
+        }
+    })
+
+    if (isDev) {
+        const url = new URL(process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173')
+        url.searchParams.set('window', 'booking')
+        url.searchParams.set('token', token)
+        await win.loadURL(url.toString())
+    } else {
+        await win.loadFile(path.join(__dirname, '../../dist/index.html'), { query: { window: 'booking', token } })
+    }
+    win.webContents.setWindowOpenHandler(createWindowOpenHandler())
+    return { ok: true, token }
+}
+
+function focusDetachedBookingWindow(draftId: string) {
+    const win = detachedBookingWindows.get(draftId)
+    if (!win || win.isDestroyed()) return { ok: false }
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    return { ok: true }
+}
+
+function closeDetachedBookingWindow(draftId: string) {
+    const win = detachedBookingWindows.get(draftId)
+    if (!win || win.isDestroyed()) return { ok: false }
+    try { ;(win as any).__allowRendererClose?.() } catch { /* ignore */ }
+    win.close()
+    return { ok: true }
+}
 
 function getWindowsIconPath(): string {
     // Keep in sync with electron-builder.yml and ensure the file is packaged via `files: - assets/**`
@@ -40,8 +127,17 @@ function ensureTray(win: BrowserWindow): Tray {
     }
 
     const quitApp = () => {
-        allowQuit = true
-        app.quit()
+        showWindow()
+        try {
+            const st = getServerStatus()
+            win.webContents.send('app.closeRequest', {
+                running: !!st?.running,
+                port: st?.port,
+                connectedClients: st?.connectedClients
+            })
+        } catch {
+            try { win.webContents.send('app.closeRequest', { running: false }) } catch { /* keep app alive */ }
+        }
     }
 
     const menu = Menu.buildFromTemplate([
@@ -138,10 +234,7 @@ async function createWindow(): Promise<BrowserWindow> {
         await win.loadFile(path.join(__dirname, '../../dist/index.html'))
     }
 
-    win.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url)
-        return { action: 'deny' }
-    })
+    win.webContents.setWindowOpenHandler(createWindowOpenHandler())
 
     return win
 }
@@ -200,7 +293,17 @@ app.whenReady().then(async () => {
         // Do NOT block startup. We'll inform the renderer via an event so it can present recovery options.
     }
     // Register IPC first so renderer can use db.location.* to recover
-    registerIpcHandlers()
+    registerIpcHandlers({
+        openDetachedBooking: createDetachedBookingWindow,
+        focusDetachedBooking: focusDetachedBookingWindow,
+        closeDetachedBooking: closeDetachedBookingWindow,
+        getDetachedBookingInitial: (token: string) => detachedBookingInitials.get(token) ?? null,
+        notifyBookingSaved: (payload: any) => {
+            for (const browserWindow of BrowserWindow.getAllWindows()) {
+                try { browserWindow.webContents.send('quickAdd:saved', payload || {}) } catch { /* ignore */ }
+            }
+        }
+    })
     createMenu()
     
     // Auto-start API server if configured
@@ -227,25 +330,19 @@ app.whenReady().then(async () => {
         allowQuit = true
     })
 
-    // When server is running, intercept close and ask renderer to confirm.
+    // Always let the renderer guard open drafts; it also adds server details when relevant.
     win.on('close', (e) => {
         if (allowQuit) return
+        e.preventDefault()
         try {
             const st = getServerStatus()
-            if (st?.running) {
-                e.preventDefault()
-                try {
-                    win.webContents.send('app.closeRequest', {
-                        running: true,
-                        port: st.port,
-                        connectedClients: st.connectedClients
-                    })
-                } catch {
-                    // If renderer cannot be reached, fall back to not closing.
-                }
-            }
+            win.webContents.send('app.closeRequest', {
+                running: !!st?.running,
+                port: st?.port,
+                connectedClients: st?.connectedClients
+            })
         } catch {
-            // ignore
+            try { win.webContents.send('app.closeRequest', { running: false }) } catch { /* keep window open */ }
         }
     })
 

@@ -176,6 +176,12 @@ export function GeneralPane({
   setGlassModals,
   modalBackdropBlur,
   setModalBackdropBlur,
+  showBookingDraftTabs,
+  setShowBookingDraftTabs,
+  showBookingEditTabs,
+  setShowBookingEditTabs,
+  bookingsOpenDetached,
+  setBookingsOpenDetached,
 }: GeneralPaneProps) {
   const themeOptions: ReadonlyArray<{ value: typeof colorTheme; label: string }> = [
     { value: 'default', label: 'Standard' },
@@ -685,6 +691,45 @@ export function GeneralPane({
               checked={navIconColorMode === 'color'}
               onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
             />
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-booking-draft-tabs">Buchungsentwürfe als Tabs</label>
+            <input
+              id="toggle-booking-draft-tabs"
+              role="switch"
+              aria-checked={showBookingDraftTabs}
+              className="toggle"
+              type="checkbox"
+              checked={showBookingDraftTabs}
+              onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
+            />
+            <span className="helper">Mehrere neue Buchungen parallel öffnen und später fortsetzen.</span>
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-booking-edit-tabs">Bearbeitungen als Tabs</label>
+            <input
+              id="toggle-booking-edit-tabs"
+              role="switch"
+              aria-checked={showBookingEditTabs}
+              className="toggle"
+              type="checkbox"
+              checked={showBookingEditTabs}
+              onChange={(e) => setShowBookingEditTabs(e.target.checked)}
+            />
+            <span className="helper">Mehrere bestehende Buchungen parallel bearbeiten.</span>
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-bookings-open-detached">Eigenes Buchungsfenster</label>
+            <input
+              id="toggle-bookings-open-detached"
+              role="switch"
+              aria-checked={bookingsOpenDetached}
+              className="toggle"
+              type="checkbox"
+              checked={bookingsOpenDetached}
+              onChange={(e) => setBookingsOpenDetached(e.target.checked)}
+            />
+            <span className="helper">Neue und bearbeitete Buchungen standardmäßig in einem separaten Fenster öffnen.</span>
           </div>
         </div>
       </div>

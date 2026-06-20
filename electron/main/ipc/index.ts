@@ -54,7 +54,16 @@ async function withSchemaHealRetry<T>(run: () => T, tableNames: string[]): Promi
     }
 }
 
-export function registerIpcHandlers() {
+type RegisterIpcHandlersOptions = {
+    openDetachedBooking?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
+    focusDetachedBooking?: (draftId: string) => { ok: boolean }
+    closeDetachedBooking?: (draftId: string) => { ok: boolean }
+    getDetachedBookingInitial?: (token: string) => any
+    notifyBookingSaved?: (payload?: any) => void
+}
+
+export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
+    const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
     // App info
     ipcMain.handle('app.version', async () => {
         try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'BudgetO' } }
@@ -74,13 +83,46 @@ export function registerIpcHandlers() {
         return { ok: false }
     })
     ipcMain.handle('window.close', async () => {
-        const win = BrowserWindow.getFocusedWindow()
+        const win = getCurrentWindow()
         win?.close()
+        return { ok: true }
+    })
+    ipcMain.handle('window.confirmClose', async () => {
+        const win = getCurrentWindow()
+        if (!win) return { ok: false }
+        try { ;(win as any).__allowRendererClose?.() } catch { /* ignore */ }
+        win.close()
         return { ok: true }
     })
     ipcMain.handle('window.isMaximized', async () => {
         const win = BrowserWindow.getFocusedWindow()
         return { isMaximized: !!win?.isMaximized() }
+    })
+    ipcMain.handle('quickAdd.openDetached', async (_e, payload) => {
+        if (!options.openDetachedBooking) return { ok: false, error: 'Abdocken ist nicht verfügbar.' }
+        return options.openDetachedBooking(payload || null)
+    })
+    ipcMain.handle('quickAdd.detachedInitial', async (_e, payload: { token?: string }) => {
+        const token = String(payload?.token || '')
+        return { initial: token && options.getDetachedBookingInitial ? options.getDetachedBookingInitial(token) : null }
+    })
+    ipcMain.handle('quickAdd.focusDetached', async (_e, payload: { draftId?: string }) => {
+        const draftId = String(payload?.draftId || '')
+        return draftId && options.focusDetachedBooking ? options.focusDetachedBooking(draftId) : { ok: false }
+    })
+    ipcMain.handle('quickAdd.closeDetached', async (_e, payload: { draftId?: string }) => {
+        const draftId = String(payload?.draftId || '')
+        return draftId && options.closeDetachedBooking ? options.closeDetachedBooking(draftId) : { ok: false }
+    })
+    ipcMain.handle('quickAdd.notifySaved', async (_e, payload) => {
+        try { options.notifyBookingSaved?.(payload || {}) } catch { /* ignore */ }
+        return { ok: true }
+    })
+    ipcMain.handle('quickAdd.syncDraft', async (_e, payload) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            try { win.webContents.send('quickAdd:detachedDraftSync', payload || {}) } catch { /* ignore */ }
+        }
+        return { ok: true }
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)

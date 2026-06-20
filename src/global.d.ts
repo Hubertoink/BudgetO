@@ -8,9 +8,22 @@ declare global {
                 toggleMaximize: () => Promise<{ ok: boolean; isMaximized?: boolean }>
                 isMaximized: () => Promise<boolean>
                 close: () => Promise<{ ok: boolean }>
+                confirmClose: () => Promise<{ ok: boolean }>
                 onMaximizeChanged: (cb: (isMax: boolean) => void) => () => void
+                onCloseRequested: (cb: () => void) => () => void
             }
             ping: () => string
+            quickAdd: {
+                openDetached: (payload?: any) => Promise<{ ok: boolean; token?: string; error?: string }>
+                detachedInitial: (payload: { token: string }) => Promise<{ initial?: any }>
+                focusDetached: (payload: { draftId: string }) => Promise<{ ok: boolean }>
+                closeDetached: (payload: { draftId: string }) => Promise<{ ok: boolean }>
+                syncDraft: (payload: any) => Promise<{ ok: boolean }>
+                notifySaved: (payload?: any) => Promise<{ ok: boolean }>
+                onDetachedDraftSync: (cb: (payload: any) => void) => () => void
+                onDetachedClosed: (cb: (payload: any) => void) => () => void
+                onSaved: (cb: (payload: any) => void) => () => void
+            }
             vouchers: {
                 create: (payload: {
                     date: string

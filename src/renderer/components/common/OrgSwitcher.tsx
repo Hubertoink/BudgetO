@@ -12,13 +12,14 @@ interface Organization {
 
 interface OrgSwitcherProps {
   notify?: (type: 'success' | 'error' | 'info', text: string) => void
+  beforeSwitch?: () => boolean
 }
 
 /**
  * Organization switcher dropdown for the top header.
  * Shows current organization and allows switching or creating new ones.
  */
-export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
+export default function OrgSwitcher({ notify, beforeSwitch }: OrgSwitcherProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [activeOrg, setActiveOrg] = useState<Organization | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -71,6 +72,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
 
   async function handleSwitch(org: Organization) {
     if (org.isActive || switching) return
+    if (beforeSwitch && !beforeSwitch()) return
     setSwitching(true)
     setIsOpen(false)
     try {

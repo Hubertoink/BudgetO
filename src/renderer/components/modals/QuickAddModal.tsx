@@ -9,6 +9,14 @@ interface QuickAddModalProps {
     setQa: (qa: QA) => void
     onSave: () => void
     onClose: () => void
+    onDetach?: () => void
+    windowMode?: boolean
+    saveLabel?: string
+    existingFiles?: Array<{ id: number; fileName: string }>
+    existingFilesLoading?: boolean
+    onOpenExistingFile?: (fileId: number) => void
+    onDownloadExistingFile?: (fileId: number) => void
+    onDeleteExistingFile?: (file: { id: number; fileName: string }) => void
     files: File[]
     setFiles: (files: File[]) => void
     openFilePicker: () => void
@@ -37,6 +45,14 @@ export default function QuickAddModal({
     setQa,
     onSave,
     onClose,
+    onDetach,
+    windowMode = false,
+    saveLabel = 'Speichern',
+    existingFiles = [],
+    existingFilesLoading = false,
+    onOpenExistingFile,
+    onDownloadExistingFile,
+    onDeleteExistingFile,
     files,
     setFiles,
     openFilePicker,
@@ -106,7 +122,7 @@ export default function QuickAddModal({
     }, [])
 
     return (
-        <div className="modal-overlay">
+        <div className={`modal-overlay${windowMode ? ' detached-booking-overlay' : ''}`}>
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 {/* Sticky Header with Summary + Actions */}
                 <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
@@ -115,8 +131,13 @@ export default function QuickAddModal({
                         <h2 style={{ margin: 0, flex: 1 }}>{title}</h2>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <span className="helper" style={{ fontSize: 11, opacity: 0.7 }}>Ctrl+S</span>
-                            <button type="submit" form="quick-add-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>Speichern</button>
-                            <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)" style={{ padding: 6 }}>
+                            {onDetach && !windowMode && (
+                                <button type="button" className="btn ghost" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
+                                    ↗
+                                </button>
+                            )}
+                            <button type="submit" form="quick-add-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>{saveLabel}</button>
+                            <button type="button" className="btn ghost" onClick={onClose} title="Schließen (ESC)" style={{ padding: 6 }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                                 </svg>
@@ -625,6 +646,19 @@ export default function QuickAddModal({
                                         )}
                                     </div>
                                 </div>
+                                {existingFilesLoading && <div className="helper">Vorhandene Anhänge werden geladen…</div>}
+                                {existingFiles.length > 0 && (
+                                    <ul className="file-list">
+                                        {existingFiles.map((file) => (
+                                            <li key={`existing-${file.id}`} className="file-list-item">
+                                                <span className="file-name">{file.fileName}</span>
+                                                {onOpenExistingFile && <button type="button" className="btn" onClick={() => onOpenExistingFile(file.id)}>Öffnen</button>}
+                                                {onDownloadExistingFile && <button type="button" className="btn" onClick={() => onDownloadExistingFile(file.id)}>Speichern unter</button>}
+                                                {onDeleteExistingFile && <button type="button" className="btn danger" onClick={() => onDeleteExistingFile(file)}>Löschen</button>}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                                 {files.length > 0 ? (
                                     <ul className="file-list">
                                         {files.map((f, i) => (
@@ -634,7 +668,7 @@ export default function QuickAddModal({
                                             </li>
                                         ))}
                                     </ul>
-                                ) : (
+                                ) : existingFiles.length === 0 && !existingFilesLoading ? (
                                     <div
                                         style={{
                                             marginTop: 8,
@@ -649,7 +683,7 @@ export default function QuickAddModal({
                                         <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
                                         <div className="helper">Dateien hierher ziehen oder klicken</div>
                                     </div>
-                                )}
+                                ) : null}
                             </div>
                         )}
                     </div>

@@ -144,6 +144,12 @@ export interface SettingsProps {
   setGlassModals: (v: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (v: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (v: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (v: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -181,6 +187,12 @@ export interface GeneralPaneProps {
   setGlassModals: (v: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (v: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (v: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (v: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (v: boolean) => void
   dateFmt: DateFmt
   setDateFmt: (v: DateFmt) => void
   journalLimit: number

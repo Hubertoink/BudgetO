@@ -2174,6 +2174,7 @@ html[data-modal-backdrop-blur="true"] .modal-overlay {
 
 .modal {
     width: min(900px, 96vw);
+    box-sizing: border-box;
     background: color-mix(in oklab, var(--surface) 80%, transparent);
     -webkit-backdrop-filter: var(--blur);
     backdrop-filter: var(--blur);
@@ -2189,7 +2190,8 @@ html[data-modal-backdrop-blur="true"] .modal-overlay {
 /* Wider layout for Quick-Add (Buchung) modal */
 .booking-modal {
     width: min(1100px, 96vw);
-    max-height: 90vh;
+    /* Account for modal-overlay vertical padding (24px top + 24px bottom) */
+    max-height: calc(100vh - 48px);
     animation: modalSlideUp 0.25s ease-out;
     display: flex;
     flex-direction: column;
@@ -2214,7 +2216,9 @@ html[data-modal-backdrop-blur="true"] .modal-overlay {
 .booking-modal > form {
     overflow-y: auto;
     flex: 1;
-    padding-right: 4px; /* space for scrollbar */
+    padding-right: 0;
+    /* Reserve space for scrollbar to avoid layout shift and remove tiny overlay scroll */
+    scrollbar-gutter: stable;
 }
 
 /* Wider Members modal similar to booking */
@@ -6719,4 +6723,130 @@ html[data-glass-modals="true"] .flyout-arrow {
     border-top: 1px solid var(--border);
     font-size: 11px;
     color: var(--text-dim);
+}
+
+/* ==================== Booking draft tabs ==================== */
+.booking-draft-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.booking-draft-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: min(320px, 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--surface) 88%, transparent);
+    color: var(--text-dim);
+    transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.booking-draft-tab:hover {
+    border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+    color: var(--text);
+}
+
+.booking-draft-tab--active {
+    border-color: color-mix(in oklab, var(--accent) 65%, var(--border));
+    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+    color: var(--text);
+}
+
+.booking-draft-tab--edit {
+    border-color: color-mix(in oklab, var(--success) 42%, var(--border));
+    background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.booking-draft-tab--edit.booking-draft-tab--active {
+    border-color: color-mix(in oklab, var(--success) 65%, var(--border));
+    background: color-mix(in oklab, var(--success) 15%, var(--surface));
+}
+
+.booking-draft-tab--detached {
+    border-style: dashed;
+}
+
+.booking-draft-tab__open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 8px 4px 8px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.booking-draft-tab__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.booking-draft-tab__badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.booking-draft-tab__close {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 7px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.booking-draft-tab__close:hover {
+    background: color-mix(in oklab, var(--danger) 18%, transparent);
+    color: var(--danger);
+}
+
+@media (max-width: 720px) {
+    .booking-draft-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .booking-draft-tab {
+        flex: 0 0 auto;
+        max-width: min(260px, 82vw);
+    }
+}
+
+.detached-booking-overlay {
+    padding: 0;
+    background: var(--bg);
+    overflow: hidden;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.detached-booking-overlay .booking-modal {
+    width: 100vw;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    border: 0;
 }

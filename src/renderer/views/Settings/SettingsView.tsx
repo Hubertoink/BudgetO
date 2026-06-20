@@ -134,6 +134,12 @@ export function SettingsView(props: SettingsProps) {
             setGlassModals={props.setGlassModals}
             modalBackdropBlur={props.modalBackdropBlur}
             setModalBackdropBlur={props.setModalBackdropBlur}
+            showBookingDraftTabs={props.showBookingDraftTabs}
+            setShowBookingDraftTabs={props.setShowBookingDraftTabs}
+            showBookingEditTabs={props.showBookingEditTabs}
+            setShowBookingEditTabs={props.setShowBookingEditTabs}
+            bookingsOpenDetached={props.bookingsOpenDetached}
+            setBookingsOpenDetached={props.setBookingsOpenDetached}
             dateFmt={props.dateFmt}
             setDateFmt={props.setDateFmt}
             journalLimit={props.journalLimit}
