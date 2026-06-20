@@ -20,6 +20,20 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
     }
   }, [canWrite])
 
+  React.useEffect(() => {
+    const run = (action?: string) => {
+      if (action === 'create-tag' && canWrite) setEditTag({ name: '', color: null })
+    }
+    try {
+      const pending = sessionStorage.getItem('settingsQuickAction') || undefined
+      if (pending) sessionStorage.removeItem('settingsQuickAction')
+      run(pending)
+    } catch { /* ignore */ }
+    const onAction = (event: Event) => run((event as CustomEvent<any>)?.detail?.action)
+    window.addEventListener('settings:quickAction', onAction)
+    return () => window.removeEventListener('settings:quickAction', onAction)
+  }, [canWrite])
+
   // Refresh tags with usage counts
   async function refreshTags() {
     setBusy(true)

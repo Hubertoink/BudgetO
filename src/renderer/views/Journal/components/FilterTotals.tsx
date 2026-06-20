@@ -75,7 +75,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         outByCategory?: Array<{ name: string; gross: number; color?: string | null }>
     }>(null)
 
-    const annualYear = useMemo(() => {
+    const budgetTarget = useMemo(() => {
         const parseYear = (s?: string) => {
             if (!s) return null
             const m = /^\s*(\d{4})-/.exec(String(s))
@@ -86,10 +86,14 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         const yFrom = parseYear(from)
         const yTo = parseYear(to)
         if (yFrom && yTo && yFrom !== yTo) return null
-        return yFrom ?? yTo ?? new Date().getFullYear()
-    }, [from, to])
+        const year = yFrom ?? yTo ?? workYear ?? new Date().getFullYear()
+        const fromMonth = from && /^\d{4}-(\d{2})-/.exec(from)?.[1]
+        const toMonth = to && /^\d{4}-(\d{2})-/.exec(to)?.[1]
+        const month = fromMonth && toMonth && fromMonth === toMonth ? Number(fromMonth) : null
+        return { year, month }
+    }, [from, to, workYear])
 
-    const [annual, setAnnual] = useState<null | { year: number; budgeted: number; remaining: number }>(null)
+    const [annual, setAnnual] = useState<null | { year: number; month: number | null; cadence: 'ANNUAL' | 'MONTHLY'; budgeted: number; remaining: number }>(null)
     const [annualLoading, setAnnualLoading] = useState(false)
 
     useEffect(() => {
@@ -174,17 +178,19 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
     useEffect(() => {
         let alive = true
         async function loadAnnual() {
-            if (!annualYear) {
+            if (!budgetTarget) {
                 setAnnual(null)
                 return
             }
             setAnnualLoading(true)
             try {
-                const [budget, usageRes] = await Promise.all([
-                    (window as any).api?.annualBudgets?.get?.({ year: annualYear, costCenterId: null }),
-                    (window as any).api?.annualBudgets?.usage?.({ year: annualYear, costCenterId: null })
-                ])
-                const budgeted = Number(usageRes?.budgeted ?? budget?.amount ?? 0) || 0
+                const config = await window.api?.budgetPeriods?.config?.get?.()
+                const cadence = config?.cadence || 'ANNUAL'
+                const useMonth = cadence === 'MONTHLY' && budgetTarget.month != null
+                const usageRes = useMonth
+                    ? await window.api?.budgetPeriods?.usage?.({ cadence: 'MONTHLY', year: budgetTarget.year, month: budgetTarget.month })
+                    : await window.api?.budgetPeriods?.yearUsage?.({ year: budgetTarget.year })
+                const budgeted = Number(usageRes?.budgeted ?? 0) || 0
                 if (budgeted <= 0) {
                     if (alive) setAnnual(null)
                     return
@@ -192,7 +198,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                 const spent = Math.max(0, Number(usageRes?.spent ?? 0))
                 const income = Math.max(0, Number(usageRes?.income ?? 0))
                 const remaining = Number(usageRes?.remaining ?? (budgeted - Math.max(0, spent - income))) || 0
-                if (alive) setAnnual({ year: annualYear, budgeted, remaining })
+                if (alive) setAnnual({ year: budgetTarget.year, month: useMonth ? budgetTarget.month : null, cadence: usageRes?.cadence || cadence, budgeted, remaining })
             } catch {
                 if (alive) setAnnual(null)
             } finally {
@@ -201,7 +207,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         }
         loadAnnual()
         return () => { alive = false }
-    }, [annualYear, refreshKey])
+    }, [budgetTarget, refreshKey])
 
     const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     if (!values && !loading) return null
@@ -324,9 +330,13 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                 </div>
 
                 {(annual || annualLoading) && (
-                    <div className="filter-totals-annual" aria-label="Jahresbudget">
+                    <div className="filter-totals-annual" aria-label="Budgetplanung">
                         <div className="helper" style={{ margin: 0 }}>
-                            Jahresbudget {annual?.year ?? annualYear}
+                            {annual?.cadence === 'MONTHLY'
+                                ? annual.month
+                                    ? `Monatsbudget ${String(annual.month).padStart(2, '0')}/${annual.year}`
+                                    : `Monatsbudgets ${annual.year}`
+                                : `Jahresbudget ${annual?.year ?? budgetTarget?.year}`}
                         </div>
                         <div className="filter-totals-annual__value" style={{ color: (annual?.remaining ?? 0) < 0 ? 'var(--danger)' : 'var(--success)' }}>
                             {fmt.format(annual?.remaining ?? 0)} verbleibend

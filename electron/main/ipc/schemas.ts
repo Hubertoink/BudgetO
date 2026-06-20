@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
+const RecurringIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 // Multi-assignments (shared between create + update)
 export const VoucherBudgetAssignment = z.object({
@@ -46,7 +47,9 @@ export const VoucherCreateInput = z
                 })
             )
             .optional(),
-        tags: z.array(z.string()).optional()
+        tags: z.array(z.string()).optional(),
+        recurringTemplateId: z.number().int().positive().optional(),
+        recurringDueDate: RecurringIsoDate.optional()
     })
     .refine((v) => v.netAmount != null || v.grossAmount != null, {
         message: 'Either netAmount or grossAmount must be provided'
@@ -58,6 +61,54 @@ export const VoucherCreateOutput = z.object({
     grossAmount: z.number(),
     warnings: z.array(z.string()).optional()
 })
+
+export const RecurrenceFrequency = z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+export const RecurringBookingTemplateData = z.object({
+    type: z.enum(['IN', 'OUT']),
+    sphere: Sphere,
+    description: z.string(),
+    grossAmount: z.number().positive(),
+    vatRate: z.number(),
+    paymentMethod: PaymentMethod,
+    categoryId: z.number().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    earmarkId: z.number().nullable().optional(),
+    tags: z.array(z.string()).optional()
+})
+export const RecurringBookingSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    frequency: RecurrenceFrequency,
+    intervalCount: z.number(),
+    nextDueDate: RecurringIsoDate,
+    endDate: RecurringIsoDate.nullable(),
+    isActive: z.boolean(),
+    isDue: z.boolean(),
+    template: RecurringBookingTemplateData,
+    createdAt: z.string()
+})
+export const RecurringBookingsListInput = z.object({
+    includeInactive: z.boolean().optional(),
+    today: RecurringIsoDate.optional()
+}).optional()
+export const RecurringBookingsListOutput = z.object({ rows: z.array(RecurringBookingSchema) })
+export const RecurringBookingUpsertInput = z.object({
+    id: z.number().optional(),
+    name: z.string().min(1),
+    frequency: RecurrenceFrequency,
+    intervalCount: z.number().int().positive().optional(),
+    nextDueDate: RecurringIsoDate,
+    endDate: RecurringIsoDate.nullable().optional(),
+    isActive: z.boolean().optional(),
+    template: RecurringBookingTemplateData
+})
+export const RecurringBookingUpsertOutput = z.object({ id: z.number() })
+export const RecurringBookingSetActiveInput = z.object({ id: z.number(), isActive: z.boolean() })
+export const RecurringBookingSetActiveOutput = z.object({ id: z.number(), isActive: z.boolean() })
+export const RecurringBookingSkipInput = z.object({ id: z.number(), dueDate: RecurringIsoDate })
+export const RecurringBookingSkipOutput = z.object({ nextDueDate: RecurringIsoDate, isActive: z.boolean() })
+export const RecurringBookingDeleteInput = z.object({ id: z.number() })
+export const RecurringBookingDeleteOutput = z.object({ id: z.number() })
 
 export const VoucherReverseInput = z.object({
     originalId: z.number(),
@@ -1197,6 +1248,17 @@ export type TSettingsGetInput = z.infer<typeof SettingsGetInput>
 export type TSettingsGetOutput = z.infer<typeof SettingsGetOutput>
 export type TSettingsSetInput = z.infer<typeof SettingsSetInput>
 export type TSettingsSetOutput = z.infer<typeof SettingsSetOutput>
+
+// Organization-wide budget periods
+export const BudgetCadenceSchema = z.enum(['ANNUAL', 'MONTHLY'])
+export const BudgetPeriodConfigOutput = z.object({ cadence: BudgetCadenceSchema, carrySurplus: z.boolean(), carryDeficit: z.boolean() })
+export const BudgetPeriodConfigSetInput = z.object({ cadence: BudgetCadenceSchema.optional(), carrySurplus: z.boolean().optional(), carryDeficit: z.boolean().optional() })
+export const BudgetPeriodGetInput = z.object({ cadence: BudgetCadenceSchema.optional(), year: z.number().int().min(1900).max(9999), month: z.number().int().min(1).max(12).nullable().optional() })
+export const BudgetPeriodListInput = z.object({ cadence: BudgetCadenceSchema.optional(), year: z.number().int().min(1900).max(9999).optional() }).optional()
+export const BudgetPeriodUpsertInput = z.object({ cadence: BudgetCadenceSchema.optional(), year: z.number().int().min(1900).max(9999), month: z.number().int().min(1).max(12).nullable().optional(), amount: z.number().finite().min(0), description: z.string().nullable().optional() })
+export const BudgetPeriodFillYearInput = z.object({ year: z.number().int().min(1900).max(9999), amount: z.number().finite().min(0), description: z.string().nullable().optional(), overwrite: z.boolean().optional() })
+export const BudgetPeriodDeleteInput = z.object({ id: z.number().int().positive() })
+export const BudgetYearUsageInput = z.object({ year: z.number().int().min(1900).max(9999) })
 
 // Tax Exemption Certificate
 export const TaxExemptionGetOutput = z.object({

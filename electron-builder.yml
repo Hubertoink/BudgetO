@@ -10,6 +10,10 @@ asarUnpack:
   - '**/*.node'
 directories:
   output: release
+publish:
+  provider: github
+  owner: Hubertoink
+  repo: BudgetO
 win:
   target:
     - target: nsis
@@ -18,7 +22,7 @@ win:
 nsis:
   installerIcon: assets/budget_logo.ico
   uninstallerIcon: assets/budget_logo.ico
-artifactName: '${productName} Setup ${version}-${arch}.${ext}'
+artifactName: '${productName}-Setup-${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance
 linux:

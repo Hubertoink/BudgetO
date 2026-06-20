@@ -8,7 +8,7 @@ interface WorkYearIndicatorProps {
 }
 
 export function WorkYearIndicator({ yearsAvail = [], onNavigateToSettings, disabled }: WorkYearIndicatorProps) {
-  const { workYear, showArchived, loading, reload } = useArchiveSettings()
+  const { workYear, workMonth, budgetCadence, showArchived, loading, reload } = useArchiveSettings()
   const [saving, setSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const closeTimerRef = useRef<number | null>(null)
@@ -51,11 +51,14 @@ export function WorkYearIndicator({ yearsAvail = [], onNavigateToSettings, disab
 
   if (loading) return null
 
-  const updateWorkYear = async (nextYear: number) => {
+  const updateWorkPeriod = async (nextYear: number, nextMonth = workMonth) => {
     if (disabled || saving || !Number.isFinite(nextYear) || nextYear <= 1900) return
     setSaving(true)
     try {
-      await window.api?.settings?.set?.({ key: 'ui.workYear', value: nextYear })
+      await Promise.all([
+        window.api?.settings?.set?.({ key: 'ui.workYear', value: nextYear }),
+        budgetCadence === 'MONTHLY' ? window.api?.settings?.set?.({ key: 'ui.workMonth', value: nextMonth }) : Promise.resolve()
+      ])
       window.dispatchEvent(new Event('ui-archive-settings-changed'))
       window.dispatchEvent(new Event('data-changed'))
       await reload()
@@ -79,16 +82,19 @@ export function WorkYearIndicator({ yearsAvail = [], onNavigateToSettings, disab
   }
 
   const archiveLabel = showArchived ? 'Archiv: ein' : 'Archiv: aus'
+  const monthLabel = new Intl.DateTimeFormat('de-DE', { month: 'short', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(workYear, workMonth - 1, 1))).replace('.', '')
+  const periodTitle = budgetCadence === 'MONTHLY' ? `Arbeitsmonat ${monthLabel} ${workYear}` : `Arbeitsjahr ${workYear}`
   const titleText = disabled
-    ? `Arbeitsjahr ${workYear} – im Client-Modus nicht änderbar`
-    : `Arbeitsjahr ${workYear} – ${archiveLabel}`
+    ? `${periodTitle} – im Client-Modus nicht änderbar`
+    : `${periodTitle} – ${archiveLabel}`
 
   return (
     <div
       className={`work-year-indicator ${menuOpen ? 'is-open' : ''}`}
       data-archive-mode={showArchived ? 'all' : 'workyear'}
       title={titleText}
-      aria-label={`Arbeitsjahr ${workYear}, ${archiveLabel}`}
+      aria-label={`${periodTitle}, ${archiveLabel}`}
       onMouseEnter={openMenu}
       onMouseLeave={closeMenuSoon}
       onFocusCapture={openMenu}
@@ -98,23 +104,26 @@ export function WorkYearIndicator({ yearsAvail = [], onNavigateToSettings, disab
         closeMenuSoon()
       }}
     >
-      <span className="work-year-badge">{workYear}</span>
-      <span className="work-year-label">Arbeitsjahr</span>
+      <span className="work-year-badge">{budgetCadence === 'MONTHLY' ? `${monthLabel} ${workYear}` : workYear}</span>
+      <span className="work-year-label">{budgetCadence === 'MONTHLY' ? 'Arbeitsmonat' : 'Arbeitsjahr'}</span>
 
-      <div className="work-year-menu" role="tooltip" aria-label="Arbeitsjahr und Archiv">
+      <div className="work-year-menu" role="tooltip" aria-label={`${budgetCadence === 'MONTHLY' ? 'Arbeitsmonat' : 'Arbeitsjahr'} und Archiv`}>
         <div className="work-year-menu__section">
-          <label className="work-year-menu__label">Arbeitsjahr</label>
-          <select
-            className="input work-year-menu__select"
-            value={workYear}
-            disabled={disabled || saving || selectableYears.length <= 1}
-            onChange={(event) => void updateWorkYear(Number(event.target.value))}
-            title="Arbeitsjahr wechseln"
-          >
-            {selectableYears.map((year) => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+          <label className="work-year-menu__label">{budgetCadence === 'MONTHLY' ? 'Arbeitsmonat' : 'Arbeitsjahr'}</label>
+          <div className={budgetCadence === 'MONTHLY' ? 'work-period-selects' : undefined}>
+            {budgetCadence === 'MONTHLY' && <select className="input work-year-menu__select" value={workMonth} disabled={disabled || saving} onChange={(event) => void updateWorkPeriod(workYear, Number(event.target.value))} title="Arbeitsmonat wechseln">{Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{new Intl.DateTimeFormat('de-DE', { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2020, month - 1, 1)))}</option>)}</select>}
+            <select
+              className="input work-year-menu__select"
+              value={workYear}
+              disabled={disabled || saving || selectableYears.length <= 1}
+              onChange={(event) => void updateWorkPeriod(Number(event.target.value), workMonth)}
+              title={budgetCadence === 'MONTHLY' ? 'Jahr des Arbeitsmonats wechseln' : 'Arbeitsjahr wechseln'}
+            >
+              {selectableYears.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="work-year-menu__section">

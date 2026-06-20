@@ -12,9 +12,10 @@ interface SideNavProps {
   collapsed: boolean
   onToggleCollapse?: () => void
   openInvoicesCount?: number
+  recurringDueCount?: number
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, openInvoicesCount = 0 }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, openInvoicesCount = 0, recurringDueCount = 0 }: SideNavProps) {
   const { isModuleEnabled } = useModules()
   const { canAccessSettings } = useAuth()
   
@@ -34,8 +35,9 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, o
       {visibleItems.map((item, idx) => {
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
-        const showBadge = item.key === 'Verbindlichkeiten' && openInvoicesCount > 0
-        const badgeText = openInvoicesCount > 99 ? '99+' : String(openInvoicesCount)
+        const badgeCount = item.key === 'Verbindlichkeiten' ? openInvoicesCount : item.key === 'Wiederkehrend' ? recurringDueCount : 0
+        const showBadge = badgeCount > 0
+        const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)
         
         return (
           <React.Fragment key={item.key}>
@@ -53,7 +55,7 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, o
                 {getNavIcon(item.key)}
               </span>
               {showBadge && (
-                <span className="nav-badge" aria-label={`${openInvoicesCount} offen`}>{badgeText}</span>
+                <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}
             </button>
           </React.Fragment>

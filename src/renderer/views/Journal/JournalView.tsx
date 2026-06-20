@@ -6,6 +6,7 @@ import TagsEditor from '../../components/TagsEditor'
 import { TimeFilterDropdown, MetaFilterDropdown, BatchAssignDropdown, ColumnSelectDropdown } from '../../components/dropdowns'
 import { useModules } from '../../context/moduleHooks'
 import { useAuth } from '../../context/authHooks'
+import { getWorkPeriodRange } from '../../utils/workPeriod'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
@@ -133,6 +134,8 @@ interface JournalViewProps {
     setPage?: (v: number) => void
     // Archive mode (server-side filtering)
     workYear?: number
+    workMonth?: number
+    budgetCadence?: 'ANNUAL' | 'MONTHLY'
     showArchived?: boolean
     archiveSettingsReady?: boolean
     showBookingDraftTabs?: boolean
@@ -204,6 +207,8 @@ export default function JournalView({
     setPage: setPageProp,
     // Archive mode
     workYear,
+    workMonth,
+    budgetCadence = 'ANNUAL',
     showArchived,
     archiveSettingsReady,
     showBookingDraftTabs = false,
@@ -262,6 +267,12 @@ export default function JournalView({
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
     const activeFilterTaxonomyTerm = filterTaxonomyTerm
     const activeQ = qProp !== undefined ? qProp : q
+    const implicitMonthRange = useMemo(() => {
+        if (showArchived !== false || budgetCadence !== 'MONTHLY' || !workYear || !workMonth) return null
+        return getWorkPeriodRange('MONTHLY', workYear, workMonth)
+    }, [budgetCadence, showArchived, workMonth, workYear])
+    const dataFrom = activeFrom || (!activeFrom && !activeTo ? implicitMonthRange?.from || '' : '')
+    const dataTo = activeTo || (!activeFrom && !activeTo ? implicitMonthRange?.to || '' : '')
     const activePage = pageProp !== undefined ? pageProp : page
     
     // Setters that use props if available
@@ -689,8 +700,8 @@ export default function JournalView({
                 sphere: activeFilterSphere || undefined,
                 categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
                 type: activeFilterType || undefined,
-                from: activeFrom || undefined,
-                to: activeTo || undefined,
+                from: dataFrom || undefined,
+                to: dataTo || undefined,
                 earmarkId: activeFilterEarmark || undefined,
                 budgetId: activeFilterBudgetId || undefined,
                 q: activeQ.trim() || undefined,
@@ -740,7 +751,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady, budgetNames, earmarks])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, dataFrom, dataTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady, budgetNames, earmarks])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -1122,8 +1133,8 @@ export default function JournalView({
             {/* Filter Totals */}
             <FilterTotals 
                 refreshKey={refreshKey} 
-                from={activeFrom || undefined} 
-                to={activeTo || undefined} 
+                from={dataFrom || undefined}
+                to={dataTo || undefined}
                 paymentMethod={activeFilterPM || undefined} 
                 sphere={activeFilterSphere || undefined} 
                 categoryId={useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined}

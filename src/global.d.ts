@@ -42,6 +42,8 @@ declare global {
                     budgetId?: number
                     files?: { name: string; dataBase64: string; mime?: string }[]
                     tags?: string[]
+                    recurringTemplateId?: number
+                    recurringDueDate?: string
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
                 list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string; taxonomyTermId?: number }) => Promise<{
@@ -91,6 +93,35 @@ declare global {
                 }
                 clearAll: () => Promise<{ deleted: number }>
             }
+            recurringBookings: {
+                list: (payload?: { includeInactive?: boolean; today?: string }) => Promise<{ rows: Array<{
+                    id: number
+                    name: string
+                    frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+                    intervalCount: number
+                    nextDueDate: string
+                    endDate: string | null
+                    isActive: boolean
+                    isDue: boolean
+                    template: {
+                        type: 'IN' | 'OUT'
+                        sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+                        description: string
+                        grossAmount: number
+                        vatRate: number
+                        paymentMethod: 'BAR' | 'BANK'
+                        categoryId?: number | null
+                        budgetId?: number | null
+                        earmarkId?: number | null
+                        tags?: string[]
+                    }
+                    createdAt: string
+                }> }>
+                upsert: (payload: any) => Promise<{ id: number }>
+                setActive: (payload: { id: number; isActive: boolean }) => Promise<{ id: number; isActive: boolean }>
+                skip: (payload: { id: number; dueDate: string }) => Promise<{ nextDueDate: string; isActive: boolean }>
+                delete: (payload: { id: number }) => Promise<{ id: number }>
+            }
             tags: {
                 list: (payload?: { q?: string; includeUsage?: boolean }) => Promise<{ rows: Array<{ id: number; name: string; color?: string | null; usage?: number }> }>
                 upsert: (payload: { id?: number; name: string; color?: string | null }) => Promise<{ id: number }>
@@ -117,6 +148,19 @@ declare global {
                 list: (payload?: any) => Promise<any>
                 delete: (payload: any) => Promise<any>
                 usage: (payload: any) => Promise<any>
+            }
+            budgetPeriods: {
+                config: {
+                    get: () => Promise<{ cadence: 'ANNUAL' | 'MONTHLY'; carrySurplus: boolean; carryDeficit: boolean }>
+                    set: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; carrySurplus?: boolean; carryDeficit?: boolean }) => Promise<{ cadence: 'ANNUAL' | 'MONTHLY'; carrySurplus: boolean; carryDeficit: boolean }>
+                }
+                get: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null }) => Promise<any | null>
+                list: (payload?: { cadence?: 'ANNUAL' | 'MONTHLY'; year?: number }) => Promise<{ periods: any[] }>
+                upsert: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null; amount: number; description?: string | null }) => Promise<{ id: number; created: boolean }>
+                fillYear: (payload: { year: number; amount: number; description?: string | null; overwrite?: boolean }) => Promise<{ updated: number }>
+                delete: (payload: { id: number }) => Promise<{ id: number }>
+                usage: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null }) => Promise<any>
+                yearUsage: (payload: { year: number }) => Promise<any>
             }
             invoices: {
                 create: (payload: any) => Promise<any>
@@ -221,6 +265,13 @@ declare global {
             }
             quotes: {
                 weekly: (payload?: { date?: string }) => Promise<{ text: string; author?: string; source?: string; id?: number }>
+            }
+            updates: {
+                status: () => Promise<any>
+                check: () => Promise<any>
+                download: () => Promise<any>
+                install: () => Promise<{ ok: boolean }>
+                onStatus: (cb: (status: any) => void) => () => void
             }
             backup: {
                 make: (reason?: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>

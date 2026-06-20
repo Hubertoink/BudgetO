@@ -10,9 +10,10 @@ interface TopNavProps {
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'
   openInvoicesCount?: number
+  recurringDueCount?: number
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, openInvoicesCount = 0 }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, openInvoicesCount = 0, recurringDueCount = 0 }: TopNavProps) {
   const { isModuleEnabled } = useModules()
   const { canAccessSettings } = useAuth()
   
@@ -33,8 +34,9 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, openInvoicesC
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         const showDividerBefore = idx > 0 && item.group !== visibleItems[idx - 1]?.group
-        const showBadge = item.key === 'Verbindlichkeiten' && openInvoicesCount > 0
-        const badgeText = openInvoicesCount > 99 ? '99+' : String(openInvoicesCount)
+        const badgeCount = item.key === 'Verbindlichkeiten' ? openInvoicesCount : item.key === 'Wiederkehrend' ? recurringDueCount : 0
+        const showBadge = badgeCount > 0
+        const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)
         
         return (
           <React.Fragment key={item.key}>
@@ -52,7 +54,7 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, openInvoicesC
                 {getNavIcon(item.key)}
               </span>
               {showBadge && (
-                <span className="nav-badge" aria-label={`${openInvoicesCount} offen`}>{badgeText}</span>
+                <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}
             </button>
           </React.Fragment>

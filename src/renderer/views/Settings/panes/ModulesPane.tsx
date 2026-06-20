@@ -178,7 +178,8 @@ function getModuleEmoji(key: string): string {
     'members': '👥',
     'earmarks': '🏷️',
     'invoices': '📄',
-    'custom-categories': '📂'
+    'custom-categories': '📂',
+    'recurring-bookings': '🔄'
   }
   return emojis[key] || '📦'
 }

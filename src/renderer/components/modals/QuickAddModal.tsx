@@ -144,6 +144,12 @@ export default function QuickAddModal({
                             </button>
                         </div>
                     </div>
+                    {qa.recurringTemplateId && qa.recurringDueDate ? (
+                        <div className="recurring-draft-notice">
+                            <span aria-hidden="true">↻</span>
+                            <span><strong>Wiederkehrende Buchung</strong> · Fälligkeit {fmtDate(qa.recurringDueDate)} · wird erst mit dem Speichern als erledigt markiert</span>
+                        </div>
+                    ) : null}
                     {/* Compact Summary Line */}
                     <div style={{ 
                         display: 'flex', 

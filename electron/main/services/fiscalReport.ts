@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
-import { getAnnualBudget } from '../repositories/annualBudgets'
+import { getBudgetYearUsage } from '../repositories/budgetPeriods'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
@@ -168,9 +168,11 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   let annualBudgeted = 0
   let annualBudgetRemaining = 0
   let annualBudgetPct = 0
+  let annualBudgetLabel = 'Jahresbudget (Plan)'
   try {
-    const budget = getAnnualBudget({ year: fiscalYear, costCenterId: null })
-    annualBudgeted = Number(budget?.amount ?? 0) || 0
+    const budget = getBudgetYearUsage(fiscalYear)
+    annualBudgeted = Number(budget?.budgeted ?? 0) || 0
+    annualBudgetLabel = budget?.cadence === 'MONTHLY' ? 'Summe Monatsbudgets (Plan)' : 'Jahresbudget (Plan)'
     const netSpent = (Number(totalOutGross) || 0) - (Number(totalInGross) || 0)
     annualBudgetRemaining = annualBudgeted - netSpent
     annualBudgetPct = annualBudgeted > 0 ? Math.min(100, Math.max(0, (netSpent / annualBudgeted) * 100)) : 0
@@ -335,7 +337,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </div>
     ${annualBudgeted > 0 ? `
     <div class="summary-row">
-      <span class="summary-label">Jahresbudget (Plan):</span>
+      <span class="summary-label">${annualBudgetLabel}:</span>
       <span class="summary-value">${euro(annualBudgeted)}</span>
     </div>
     <div class="summary-row">

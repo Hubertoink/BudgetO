@@ -1,6 +1,6 @@
 import type { ModuleKey } from '../context/moduleTypes'
 
-export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Übungsleiter' | 'Barvorschüsse' | 'Belege' | 'Reports' | 'Einstellungen'
+export type NavKey = 'Dashboard' | 'Buchungen' | 'Wiederkehrend' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Übungsleiter' | 'Barvorschüsse' | 'Belege' | 'Reports' | 'Einstellungen'
 
 /**
  * Navigation groups for visual separation:
@@ -26,6 +26,7 @@ export const navItems: NavItem[] = [
   { key: 'Dashboard', label: 'Dashboard', group: 'overview' },
   // Kernbereiche Geldfluss
   { key: 'Buchungen', label: 'Buchungen', group: 'transactions' },
+  { key: 'Wiederkehrend', label: 'Wiederkehrende Buchungen', group: 'transactions', moduleKey: 'recurring-bookings' },
   { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'transactions', moduleKey: 'invoices' },
   { key: 'Barvorschüsse', label: 'Barvorschüsse', group: 'transactions', moduleKey: 'cash-advance' },
   // Vereinsstruktur & Planung

@@ -379,6 +379,31 @@ function registerHandlers() {
     return clearAllVouchers()
   })
 
+  apiHandlers.set('recurringBookings.list', async (body) => {
+    const { listRecurringBookings } = await import('../repositories/recurringBookings')
+    return { rows: listRecurringBookings(body || {}) }
+  })
+
+  apiHandlers.set('recurringBookings.upsert', async (body) => {
+    const { upsertRecurringBooking } = await import('../repositories/recurringBookings')
+    return upsertRecurringBooking(body)
+  })
+
+  apiHandlers.set('recurringBookings.setActive', async (body) => {
+    const { setRecurringBookingActive } = await import('../repositories/recurringBookings')
+    return setRecurringBookingActive(body.id, body.isActive)
+  })
+
+  apiHandlers.set('recurringBookings.skip', async (body) => {
+    const { skipRecurringOccurrence } = await import('../repositories/recurringBookings')
+    return skipRecurringOccurrence(body.id, body.dueDate)
+  })
+
+  apiHandlers.set('recurringBookings.delete', async (body) => {
+    const { deleteRecurringBooking } = await import('../repositories/recurringBookings')
+    return deleteRecurringBooking(body.id)
+  })
+
   // Reports
   apiHandlers.set('reports.summary', async (body) => {
     const { summarizeVouchers } = await import('../repositories/vouchers')
@@ -592,6 +617,43 @@ function registerHandlers() {
   apiHandlers.set('annualBudgets.usage', async (body) => {
     const { getAnnualBudgetUsage } = await import('../repositories/annualBudgets')
     return getAnnualBudgetUsage(body)
+  })
+
+  apiHandlers.set('budgetPeriods.config.get', async () => {
+    const { getBudgetPeriodConfig } = await import('../repositories/budgetPeriods')
+    return getBudgetPeriodConfig()
+  })
+  apiHandlers.set('budgetPeriods.config.set', async (body) => {
+    const { setBudgetPeriodConfig } = await import('../repositories/budgetPeriods')
+    return setBudgetPeriodConfig(body)
+  })
+  apiHandlers.set('budgetPeriods.get', async (body) => {
+    const { getBudgetPeriod } = await import('../repositories/budgetPeriods')
+    return getBudgetPeriod(body)
+  })
+  apiHandlers.set('budgetPeriods.list', async (body) => {
+    const { listBudgetPeriods } = await import('../repositories/budgetPeriods')
+    return { periods: listBudgetPeriods(body || {}) }
+  })
+  apiHandlers.set('budgetPeriods.upsert', async (body) => {
+    const { upsertBudgetPeriod } = await import('../repositories/budgetPeriods')
+    return upsertBudgetPeriod(body)
+  })
+  apiHandlers.set('budgetPeriods.fillYear', async (body) => {
+    const { upsertMonthlyBudgetYear } = await import('../repositories/budgetPeriods')
+    return upsertMonthlyBudgetYear(body)
+  })
+  apiHandlers.set('budgetPeriods.delete', async (body) => {
+    const { deleteBudgetPeriod } = await import('../repositories/budgetPeriods')
+    return deleteBudgetPeriod(body.id)
+  })
+  apiHandlers.set('budgetPeriods.usage', async (body) => {
+    const { getBudgetPeriodUsage } = await import('../repositories/budgetPeriods')
+    return getBudgetPeriodUsage(body)
+  })
+  apiHandlers.set('budgetPeriods.yearUsage', async (body) => {
+    const { getBudgetYearUsage } = await import('../repositories/budgetPeriods')
+    return getBudgetYearUsage(body.year)
   })
   
   // Modules
@@ -1009,6 +1071,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           'switch',
           'reset',
           'restore',
+          'skip',
           'close',
           'reopen'
         ]

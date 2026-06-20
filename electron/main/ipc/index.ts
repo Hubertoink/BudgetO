@@ -25,6 +25,8 @@ import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSma
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
+import { checkForAppUpdates, downloadAppUpdate, getUpdateStatus, initializeUpdater, installAppUpdate } from '../services/updater'
+import { BudgetPeriodConfigOutput, BudgetPeriodConfigSetInput, BudgetPeriodDeleteInput, BudgetPeriodFillYearInput, BudgetPeriodGetInput, BudgetPeriodListInput, BudgetPeriodUpsertInput, BudgetYearUsageInput } from './schemas'
 
 function isMissingTableError(error: unknown, tableNames: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -63,6 +65,7 @@ type RegisterIpcHandlersOptions = {
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
+    initializeUpdater()
     const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
     // App info
     ipcMain.handle('app.version', async () => {
@@ -87,6 +90,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         win?.close()
         return { ok: true }
     })
+    ipcMain.handle('updates.status', async () => getUpdateStatus())
+    ipcMain.handle('updates.check', async () => checkForAppUpdates())
+    ipcMain.handle('updates.download', async () => downloadAppUpdate())
+    ipcMain.handle('updates.install', async () => installAppUpdate())
     ipcMain.handle('window.confirmClose', async () => {
         const win = getCurrentWindow()
         if (!win) return { ok: false }
@@ -589,12 +596,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             let annualBudgeted = 0
             let annualBudgetRemaining = 0
             let annualBudgetPct = 0
+            let annualBudgetLabel = 'Jahresbudget (Plan)'
             try {
                 const yearStr = (parsed.from && String(parsed.from).slice(0, 4)) || (parsed.to && String(parsed.to).slice(0, 4))
                 const budgetYear = Number.isFinite(Number(yearStr)) ? Number(yearStr) : new Date().getFullYear()
-                const { getAnnualBudget } = await import('../repositories/annualBudgets')
-                const budget = getAnnualBudget({ year: budgetYear, costCenterId: null })
-                annualBudgeted = Number(budget?.amount ?? 0) || 0
+                const { getBudgetYearUsage } = await import('../repositories/budgetPeriods')
+                const budget = getBudgetYearUsage(budgetYear)
+                annualBudgeted = Number(budget?.budgeted ?? 0) || 0
+                annualBudgetLabel = budget?.cadence === 'MONTHLY' ? 'Summe Monatsbudgets (Plan)' : 'Jahresbudget (Plan)'
 
                 if (annualBudgeted > 0) {
                     const hasRange = Boolean(parsed.from || parsed.to)
@@ -670,7 +679,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         <div class="kpi"><div class="label">Einnahmen (Brutto)</div><div class="value">${totalIn.toFixed(2)} €</div></div>
         <div class="kpi"><div class="label">Ausgaben (Brutto)</div><div class="value">${totalOut.toFixed(2)} €</div></div>
         <div class="kpi"><div class="label">Saldo</div><div class="value">${saldo.toFixed(2)} €</div></div>
-        ${annualBudgeted > 0 ? `<div class="kpi"><div class="label">Jahresbudget (Plan)</div><div class="value">${euro(annualBudgeted)}</div></div>` : ''}
+        ${annualBudgeted > 0 ? `<div class="kpi"><div class="label">${annualBudgetLabel}</div><div class="value">${euro(annualBudgeted)}</div></div>` : ''}
         ${annualBudgeted > 0 ? `<div class="kpi"><div class="label">Restbudget (Plan-Ist)</div><div class="value">${euro(annualBudgetRemaining)} <span class="badge">${annualBudgetPct.toFixed(0)}%</span></div></div>` : ''}
     </div>
     <div class="grid">
@@ -1283,6 +1292,92 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
         const rows = listRecentVouchers(parsed.limit)
         return VouchersRecentOutput.parse({ rows })
+    })
+
+    ipcMain.handle('recurringBookings.list', async (_e, payload) => {
+        const { RecurringBookingsListInput, RecurringBookingsListOutput } = await import('./schemas')
+        const parsed = RecurringBookingsListInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return RecurringBookingsListOutput.parse(await remoteCall(cfg.serverAddress, 'recurringBookings.list', parsed || {}))
+        }
+        const { listRecurringBookings } = await import('../repositories/recurringBookings')
+        return RecurringBookingsListOutput.parse({ rows: listRecurringBookings(parsed || {}) })
+    })
+
+    ipcMain.handle('recurringBookings.upsert', async (_e, payload) => {
+        const { RecurringBookingUpsertInput, RecurringBookingUpsertOutput } = await import('./schemas')
+        const parsed = RecurringBookingUpsertInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return RecurringBookingUpsertOutput.parse(await remoteCall(cfg.serverAddress, 'recurringBookings.upsert', parsed))
+        }
+        const { getUserBySessionToken } = await import('../repositories/users')
+        const user = getClientAuthToken() ? getUserBySessionToken(getClientAuthToken()!) : null
+        if (user?.role === 'READONLY') throw new Error('Forbidden')
+        const { upsertRecurringBooking } = await import('../repositories/recurringBookings')
+        const result = upsertRecurringBooking(parsed)
+        bumpChangeSeq()
+        return RecurringBookingUpsertOutput.parse(result)
+    })
+
+    ipcMain.handle('recurringBookings.setActive', async (_e, payload) => {
+        const { RecurringBookingSetActiveInput, RecurringBookingSetActiveOutput } = await import('./schemas')
+        const parsed = RecurringBookingSetActiveInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return RecurringBookingSetActiveOutput.parse(await remoteCall(cfg.serverAddress, 'recurringBookings.setActive', parsed))
+        }
+        const { getUserBySessionToken } = await import('../repositories/users')
+        const user = getClientAuthToken() ? getUserBySessionToken(getClientAuthToken()!) : null
+        if (user?.role === 'READONLY') throw new Error('Forbidden')
+        const { setRecurringBookingActive } = await import('../repositories/recurringBookings')
+        const result = setRecurringBookingActive(parsed.id, parsed.isActive)
+        bumpChangeSeq()
+        return RecurringBookingSetActiveOutput.parse(result)
+    })
+
+    ipcMain.handle('recurringBookings.skip', async (_e, payload) => {
+        const { RecurringBookingSkipInput, RecurringBookingSkipOutput } = await import('./schemas')
+        const parsed = RecurringBookingSkipInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return RecurringBookingSkipOutput.parse(await remoteCall(cfg.serverAddress, 'recurringBookings.skip', parsed))
+        }
+        const { getUserBySessionToken } = await import('../repositories/users')
+        const user = getClientAuthToken() ? getUserBySessionToken(getClientAuthToken()!) : null
+        if (user?.role === 'READONLY') throw new Error('Forbidden')
+        const { skipRecurringOccurrence } = await import('../repositories/recurringBookings')
+        const result = skipRecurringOccurrence(parsed.id, parsed.dueDate)
+        bumpChangeSeq()
+        return RecurringBookingSkipOutput.parse(result)
+    })
+
+    ipcMain.handle('recurringBookings.delete', async (_e, payload) => {
+        const { RecurringBookingDeleteInput, RecurringBookingDeleteOutput } = await import('./schemas')
+        const parsed = RecurringBookingDeleteInput.parse(payload)
+        const { getServerConfig, remoteCall, getClientAuthToken, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return RecurringBookingDeleteOutput.parse(await remoteCall(cfg.serverAddress, 'recurringBookings.delete', parsed))
+        }
+        const { getUserBySessionToken } = await import('../repositories/users')
+        const token = getClientAuthToken()
+        const user = token ? getUserBySessionToken(token) : null
+        if (user?.role === 'READONLY') throw new Error('Forbidden')
+        const { deleteRecurringBooking } = await import('../repositories/recurringBookings')
+        const result = deleteRecurringBooking(parsed.id)
+        bumpChangeSeq()
+        return RecurringBookingDeleteOutput.parse(result)
     })
 
     // Get category IDs used in vouchers
@@ -2960,6 +3055,114 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const { getAnnualBudgetUsage } = await import('../repositories/annualBudgets')
         const res = getAnnualBudgetUsage({ year, costCenterId })
         return res
+    })
+
+    // Generic annual/monthly organization budget periods
+    ipcMain.handle('budgetPeriods.config.get', async () => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetPeriodConfigOutput.parse(await remoteCall(cfg.serverAddress, 'budgetPeriods.config.get', {}))
+        }
+        const { getBudgetPeriodConfig } = await import('../repositories/budgetPeriods')
+        return BudgetPeriodConfigOutput.parse(getBudgetPeriodConfig())
+    })
+    ipcMain.handle('budgetPeriods.config.set', async (_e, payload) => {
+        const parsed = BudgetPeriodConfigSetInput.parse(payload)
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return BudgetPeriodConfigOutput.parse(await remoteCall(cfg.serverAddress, 'budgetPeriods.config.set', parsed))
+        }
+        const { setBudgetPeriodConfig } = await import('../repositories/budgetPeriods')
+        const result = setBudgetPeriodConfig(parsed)
+        bumpChangeSeq()
+        return BudgetPeriodConfigOutput.parse(result)
+    })
+    ipcMain.handle('budgetPeriods.get', async (_e, payload) => {
+        const parsed = BudgetPeriodGetInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.get', parsed)
+        }
+        const { getBudgetPeriod } = await import('../repositories/budgetPeriods')
+        return getBudgetPeriod(parsed)
+    })
+    ipcMain.handle('budgetPeriods.list', async (_e, payload) => {
+        const parsed = BudgetPeriodListInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.list', parsed || {})
+        }
+        const { listBudgetPeriods } = await import('../repositories/budgetPeriods')
+        return { periods: listBudgetPeriods(parsed || {}) }
+    })
+    ipcMain.handle('budgetPeriods.upsert', async (_e, payload) => {
+        const parsed = BudgetPeriodUpsertInput.parse(payload)
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.upsert', parsed)
+        }
+        const { upsertBudgetPeriod } = await import('../repositories/budgetPeriods')
+        const result = upsertBudgetPeriod(parsed)
+        bumpChangeSeq()
+        return result
+    })
+    ipcMain.handle('budgetPeriods.fillYear', async (_e, payload) => {
+        const parsed = BudgetPeriodFillYearInput.parse(payload)
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.fillYear', parsed)
+        }
+        const { upsertMonthlyBudgetYear } = await import('../repositories/budgetPeriods')
+        const result = upsertMonthlyBudgetYear(parsed)
+        bumpChangeSeq()
+        return result
+    })
+    ipcMain.handle('budgetPeriods.delete', async (_e, payload) => {
+        const parsed = BudgetPeriodDeleteInput.parse(payload)
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.delete', parsed)
+        }
+        const { deleteBudgetPeriod } = await import('../repositories/budgetPeriods')
+        const result = deleteBudgetPeriod(parsed.id)
+        bumpChangeSeq()
+        return result
+    })
+    ipcMain.handle('budgetPeriods.usage', async (_e, payload) => {
+        const parsed = BudgetPeriodGetInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.usage', parsed)
+        }
+        const { getBudgetPeriodUsage } = await import('../repositories/budgetPeriods')
+        return getBudgetPeriodUsage(parsed)
+    })
+    ipcMain.handle('budgetPeriods.yearUsage', async (_e, payload) => {
+        const parsed = BudgetYearUsageInput.parse(payload)
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        if (cfg.mode === 'client') {
+            if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
+            return remoteCall(cfg.serverAddress, 'budgetPeriods.yearUsage', parsed)
+        }
+        const { getBudgetYearUsage } = await import('../repositories/budgetPeriods')
+        return getBudgetYearUsage(parsed.year)
     })
 
     // ─────────────────────────────────────────────────────────────────────────

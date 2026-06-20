@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 interface BudgetData {
+  cadence?: 'ANNUAL' | 'MONTHLY'
+  configuredPeriods?: number
   budgeted: number
   spent: number
   income: number
@@ -20,7 +22,7 @@ export default function ReportsAnnualBudget({ year, refreshKey }: { year: number
     }
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.annualBudgets?.usage?.({ year })
+    window.api?.budgetPeriods?.yearUsage?.({ year })
       .then((res: BudgetData | null) => {
         if (!cancelled) setData(res)
       })
@@ -33,7 +35,7 @@ export default function ReportsAnnualBudget({ year, refreshKey }: { year: number
   if (loading) {
     return (
       <div className="card" style={{ marginTop: 12, padding: 16 }}>
-        <div style={{ color: 'var(--text-dim)' }}>Lade Jahresbudget…</div>
+        <div style={{ color: 'var(--text-dim)' }}>Lade Budgetplanung…</div>
       </div>
     )
   }
@@ -55,8 +57,8 @@ export default function ReportsAnnualBudget({ year, refreshKey }: { year: number
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>📊</span>
             <div>
-              <strong style={{ fontSize: 15 }}>Jahresbudget {year}</strong>
-              <div className="helper" style={{ marginTop: 2 }}>Budgetauslastung für das Kalenderjahr</div>
+              <strong style={{ fontSize: 15 }}>{data.cadence === 'MONTHLY' ? `Monatsbudgets ${year}` : `Jahresbudget ${year}`}</strong>
+              <div className="helper" style={{ marginTop: 2 }}>{data.cadence === 'MONTHLY' ? `${data.configuredPeriods || 0} von 12 Monaten geplant` : 'Budgetauslastung für das Kalenderjahr'}</div>
             </div>
           </div>
           <div style={{

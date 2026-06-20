@@ -80,6 +80,13 @@ contextBridge.exposeInMainWorld('api', {
         },
         clearAll: () => ipcRenderer.invoke('vouchers.clearAll', { confirm: true })
     },
+    recurringBookings: {
+        list: (payload?: any) => ipcRenderer.invoke('recurringBookings.list', payload),
+        upsert: (payload: any) => cleanInvoke('recurringBookings.upsert', payload),
+        setActive: (payload: any) => cleanInvoke('recurringBookings.setActive', payload),
+        skip: (payload: any) => cleanInvoke('recurringBookings.skip', payload),
+        delete: (payload: any) => cleanInvoke('recurringBookings.delete', payload)
+    },
     tags: {
         list: (payload?: any) => ipcRenderer.invoke('tags.list', payload),
         upsert: (payload: any) => ipcRenderer.invoke('tags.upsert', payload),
@@ -382,6 +389,30 @@ contextBridge.exposeInMainWorld('api', {
             ipcRenderer.invoke('annualBudgets.delete', payload),
         usage: (payload: { year: number; costCenterId?: number | null }) => 
             ipcRenderer.invoke('annualBudgets.usage', payload)
+    },
+    updates: {
+        status: () => ipcRenderer.invoke('updates.status'),
+        check: () => ipcRenderer.invoke('updates.check'),
+        download: () => ipcRenderer.invoke('updates.download'),
+        install: () => ipcRenderer.invoke('updates.install'),
+        onStatus: (cb: (status: any) => void) => {
+            const handler = (_event: any, status: any) => cb(status)
+            ipcRenderer.on('updates:status', handler)
+            return () => ipcRenderer.removeListener('updates:status', handler)
+        }
+    },
+    budgetPeriods: {
+        config: {
+            get: () => ipcRenderer.invoke('budgetPeriods.config.get'),
+            set: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; carrySurplus?: boolean; carryDeficit?: boolean }) => ipcRenderer.invoke('budgetPeriods.config.set', payload)
+        },
+        get: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null }) => ipcRenderer.invoke('budgetPeriods.get', payload),
+        list: (payload?: { cadence?: 'ANNUAL' | 'MONTHLY'; year?: number }) => ipcRenderer.invoke('budgetPeriods.list', payload),
+        upsert: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null; amount: number; description?: string | null }) => ipcRenderer.invoke('budgetPeriods.upsert', payload),
+        fillYear: (payload: { year: number; amount: number; description?: string | null; overwrite?: boolean }) => ipcRenderer.invoke('budgetPeriods.fillYear', payload),
+        delete: (payload: { id: number }) => ipcRenderer.invoke('budgetPeriods.delete', payload),
+        usage: (payload: { cadence?: 'ANNUAL' | 'MONTHLY'; year: number; month?: number | null }) => ipcRenderer.invoke('budgetPeriods.usage', payload),
+        yearUsage: (payload: { year: number }) => ipcRenderer.invoke('budgetPeriods.yearUsage', payload)
     },
     // BudgetO: Benutzerdefinierte Kategorien (Custom Categories)
     customCategories: {

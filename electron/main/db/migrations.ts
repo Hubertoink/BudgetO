@@ -1038,6 +1038,104 @@ export const MIGRATIONS: Mig[] = [
       `)
     }
   }
+  ,
+  {
+    version: 39,
+    up(db: DB) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS recurring_booking_templates (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          frequency TEXT CHECK(frequency IN ('WEEKLY','MONTHLY','QUARTERLY','YEARLY')) NOT NULL,
+          interval_count INTEGER NOT NULL DEFAULT 1 CHECK(interval_count > 0),
+          anchor_day INTEGER NOT NULL,
+          next_due_date TEXT NOT NULL,
+          end_date TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          template_json TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS recurring_booking_occurrences (
+          id INTEGER PRIMARY KEY,
+          template_id INTEGER NOT NULL,
+          due_date TEXT NOT NULL,
+          status TEXT CHECK(status IN ('BOOKED','SKIPPED')) NOT NULL,
+          voucher_id INTEGER,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(template_id) REFERENCES recurring_booking_templates(id) ON DELETE CASCADE,
+          FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+          UNIQUE(template_id, due_date)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_recurring_templates_due
+          ON recurring_booking_templates(is_active, next_due_date);
+        CREATE INDEX IF NOT EXISTS idx_recurring_occurrences_template
+          ON recurring_booking_occurrences(template_id, due_date);
+
+      `)
+    }
+  }
+  ,
+  {
+    version: 40,
+    up: `
+      INSERT OR IGNORE INTO module_config (module_key, enabled, display_order)
+      VALUES ('recurring-bookings', 1, 9);
+    `
+  },
+  {
+    version: 41,
+    up(db: DB) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS budget_period_config (
+          id INTEGER PRIMARY KEY CHECK(id = 1),
+          cadence TEXT NOT NULL DEFAULT 'ANNUAL' CHECK(cadence IN ('ANNUAL','MONTHLY')),
+          updated_at TEXT
+        );
+        INSERT OR IGNORE INTO budget_period_config(id, cadence) VALUES(1, 'ANNUAL');
+
+        CREATE TABLE IF NOT EXISTS budget_periods (
+          id INTEGER PRIMARY KEY,
+          cadence TEXT NOT NULL CHECK(cadence IN ('ANNUAL','MONTHLY')),
+          year INTEGER NOT NULL,
+          month INTEGER CHECK(month IS NULL OR (month >= 1 AND month <= 12)),
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          amount REAL NOT NULL CHECK(amount >= 0),
+          description TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT,
+          CHECK((cadence='ANNUAL' AND month IS NULL) OR (cadence='MONTHLY' AND month IS NOT NULL)),
+          UNIQUE(cadence, start_date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_budget_periods_year ON budget_periods(year, cadence);
+
+        INSERT OR IGNORE INTO budget_periods(
+          cadence, year, month, start_date, end_date, amount, description, created_at, updated_at
+        )
+        SELECT 'ANNUAL', ab.year, NULL, printf('%04d-01-01', ab.year), printf('%04d-12-31', ab.year),
+               ab.amount, ab.description, ab.created_at, ab.updated_at
+        FROM annual_budgets ab
+        WHERE ab.id IN (
+          SELECT MAX(id) FROM annual_budgets GROUP BY year, IFNULL(cost_center_id, -1)
+        ) AND ab.cost_center_id IS NULL;
+      `)
+    }
+  },
+  {
+    version: 42,
+    up(db: DB) {
+      const columns = db.prepare('PRAGMA table_info(budget_period_config)').all() as Array<{ name: string }>
+      if (!columns.some((column) => column.name === 'carry_surplus')) {
+        db.exec('ALTER TABLE budget_period_config ADD COLUMN carry_surplus INTEGER NOT NULL DEFAULT 0 CHECK(carry_surplus IN (0,1))')
+      }
+      if (!columns.some((column) => column.name === 'carry_deficit')) {
+        db.exec('ALTER TABLE budget_period_config ADD COLUMN carry_deficit INTEGER NOT NULL DEFAULT 0 CHECK(carry_deficit IN (0,1))')
+      }
+    }
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

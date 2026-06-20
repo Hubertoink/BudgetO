@@ -22,6 +22,8 @@ type QA = {
     budgets?: BudgetAssignment[]
     earmarksAssigned?: EarmarkAssignment[]
     taxonomySelectionById?: Record<number, number | ''>
+    recurringTemplateId?: number
+    recurringDueDate?: string
 }
 
 type QuickAddDraft = {
@@ -208,6 +210,10 @@ export function useQuickAdd(
 
         if (typeof currentQa.categoryId === 'number') payload.categoryId = currentQa.categoryId
         if (Array.isArray(currentQa.tags)) payload.tags = currentQa.tags
+        if (currentQa.recurringTemplateId && currentQa.recurringDueDate) {
+            payload.recurringTemplateId = currentQa.recurringTemplateId
+            payload.recurringDueDate = currentQa.recurringDueDate
+        }
 
         const budgets = (currentQa.budgets || []).filter((item) => item.budgetId > 0 && item.amount > 0)
         const earmarks = (currentQa.earmarksAssigned || []).filter((item) => item.earmarkId > 0 && item.amount > 0)

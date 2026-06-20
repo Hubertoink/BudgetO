@@ -13,6 +13,7 @@ import { CashCheckPane } from './panes/CashCheckPane'
 import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
+import { UpdatePane } from './panes/UpdatePane'
 import { useAuth } from '../../context/authHooks'
 import { useModules } from '../../context/moduleHooks'
 
@@ -48,6 +49,7 @@ export function SettingsView(props: SettingsProps) {
       { key: 'users', icon: '👥', label: 'Benutzer' },
       { key: 'server', icon: '🌐', label: 'Netzwerk' },
       { key: 'storage', icon: '💾', label: 'Speicher & Backup' },
+      { key: 'updates', icon: '⬆️', label: 'Updates' },
       { key: 'import', icon: '📥', label: 'Import' },
       { key: 'org', icon: '🏢', label: 'Sachgebiet' },
       { key: 'tags', icon: '🏷️', label: 'Tags' },
@@ -170,6 +172,8 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
           />
         )}
+
+        {activeTile === 'updates' && <UpdatePane />}
         
   {activeTile === 'import' && importEnabled && <ImportPane notify={props.notify} />}
 

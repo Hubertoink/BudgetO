@@ -24,7 +24,7 @@
 
 ### Kernfunktionen:
 
-- 📊 **Jahresbudget-Planung** mit Soll-Ist-Vergleich
+- 📊 **Jährliche oder monatliche Budgetplanung** mit Soll-Ist-Vergleich und Vorschau wiederkehrender Buchungen
 - 👥 **Übungsleiter-Verwaltung** mit Verträgen, Rechnungen und Jahresobergrenzen
 - 💵 **Barvorschuss-Management** mit Anordnungsnummern und Teil-Vorschüssen
 - 📁 **Excel-Import** für Buchungen
@@ -50,6 +50,24 @@
 - Sach- und Honorarbuchungen
 - Kategorisierung via Tag-System
 - Belegverwaltung mit Datei-Upload (Drag & Drop)
+- Wiederkehrende Buchungsvorlagen mit Fälligkeitsliste und prüfbaren Entwürfen
+- Parallele Buchungsentwürfe, optional in eigenen Fenstern
+
+### ⌨️ Tastaturbefehle
+
+- `Space` öffnet die kontextsensitive Befehlsübersicht
+- `Space`, `G`, … navigiert zu einem Bereich
+- `Space`, `S`, … öffnet die Suche eines Bereichs
+- `Space`, `N` legt eine Buchung an; `Space`, `W` öffnet wiederkehrende Buchungen
+- `Space`, `E`, … öffnet häufige Einstellungen; `E T N` legt einen Tag und `E K N` eine Kategorie an
+- Unter `Space`, `E`, `D`, … lassen sich Designs direkt per Tastatur auswählen
+- `Backspace` geht eine Befehlsebene zurück, `Esc` schließt die Übersicht
+
+### ⬆️ App-Updates
+
+- Unter **Einstellungen → Updates** prüft BudgetO direkt auf neue GitHub-Releases
+- Updates werden erst nach Bestätigung heruntergeladen und anschließend per Neustart installiert
+- Der passende Einstieg ist auch über `Space`, `E`, `A` erreichbar
 
 ### 👨‍🏫 Übungsleiter-Modul
 
@@ -157,7 +175,8 @@ Die erstellten Dateien findest du im `release/` Ordner:
 2. **Setup-Wizard:** Beim ersten Start führt ein Assistent durch die Grundkonfiguration
 3. **Organisation anlegen:** Sachgebiet/Kostenstelle definieren
 4. **Module aktivieren:** In Einstellungen → Module die gewünschten Features aktivieren
-5. **Budget planen:** Jahresbudget nach Kategorien erstellen
+5. **Budget planen:** In den Sachgebiet-Einstellungen jährlichen oder monatlichen Budgetrhythmus wählen
+   - Im Monatsmodus können Überschüsse und Unterdeckungen unabhängig in den Folgemonat übertragen werden
 6. **Buchungen erfassen:** Ausgaben und Einnahmen buchen
 
 ---
@@ -241,7 +260,7 @@ BudgetO ist modular aufgebaut. Module können in den **Einstellungen → Module*
 
 | Modul                | Key            | Beschreibung                                |
 | -------------------- | -------------- | ------------------------------------------- |
-| 📊 Budgets           | `budgets`      | Jahresbudget-Planung mit Soll-Ist           |
+| 📊 Budgets           | `budgets`      | Jahres- oder Monatsbudget mit Soll-Ist      |
 | 👨‍🏫 Übungsleiter      | `instructors`  | ÜL-Verwaltung, Verträge, Rechnungen         |
 | 💵 Barvorschüsse     | `cash-advance` | Anordnungsnummern, Teil-Vorschüsse, Deckung |
 | 📥 Excel-Import      | `excel-import` | Buchungsimport aus .xlsx                    |

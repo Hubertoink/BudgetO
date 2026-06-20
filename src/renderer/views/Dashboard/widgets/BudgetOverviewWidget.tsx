@@ -3,6 +3,8 @@ import AnnualBudgetCard from '../AnnualBudgetCard'
 
 export default function BudgetOverviewWidget(props: {
   year: number
+  month?: number | null
+  period: 'MONAT' | 'JAHR'
   periodLabel: string
   income: number
   expenses: number
@@ -12,7 +14,7 @@ export default function BudgetOverviewWidget(props: {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <AnnualBudgetCard year={props.year} />
+      <AnnualBudgetCard year={props.year} month={props.month} period={props.period} />
 
       <div className="dashboard-grid-auto">
         <div className="card card--success summary-card">

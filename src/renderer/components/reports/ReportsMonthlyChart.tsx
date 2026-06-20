@@ -26,6 +26,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [openingBalance, setOpeningBalance] = useState<number>(0)
+  const [budgetCadence, setBudgetCadence] = useState<'ANNUAL' | 'MONTHLY'>('ANNUAL')
+  const [monthlyBudgetMap, setMonthlyBudgetMap] = useState<Record<string, number>>({})
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -112,17 +114,23 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
       return () => { cancelled = true }
     }
 
-    const p = (window as any).api?.annualBudgets?.get?.({ year, costCenterId: null })
-    if (!p || typeof p.then !== 'function') {
-      setOpeningBalance(0)
-      return () => { cancelled = true }
-    }
-
-    p.then((budget: any) => {
+    Promise.all([
+      window.api?.budgetPeriods?.config?.get?.(),
+      window.api?.budgetPeriods?.get?.({ cadence: 'ANNUAL', year }),
+      window.api?.budgetPeriods?.list?.({ cadence: 'MONTHLY', year })
+    ]).then(async ([config, annual, monthly]) => {
       if (cancelled) return
-      setOpeningBalance(Number(budget?.amount) || 0)
+      const cadence = config?.cadence || 'ANNUAL'
+      setBudgetCadence(cadence)
+      setOpeningBalance(cadence === 'ANNUAL' ? Number(annual?.amount || 0) : 0)
+      if (cadence === 'MONTHLY') {
+        const usages = await Promise.all(Array.from({ length: 12 }, (_, index) => window.api?.budgetPeriods?.usage?.({ cadence: 'MONTHLY', year, month: index + 1 })))
+        if (!cancelled) setMonthlyBudgetMap(Object.fromEntries(usages.map((usage: any, index) => [`${year}-${String(index + 1).padStart(2, '0')}`, Number(usage?.budgeted || 0)])))
+      } else {
+        setMonthlyBudgetMap(Object.fromEntries((monthly?.periods || []).map((period: any) => [String(period.startDate).slice(0, 7), Number(period.amount || 0)])))
+      }
     }).catch(() => {
-      if (!cancelled) setOpeningBalance(0)
+      if (!cancelled) { setOpeningBalance(0); setMonthlyBudgetMap({}) }
     })
 
     return () => { cancelled = true }
@@ -158,6 +166,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     outGross: -(outMap.get(m) || 0),
   }))
   const saldo = (() => {
+    if (budgetCadence === 'MONTHLY') {
+      return series.map((s) => (monthlyBudgetMap[s.month] || 0) + s.inGross + s.outGross)
+    }
     let cum = openingBalance
     return series.map((s) => { cum += (s.inGross + s.outGross); return cum })
   })()
@@ -257,7 +268,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   return (
     <div className="card" style={{ marginTop: 12, padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Monatsverlauf (Balken: IN/OUT · Linie: Restbudget)</strong>
+        <strong>Monatsverlauf (Balken: IN/OUT · Linie: {budgetCadence === 'MONTHLY' ? 'Monats-Restbudget' : 'Restbudget'})</strong>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="helper" style={{ margin: 0 }}>Budgetstart: <strong style={{ color: 'var(--text)' }}>{eurFmt.format(openingBalance || 0)}</strong></div>
           <div className="legend">

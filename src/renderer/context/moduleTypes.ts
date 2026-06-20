@@ -8,6 +8,7 @@ export type ModuleKey =
   | 'earmarks'
   | 'invoices'
   | 'custom-categories'
+  | 'recurring-bookings'
 
 export interface ModuleInfo {
   key: ModuleKey

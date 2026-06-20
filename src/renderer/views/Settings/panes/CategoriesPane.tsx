@@ -153,6 +153,23 @@ export function CategoriesPane({ notify }: CategoriesPaneProps) {
     }
   }, [canWrite])
 
+  React.useEffect(() => {
+    const run = (action?: string) => {
+      if (action === 'create-category' && canWrite) {
+        setActiveTab('categories')
+        setCategoryModal({ name: '', color: '#4CAF50', description: '' })
+      }
+    }
+    try {
+      const pending = sessionStorage.getItem('settingsQuickAction') || undefined
+      if (pending) sessionStorage.removeItem('settingsQuickAction')
+      run(pending)
+    } catch { /* ignore */ }
+    const onAction = (event: Event) => run((event as CustomEvent<any>)?.detail?.action)
+    window.addEventListener('settings:quickAction', onAction)
+    return () => window.removeEventListener('settings:quickAction', onAction)
+  }, [canWrite])
+
   // Load categories
   async function loadCategories() {
     setLoadingCategories(true)

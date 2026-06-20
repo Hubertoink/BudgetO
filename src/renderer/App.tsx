@@ -47,6 +47,9 @@ import { StatusFlyout } from './components/layout/StatusFlyout'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 import { useWindowWidth } from './hooks/useWindowWidth'
+import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
+import RecurringBookingsModal, { type RecurringBooking } from './components/modals/RecurringBookingsModal'
+import { getNavIcon } from './utils/navIcons'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../assets/Budget_Logo.ico', import.meta.url).href
 
@@ -615,8 +618,9 @@ function AppInner() {
     }, [serverMode, notify, onCancelLogin])
     
     // Use modules context for feature toggles
-    const { isModuleEnabled } = useModules()
+    const { isModuleEnabled, loading: modulesLoading } = useModules()
     const useCategoriesModule = isModuleEnabled('custom-categories')
+    const recurringBookingsEnabled = isModuleEnabled('recurring-bookings')
     
     // Custom categories for Quick-Add modal
     const [customCategories, setCustomCategories] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
@@ -755,11 +759,11 @@ function AppInner() {
             try {
                 const [yearsRes, budgetsRes] = await Promise.all([
                     window.api?.reports?.years?.(),
-                    (window as any).api?.annualBudgets?.list?.({})
+                    window.api?.budgetPeriods?.list?.({})
                 ])
 
                 const voucherYears = (yearsRes?.years || []) as number[]
-                const annualBudgets = ((budgetsRes?.budgets || []) as Array<{ year: number; amount: number; costCenterId: number | null }>)
+                const annualBudgets = ((budgetsRes?.periods || []) as Array<{ year: number; amount: number; cadence: 'ANNUAL' | 'MONTHLY' }>)
                 const annualBudgetYears = annualBudgets
                     .filter((b) => b && typeof b.year === 'number')
                     .map((b) => b.year)
@@ -771,7 +775,7 @@ function AppInner() {
                 if (!cancelled) setYearsAvail(mergedYears)
 
                 const preferred = annualBudgets
-                    .filter((b) => (b?.costCenterId ?? null) === null && Number(b?.amount || 0) > 0 && Number.isFinite(b?.year))
+                    .filter((b) => Number(b?.amount || 0) > 0 && Number.isFinite(b?.year))
                     .map((b) => Number(b.year))
                     .filter((y) => y > 1900)
                     .sort((a, b) => b - a)[0]
@@ -787,6 +791,12 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+
+    useEffect(() => {
+        if (!modulesLoading && activePage === 'Wiederkehrend' && !recurringBookingsEnabled) {
+            setActivePage('Buchungen')
+        }
+    }, [activePage, modulesLoading, recurringBookingsEnabled])
 
     // If the current user has no settings access, avoid leaving them on Einstellungen.
     useEffect(() => {
@@ -1129,6 +1139,155 @@ function AppInner() {
     }, [bookingsOpenDetached, dockAndOpenDraft, notify, openQuickAdd, showBookingDraftTabs])
     openNewBookingRef.current = () => { void openNewBooking() }
 
+    const [recurringDueCount, setRecurringDueCount] = useState(0)
+    const loadRecurringDueCount = useCallback(async () => {
+        try {
+            const result = await window.api?.recurringBookings.list({ today })
+            setRecurringDueCount((result?.rows || []).filter((row) => row.isDue).length)
+        } catch {
+            setRecurringDueCount(0)
+        }
+    }, [today])
+
+    useEffect(() => {
+        void loadRecurringDueCount()
+        const onChanged = () => { void loadRecurringDueCount() }
+        window.addEventListener('data-changed', onChanged)
+        return () => window.removeEventListener('data-changed', onChanged)
+    }, [loadRecurringDueCount, refreshKey])
+
+    const openRecurringDue = useCallback((booking: RecurringBooking) => {
+        const amount = Number(booking.template.grossAmount || 0)
+        openQuickAdd({
+            qa: {
+                date: booking.nextDueDate,
+                type: booking.template.type,
+                sphere: booking.template.sphere,
+                description: booking.template.description,
+                grossAmount: amount,
+                vatRate: 0,
+                mode: 'GROSS',
+                paymentMethod: booking.template.paymentMethod,
+                categoryId: booking.template.categoryId ?? null,
+                budgetId: booking.template.budgetId ?? null,
+                earmarkId: booking.template.earmarkId ?? null,
+                tags: booking.template.tags || [],
+                budgets: booking.template.budgetId ? [{ budgetId: booking.template.budgetId, amount }] : [],
+                earmarksAssigned: booking.template.earmarkId ? [{ earmarkId: booking.template.earmarkId, amount }] : [],
+                taxonomySelectionById: {},
+                recurringTemplateId: booking.id,
+                recurringDueDate: booking.nextDueDate
+            },
+            files: []
+        })
+        setActivePage('Buchungen')
+    }, [openQuickAdd])
+
+    const navigateAndFocus = useCallback((page: NavKey, selector: string) => {
+        setActivePage(page)
+        window.setTimeout(() => {
+            const input = document.querySelector(selector) as HTMLInputElement | null
+            input?.focus()
+            input?.select()
+        }, 80)
+    }, [])
+
+    const openSettingsTile = useCallback((tile: string, quickAction?: string) => {
+        try {
+            sessionStorage.setItem('settingsActiveTile', tile)
+            if (quickAction) sessionStorage.setItem('settingsQuickAction', quickAction)
+        } catch { /* ignore */ }
+        setActivePage('Einstellungen')
+        window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile } }))
+            if (quickAction) window.dispatchEvent(new CustomEvent('settings:quickAction', { detail: { action: quickAction } }))
+        }, 120)
+    }, [])
+
+    const shortcutCommands = useMemo<ShortcutCommand[]>(() => [
+        {
+            key: 'n',
+            label: 'Neue Buchung',
+            description: 'Öffnet einen neuen Buchungsentwurf',
+            action: () => { void openNewBooking() },
+            disabled: !canWrite
+        },
+        {
+            key: 'g',
+            label: 'Gehe zu …',
+            description: 'Bereich in BudgetO öffnen',
+            children: [
+                { key: 'd', label: 'Dashboard', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Dashboard' : ''}>{getNavIcon('Dashboard')}</span>, action: () => setActivePage('Dashboard') },
+                { key: 'b', label: 'Buchungen', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Buchungen' : ''}>{getNavIcon('Buchungen')}</span>, action: () => setActivePage('Buchungen') },
+                { key: 'w', label: 'Wiederkehrend', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Wiederkehrend' : ''}>{getNavIcon('Wiederkehrend')}</span>, action: () => setActivePage('Wiederkehrend'), disabled: !recurringBookingsEnabled },
+                { key: 'v', label: 'Verbindlichkeiten', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Verbindlichkeiten' : ''}>{getNavIcon('Verbindlichkeiten')}</span>, action: () => setActivePage('Verbindlichkeiten') },
+                { key: 'm', label: 'Mitglieder', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Mitglieder' : ''}>{getNavIcon('Mitglieder')}</span>, action: () => setActivePage('Mitglieder') },
+                { key: 'p', label: 'Budgets & Planung', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Budgets' : ''}>{getNavIcon('Budgets')}</span>, action: () => setActivePage('Budgets') },
+                { key: 'z', label: 'Zweckbindungen', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Zweckbindungen' : ''}>{getNavIcon('Zweckbindungen')}</span>, action: () => setActivePage('Zweckbindungen') },
+                { key: 'r', label: 'Reports', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Reports' : ''}>{getNavIcon('Reports')}</span>, action: () => setActivePage('Reports') },
+                { key: 'e', label: 'Einstellungen', icon: <span className={navIconColorMode === 'color' ? 'icon-color-Einstellungen' : ''}>{getNavIcon('Einstellungen')}</span>, action: () => setActivePage('Einstellungen'), disabled: !canAccessSettings }
+            ]
+        },
+        {
+            key: 's',
+            label: 'Suche …',
+            description: 'Bereich öffnen und Suchfeld fokussieren',
+            children: [
+                { key: 'b', label: 'Buchungen', action: () => navigateAndFocus('Buchungen', 'input[placeholder^="Suche (#ID"]') },
+                { key: 'v', label: 'Verbindlichkeiten', action: () => navigateAndFocus('Verbindlichkeiten', 'input[placeholder^="Suche Verbindlichkeiten"]') },
+                { key: 'm', label: 'Mitglieder', action: () => navigateAndFocus('Mitglieder', 'input.members-search') },
+                { key: 'p', label: 'Budgets', action: () => navigateAndFocus('Budgets', 'input[placeholder^="Suche (Jahr"]') },
+                { key: 'z', label: 'Zweckbindungen', action: () => navigateAndFocus('Zweckbindungen', 'input[placeholder^="Suche (Code"]') }
+            ]
+        },
+        {
+            key: 'w',
+            label: 'Wiederkehrende Buchungen',
+            description: recurringDueCount ? `${recurringDueCount} Fälligkeit${recurringDueCount === 1 ? '' : 'en'} offen` : 'Vorlagen und nächste Fälligkeiten',
+            icon: <span className={navIconColorMode === 'color' ? 'icon-color-Wiederkehrend' : ''}>{getNavIcon('Wiederkehrend')}</span>,
+            action: () => setActivePage('Wiederkehrend'),
+            disabled: !recurringBookingsEnabled
+        },
+        {
+            key: 'e',
+            label: 'Einstellungen & Verwaltung …',
+            description: 'Häufige Einstellungen öffnen oder direkt anlegen',
+            icon: <span className={navIconColorMode === 'color' ? 'icon-color-Einstellungen' : ''}>{getNavIcon('Einstellungen')}</span>,
+            disabled: !canAccessSettings,
+            children: [
+                {
+                    key: 't', label: 'Tags …', icon: <span aria-hidden>🏷️</span>, children: [
+                        { key: 'n', label: 'Neuen Tag anlegen', description: 'Öffnet direkt den Tag-Dialog', action: () => openSettingsTile('tags', 'create-tag'), disabled: !canWrite },
+                        { key: 'v', label: 'Tags verwalten', action: () => openSettingsTile('tags') }
+                    ]
+                },
+                {
+                    key: 'k', label: 'Kategorien …', icon: <span aria-hidden>📁</span>, children: [
+                        { key: 'n', label: 'Neue Kategorie anlegen', description: 'Öffnet direkt den Kategorie-Dialog', action: () => openSettingsTile('categories', 'create-category'), disabled: !canWrite },
+                        { key: 'v', label: 'Kategorien verwalten', action: () => openSettingsTile('categories') },
+                        { key: 't', label: 'Taxonomien verwalten', action: () => openSettingsTile('categories') }
+                    ]
+                },
+                {
+                    key: 'd', label: 'Design auswählen …', icon: <span aria-hidden>🎨</span>, children: [
+                        { key: 's', label: 'Standard', icon: <span className="theme-swatch shortcut-theme-swatch" data-theme="default" aria-hidden />, action: () => setColorTheme('default') },
+                        { key: 'p', label: 'Professional', icon: <span className="theme-swatch shortcut-theme-swatch" data-theme="professional-light" aria-hidden />, action: () => setColorTheme('professional-light') },
+                        { key: 'e', label: 'Earthy Tones', icon: <span className="theme-swatch shortcut-theme-swatch" data-theme="earthy-tones" aria-hidden />, action: () => setColorTheme('earthy-tones') },
+                        { key: 'w', label: 'Wisteria Pastel', icon: <span className="theme-swatch shortcut-theme-swatch" data-theme="wisteria-pastel" aria-hidden />, action: () => setColorTheme('wisteria-pastel') },
+                        { key: 'a', label: 'Alle Darstellungsoptionen', action: () => openSettingsTile('general') }
+                    ]
+                },
+                { key: 'b', label: 'Budgetplanung & Sachgebiet', icon: <span aria-hidden>🏢</span>, action: () => openSettingsTile('org') },
+                { key: 'm', label: 'Module', icon: <span aria-hidden>🧩</span>, action: () => openSettingsTile('modules'), disabled: !canWrite },
+                { key: 'u', label: 'Benutzer', icon: <span aria-hidden>👥</span>, action: () => openSettingsTile('users'), disabled: !canWrite },
+                { key: 'n', label: 'Netzwerk', icon: <span aria-hidden>🌐</span>, action: () => openSettingsTile('server'), disabled: !canWrite },
+                { key: 's', label: 'Speicher & Backup', icon: <span aria-hidden>💾</span>, action: () => openSettingsTile('storage'), disabled: !canWrite },
+                { key: 'a', label: 'App-Update', icon: <span aria-hidden>⬆️</span>, action: () => openSettingsTile('updates') },
+                { key: 'j', label: 'Jahresabschluss', icon: <span aria-hidden>📊</span>, action: () => openSettingsTile('yearEnd'), disabled: !canWrite }
+            ]
+        }
+    ], [canAccessSettings, canWrite, navigateAndFocus, navIconColorMode, openNewBooking, openSettingsTile, recurringBookingsEnabled, recurringDueCount, setColorTheme])
+
     useEffect(() => {
         const offSync = window.api?.quickAdd?.onDetachedDraftSync?.((payload: any) => {
             const draftId = String(payload?.draftId || '')
@@ -1267,6 +1426,9 @@ function AppInner() {
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return (localStorage.getItem('journal.sort') as any) || 'DESC' } catch { return 'DESC' } })
     const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net'>(() => { try { return (localStorage.getItem('journal.sortBy') as any) || 'date' } catch { return 'date' } })
     // PaymentsAssignModal extracted to components/modals/PaymentsAssignModal.tsx
+    // Globaler Arbeitszeitraum + Archivmodus
+    const { workYear: uiWorkYear, workMonth: uiWorkMonth, budgetCadence: uiBudgetCadence, showArchived: uiShowArchived, ready: archiveSettingsReady } = useArchiveSettings()
+
     // Buchungen (Journal) filter states
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
@@ -1332,6 +1494,7 @@ function AppInner() {
 
     // Default: if an annual budget exists, default Buchungen to that budget year.
     useEffect(() => {
+        if (uiBudgetCadence === 'MONTHLY') return
         if (!preferredBudgetYear) return
         if (from || to) return
         let mode: string | null = null
@@ -1342,7 +1505,20 @@ function AppInner() {
         setFrom(nf)
         setTo(nt)
         journalTimeFilter.persist(nf, nt)
-    }, [from, to, preferredBudgetYear, journalTimeFilter])
+    }, [from, to, preferredBudgetYear, journalTimeFilter, uiBudgetCadence])
+
+    // A formerly persisted full-year filter must not shadow the global work month.
+    // Explicit filters selected later in the monthly session still remain possible.
+    useEffect(() => {
+        if (!archiveSettingsReady || uiBudgetCadence !== 'MONTHLY') return
+        try {
+            if (localStorage.getItem('journal.timeFilter.mode') !== 'YEAR') return
+            localStorage.removeItem('journal.timeFilter.mode')
+            localStorage.removeItem('journal.timeFilter.year')
+            setFrom('')
+            setTo('')
+        } catch { /* ignore */ }
+    }, [archiveSettingsReady, uiBudgetCadence])
 
     // If user previously chose YEAR mode, don't allow clearing back to empty implicitly.
     // (Users can still intentionally switch to ALL via the time filter modal.)
@@ -1362,8 +1538,6 @@ function AppInner() {
         }
     }, [from, to])
 
-    // Global: Arbeitsjahr + Archivmodus (Blank-Slate) – used for server-side filtering
-    const { workYear: uiWorkYear, showArchived: uiShowArchived, ready: archiveSettingsReady } = useArchiveSettings()
     // Reports filter states (separate to avoid interference with Buchungen)
     // Default to current year
     const [reportsFrom, setReportsFrom] = useState<string>(() => {
@@ -1666,6 +1840,7 @@ function AppInner() {
     const navIconPalette: Record<string, string> = {
         'Dashboard': '#7C4DFF',
         'Buchungen': '#2962FF',
+        'Wiederkehrend': '#00BFA5',
         'Verbindlichkeiten': '#00B8D4',
         'Mitglieder': '#26A69A',
         'Budgets': '#00C853',
@@ -1680,6 +1855,7 @@ function AppInner() {
     const isTopNav = navLayout === 'top' && windowWidth >= NAV_COLLAPSE_BREAKPOINT
     return (
         <>
+            <LeaderShortcuts commands={shortcutCommands} />
             <LoginModal
                 isOpen={!!authEnforced && !authLoading && !isAuthenticated}
                 allowClose={serverMode === 'client'}
@@ -1724,6 +1900,7 @@ function AppInner() {
                             onNavigate={setActivePage}
                             navIconColorMode={navIconColorMode}
                             openInvoicesCount={openInvoicesCount}
+                            recurringDueCount={recurringDueCount}
                         />
                     </div>
                 ) : null}
@@ -1752,6 +1929,7 @@ function AppInner() {
                         navIconColorMode={navIconColorMode}
                         collapsed={true}
                         openInvoicesCount={openInvoicesCount}
+                        recurringDueCount={recurringDueCount}
                     />
                 </aside>
             )}
@@ -1873,6 +2051,8 @@ function AppInner() {
                             page={page}
                             setPage={setPage}
                             workYear={uiWorkYear}
+                            workMonth={uiWorkMonth}
+                            budgetCadence={uiBudgetCadence}
                             showArchived={uiShowArchived}
                             archiveSettingsReady={archiveSettingsReady}
                             showBookingDraftTabs={showBookingDraftTabs}
@@ -1883,6 +2063,16 @@ function AppInner() {
                             bookingsOpenDetached={bookingsOpenDetached}
                             onOpenEditTabsChange={setOpenEditTabCount}
                             onDetachedEditOpened={registerDetachedEdit}
+                        />
+                    )}
+                    {activePage === 'Wiederkehrend' && recurringBookingsEnabled && (
+                        <RecurringBookingsModal
+                            onUseDue={openRecurringDue}
+                            onChanged={() => { void loadRecurringDueCount() }}
+                            notify={notify}
+                            canWrite={canWrite}
+                            tagDefs={tagDefs}
+                            customCategories={customCategories}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -2031,7 +2221,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {canWrite && activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
+            {canWrite && activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Wiederkehrend' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Barvorschüsse' && (
                 <button className="fab fab-buchung" onClick={() => { void openNewBooking() }} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>

@@ -39,8 +39,16 @@ export default function DashboardView({
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
   useEffect(() => {
     let cancelled = false
-    window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) })
-    const onChanged = () => { window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) }) }
+    const loadYears = async () => {
+      const [reports, budgets] = await Promise.all([window.api?.reports.years?.(), window.api?.budgetPeriods?.list?.({})])
+      if (cancelled) return
+      const years = Array.from(new Set([new Date().getUTCFullYear(), ...(reports?.years || []), ...(budgets?.periods || []).map((period: any) => Number(period.year))]))
+        .filter((year) => Number.isFinite(year) && year > 1900)
+        .sort((a, b) => b - a)
+      setYearsAvail(years)
+    }
+    void loadYears()
+    const onChanged = () => { void loadYears() }
     window.addEventListener('data-changed', onChanged)
     return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
   }, [])
@@ -53,28 +61,39 @@ export default function DashboardView({
       return 'JAHR'
     }
   })
-  useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
-  const [yearSel, setYearSel] = useState<number | null>(null)
+  const [monthSel, setMonthSel] = useState(() => new Date().getUTCMonth() + 1)
   useEffect(() => {
-    if (period === 'JAHR' && yearsAvail.length > 0 && (yearSel == null || !yearsAvail.includes(yearSel))) {
-      setYearSel(yearsAvail[0])
+    try {
+      if (!localStorage.getItem('dashPeriod')) {
+        window.api?.budgetPeriods?.config?.get?.().then((res) => {
+          if (res?.cadence === 'MONTHLY') setPeriod('MONAT')
+        })
+      }
+    } catch { }
+  }, [])
+  useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
+  const [yearSel, setYearSel] = useState<number | null>(new Date().getUTCFullYear())
+  useEffect(() => {
+    const currentYear = new Date().getUTCFullYear()
+    if (yearsAvail.length > 0 && (yearSel == null || !yearsAvail.includes(yearSel))) {
+      setYearSel(yearsAvail.includes(currentYear) ? currentYear : yearsAvail[0])
     }
-  }, [yearsAvail, period])
+  }, [yearsAvail, yearSel])
 
-  const { from, to, selectedYear, periodLabel } = useMemo(() => {
+  const { from, to, selectedYear, selectedMonth, periodLabel } = useMemo(() => {
     const now = new Date()
-    const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+    const y = yearSel || now.getUTCFullYear()
 
     if (period === 'MONAT') {
-      const monthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-      const monthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-      return { from: monthFrom, to: monthTo, selectedYear: y, periodLabel: 'Monat' as const }
+      const monthFrom = new Date(Date.UTC(y, monthSel - 1, 1)).toISOString().slice(0, 10)
+      const monthTo = new Date(Date.UTC(y, monthSel, 0)).toISOString().slice(0, 10)
+      return { from: monthFrom, to: monthTo, selectedYear: y, selectedMonth: monthSel, periodLabel: 'Monat' as const }
     }
 
     const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
     const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-    return { from: yearFrom, to: yearTo, selectedYear: y, periodLabel: 'Jahr' as const }
-  }, [period, yearSel])
+    return { from: yearFrom, to: yearTo, selectedYear: y, selectedMonth: null, periodLabel: 'Jahr' as const }
+  }, [period, yearSel, monthSel])
 
   const monthLabel = useMemo(() => {
     if (period !== 'MONAT') return null
@@ -129,7 +148,12 @@ export default function DashboardView({
             <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
             <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
           </div>
-          {period === 'JAHR' && yearsAvail.length > 1 && (
+          {period === 'MONAT' && (
+            <select className="input" value={monthSel} onChange={(e) => setMonthSel(Number(e.target.value))} aria-label="Monat auswählen">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => <option key={month} value={month}>{new Intl.DateTimeFormat('de-DE', { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2020, month - 1, 1)))}</option>)}
+            </select>
+          )}
+          {yearsAvail.length > 1 && (
             <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label="Jahr auswählen">
               {yearsAvail.map((y) => (
                 <option key={y} value={String(y)}>{y}</option>
@@ -142,6 +166,8 @@ export default function DashboardView({
       <div style={{ display: 'grid', gap: 12 }}>
         <BudgetOverviewWidget
           year={selectedYear}
+          month={selectedMonth}
+          period={period}
           periodLabel={periodLabel}
           income={sum?.inGross || 0}
           expenses={sum?.outGross || 0}

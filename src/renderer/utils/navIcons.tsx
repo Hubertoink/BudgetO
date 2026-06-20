@@ -17,6 +17,15 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <path d="M4 6h2v2H4V6zm4 0h12v2H8V6zM4 11h2v2H4v-2zm4 0h12v2H8v-2zM4 16h2v2H4v-2zm4 0h12v2H8v-2z"/>
         </svg>
       )
+    case 'Wiederkehrend':
+      // Circular arrows with a small calendar marker
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M6.1 9A7 7 0 0118.7 6.4L20 8M17.9 15A7 7 0 015.3 17.6L4 16" strokeLinecap="round"/>
+          <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>
+        </svg>
+      )
     case 'Verbindlichkeiten':
       // Invoice/Bill with euro symbol
       return (
@@ -102,6 +111,7 @@ export function getNavIcon(key: NavKey): React.ReactNode {
 export const navIconPalette: Record<NavKey, string> = {
   Dashboard: '#7C4DFF',
   Buchungen: '#2962FF',
+  Wiederkehrend: '#00BFA5',
   Verbindlichkeiten: '#00B8D4',
   Barvorschüsse: '#00C853',
   Mitglieder: '#26A69A',

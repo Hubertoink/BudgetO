@@ -6,6 +6,7 @@ import { ensurePeriodOpen, getSetting } from '../services/settings'
 import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { getTagsForVoucher, setVoucherTags } from './tags'
+import { markRecurringOccurrenceBooked } from './recurringBookings'
 
 type DB = InstanceType<typeof Database>
 
@@ -35,6 +36,8 @@ export type CreateVoucherInput = {
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
+    recurringTemplateId?: number
+    recurringDueDate?: string
 }
 
 export function createVoucherTx(d: DB, input: CreateVoucherInput) {
@@ -196,6 +199,13 @@ export function createVoucherTx(d: DB, input: CreateVoucherInput) {
         } else {
             d.prepare('UPDATE vouchers SET earmark_id = NULL, earmark_amount = NULL WHERE id = ?').run(id)
         }
+    }
+
+    if (input.recurringTemplateId != null || input.recurringDueDate != null) {
+        if (input.recurringTemplateId == null || !input.recurringDueDate) {
+            throw new Error('Unvollständiger Bezug zur wiederkehrenden Buchung')
+        }
+        markRecurringOccurrenceBooked(d, input.recurringTemplateId, input.recurringDueDate, id)
     }
 
     if (input.files?.length) {

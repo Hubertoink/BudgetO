@@ -27,6 +27,36 @@ export const IconArrow = ({ size = 14 }: { size?: number }) => (
     </svg>
 )
 
+export const IconEdit = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M4 20h4l11-11-4-4L4 16v4zM13.5 6.5l4 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+)
+
+export const IconPause = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+)
+
+export const IconPlay = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M7 4v16l13-8L7 4z" />
+    </svg>
+)
+
+export const IconSkip = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M5 5l10 7L5 19V5zM19 5v14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+)
+
+export const IconDraft = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+)
+
 // Helper für Zahlweg-Icons (React)
 export function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     if (method === 'BANK') return <IconBank size={size} />

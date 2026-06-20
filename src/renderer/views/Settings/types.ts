@@ -12,6 +12,7 @@ export type TileKey =
   | 'general'
   | 'table'
   | 'storage'
+  | 'updates'
   | 'import'
   | 'org'
   | 'tags'

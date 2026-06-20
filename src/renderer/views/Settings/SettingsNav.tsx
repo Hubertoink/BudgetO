@@ -30,6 +30,7 @@ export function SettingsNav({ active, onSelect, tiles }: SettingsNavProps) {
     { key: 'users', icon: '👥', label: 'Benutzer' },
     { key: 'server', icon: '🌐', label: 'Netzwerk' },
     { key: 'storage', icon: '💾', label: 'Speicher & Backup' },
+    { key: 'updates', icon: '⬆️', label: 'Updates' },
     { key: 'import', icon: '📥', label: 'Import' },
     { key: 'org', icon: '🏢', label: 'Sachgebiet' },
     { key: 'tags', icon: '🏷️', label: 'Tags' },

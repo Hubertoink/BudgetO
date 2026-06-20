@@ -15,6 +15,7 @@ export type ModuleKey =
   | 'earmarks' 
   | 'invoices'
   | 'custom-categories'
+  | 'recurring-bookings'
 
 export interface ModuleConfig {
   id: number
@@ -39,7 +40,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   {
     key: 'budgets',
     name: 'Budgets',
-    description: 'Jahresbudget-Planung mit Soll-Ist-Vergleich',
+    description: 'Jährliche oder monatliche Budgetplanung mit Soll-Ist-Vergleich',
     icon: 'chart-bar',
     navKey: 'Budgets'
   },
@@ -91,6 +92,13 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: 'Rechnungsverwaltung mit Zahlungsverfolgung',
     icon: 'document-text',
     navKey: 'Verbindlichkeiten'
+  },
+  {
+    key: 'recurring-bookings',
+    name: 'Wiederkehrende Buchungen',
+    description: 'Abos und regelmäßige Einnahmen als prüfbare Buchungsentwürfe verwalten',
+    icon: 'arrow-path',
+    navKey: 'Wiederkehrend'
   },
   {
     key: 'custom-categories',

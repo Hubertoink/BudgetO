@@ -56,10 +56,10 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
       try {
         const [y, budgetsRes] = await Promise.all([
           window.api?.reports?.years?.(),
-          (window as any).api?.annualBudgets?.list?.({})
+          window.api?.budgetPeriods?.list?.({})
         ])
         const voucherYears = (y?.years || []) as number[]
-        const budgetYears = ((budgetsRes?.budgets || []) as Array<{ year: number }>).map(b => Number(b.year))
+        const budgetYears = ((budgetsRes?.periods || []) as Array<{ year: number }>).map(b => Number(b.year))
         const merged = Array.from(new Set<number>([...voucherYears, ...budgetYears]))
           .filter((n) => Number.isFinite(n) && n > 1900)
           .sort((a, b) => b - a)
