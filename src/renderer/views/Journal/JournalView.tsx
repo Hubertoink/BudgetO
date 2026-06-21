@@ -1148,7 +1148,7 @@ export default function JournalView({
             />
 
             {/* Main Table Card */}
-            <div>
+            <div className="journal-table-section">
                 <div className="card journal-table-card">
                     {bookingTabs.length > 0 && (
                         <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
@@ -1168,8 +1168,7 @@ export default function JournalView({
                                                 if (tab.detached) {
                                                     void window.api?.quickAdd?.focusDetached?.({ draftId: tab.id }).then((result) => {
                                                         if (!result?.ok) {
-                                                            setBookingEditTabs((tabs) => tabs.map((item) => item.id === tab.id ? { ...item, detached: false } : item))
-                                                            activateBookingEditTab({ ...tab, detached: false })
+                                                            void openDetachedEdit(tab.row)
                                                         }
                                                     })
                                                 } else if (bookingsOpenDetached) {

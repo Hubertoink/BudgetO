@@ -700,6 +700,8 @@ function AppInner() {
         setCustomBackgroundImage,
         glassModals,
         setGlassModals,
+        backgroundContrast,
+        setBackgroundContrast,
         modalBackdropBlur,
         setModalBackdropBlur,
         showBookingDraftTabs,
@@ -791,6 +793,53 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    const startupUpdateNoticeShown = useRef(false)
+
+    const showStartupUpdateNotice = useCallback((status: any) => {
+        if (startupUpdateNoticeShown.current) return
+        startupUpdateNoticeShown.current = true
+        const version = status?.version
+        notify(
+            'info',
+            version ? `BudgetO ${version} ist verfügbar.` : 'Ein Update für BudgetO ist verfügbar.',
+            10000,
+            {
+                label: 'Einstellungen öffnen',
+                onClick: () => {
+                    try { sessionStorage.setItem('settingsActiveTile', 'general') } catch { /* ignore */ }
+                    setActivePage('Einstellungen')
+                    window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'general' } }))
+                    }, 0)
+                }
+            }
+        )
+    }, [notify])
+
+    useEffect(() => {
+        let disposed = false
+        const off = window.api?.updates?.onStatus?.((status: any) => {
+            if (!disposed && (status?.phase === 'available' || status?.phase === 'downloaded')) {
+                showStartupUpdateNotice(status)
+            }
+        })
+        ;(async () => {
+            try {
+                const enabled = (await window.api?.settings?.get?.({ key: 'updates.autoCheck' }))?.value
+                if (enabled === false) return
+                const status = await window.api?.updates?.check?.()
+                if (!disposed && (status?.phase === 'available' || status?.phase === 'downloaded')) {
+                    showStartupUpdateNotice(status)
+                }
+            } catch {
+                // Startup checks stay quiet unless an update is available.
+            }
+        })()
+        return () => {
+            disposed = true
+            try { off?.() } catch { /* ignore */ }
+        }
+    }, [showStartupUpdateNotice])
 
     useEffect(() => {
         if (!modulesLoading && activePage === 'Wiederkehrend' && !recurringBookingsEnabled) {
@@ -1935,7 +1984,10 @@ function AppInner() {
             )}
 
             {/* Main content */}
-            <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
+            <main
+                className={activePage === 'Buchungen' ? 'app-main--journal' : undefined}
+                style={{ gridArea: 'main', padding: 16, overflowY: activePage === 'Buchungen' ? 'hidden' : 'auto' }}
+            >
                     
                     {activePage === 'Reports' && (
                         <>
@@ -2107,6 +2159,8 @@ function AppInner() {
                             setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
+                            backgroundContrast={backgroundContrast}
+                            setBackgroundContrast={setBackgroundContrast}
                             modalBackdropBlur={modalBackdropBlur}
                             setModalBackdropBlur={setModalBackdropBlur}
                             showBookingDraftTabs={showBookingDraftTabs}

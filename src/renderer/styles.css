@@ -5215,6 +5215,21 @@ html[data-glass-modals="true"] .settings-pane-card {
     background: color-mix(in oklab, var(--surface) 60%, transparent) !important;
 }
 
+/* Optional readability boost when a photo is visible behind the interface. */
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .card,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .settings-content,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .flyout-popover {
+    background: color-mix(in oklab, var(--surface) 94%, transparent) !important;
+}
+
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-in,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-out,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-transfer,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .filter-totals-stat__value {
+    font-weight: 750;
+    text-shadow: 0 1px 2px var(--surface);
+}
+
 /* ========================================
    Info Icon Button
    ======================================== */
@@ -5706,6 +5721,10 @@ html[data-glass-modals="true"] .flyout-arrow {
 /* ==================== Journal Toolbar ==================== */
 .journal-view {
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
     overflow-x: visible;
 }
 
@@ -5713,9 +5732,35 @@ html[data-glass-modals="true"] .flyout-arrow {
     max-width: 100%;
 }
 
+.journal-view > :not(.journal-table-section) {
+    flex-shrink: 0;
+}
+
+.journal-table-section {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 /* Allow hover tooltips in Buchungen table (budget usage) to escape the card */
 .journal-table-card {
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.journal-table-card .journal-table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.journal-table-card .journal-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
 }
 
 /* ==================== Journal: Budget usage tooltip ==================== */

@@ -61,6 +61,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   })
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
+  const [backgroundContrast, setBackgroundContrastState] = useState<boolean>(false)
   const [modalBackdropBlur, setModalBackdropBlurState] = useState<boolean>(() => {
     try {
       return localStorage.getItem('ui.modalBackdropBlur') === 'true'
@@ -110,6 +111,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
               localStorage.setItem('ui.glassModals', String(appearance.glassModals))
               document.documentElement.setAttribute('data-glass-modals', String(appearance.glassModals))
             }
+            if (typeof appearance.backgroundContrast === 'boolean') {
+              setBackgroundContrastState(appearance.backgroundContrast)
+              localStorage.setItem('ui.backgroundContrast', String(appearance.backgroundContrast))
+              document.documentElement.setAttribute('data-background-contrast', String(appearance.backgroundContrast))
+            }
             appearanceInitializedRef.current = true
             return
           }
@@ -135,6 +141,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         const storedGlass = localStorage.getItem('ui.glassModals')
         setGlassModalsState(storedGlass === 'true')
         document.documentElement.setAttribute('data-glass-modals', storedGlass === 'true' ? 'true' : 'false')
+
+        const storedContrast = localStorage.getItem('ui.backgroundContrast')
+        setBackgroundContrastState(storedContrast === 'true')
+        document.documentElement.setAttribute('data-background-contrast', storedContrast === 'true' ? 'true' : 'false')
 
         const storedBackdropBlur = localStorage.getItem('ui.modalBackdropBlur')
         setModalBackdropBlurState(storedBackdropBlur === 'true')
@@ -168,7 +178,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
   
   // Helper to save appearance to organization
-  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => {
+  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean; backgroundContrast?: boolean }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
@@ -238,6 +248,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const setGlassModals = (val: boolean) => {
     setGlassModalsState(val)
     saveAppearanceToOrg({ glassModals: val })
+  }
+
+  const setBackgroundContrast = (val: boolean) => {
+    setBackgroundContrastState(val)
+    saveAppearanceToOrg({ backgroundContrast: val })
   }
 
   const setModalBackdropBlur = (val: boolean) => {
@@ -341,6 +356,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [glassModals])
 
   useEffect(() => {
+    localStorage.setItem('ui.backgroundContrast', String(backgroundContrast))
+    document.documentElement.setAttribute('data-background-contrast', String(backgroundContrast))
+  }, [backgroundContrast])
+
+  useEffect(() => {
     localStorage.setItem('ui.modalBackdropBlur', String(modalBackdropBlur))
     document.documentElement.setAttribute('data-modal-backdrop-blur', String(modalBackdropBlur))
   }, [modalBackdropBlur])
@@ -368,6 +388,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setCustomBackgroundImage,
         glassModals,
         setGlassModals,
+        backgroundContrast,
+        setBackgroundContrast,
         modalBackdropBlur,
         setModalBackdropBlur,
         showBookingDraftTabs,

@@ -143,6 +143,8 @@ export interface SettingsProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  backgroundContrast: boolean
+  setBackgroundContrast: (v: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (v: boolean) => void
   showBookingDraftTabs: boolean
@@ -186,6 +188,8 @@ export interface GeneralPaneProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  backgroundContrast: boolean
+  setBackgroundContrast: (v: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (v: boolean) => void
   showBookingDraftTabs: boolean

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Menu, session, dialog, Tray, nativeImage, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, Menu, session, dialog, Tray, nativeImage, ipcMain, screen } from 'electron'
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
@@ -15,6 +15,30 @@ const isDev = !app.isPackaged
 const enableDevTools = isDev || process.env.BUDGETO_DEVTOOLS === '1'
 const detachedBookingInitials = new Map<string, any>()
 const detachedBookingWindows = new Map<string, BrowserWindow>()
+const DETACHED_BOOKING_BOUNDS_SETTING = 'ui.detachedBookingBounds'
+
+type WindowBounds = { x: number; y: number; width: number; height: number }
+
+function getDetachedBookingBounds(): WindowBounds | undefined {
+    try {
+        const saved = getSetting<Partial<WindowBounds>>(DETACHED_BOOKING_BOUNDS_SETTING)
+        if (![saved?.x, saved?.y, saved?.width, saved?.height].every(Number.isFinite)) return undefined
+        const bounds = {
+            x: Math.round(saved!.x!),
+            y: Math.round(saved!.y!),
+            width: Math.max(860, Math.round(saved!.width!)),
+            height: Math.max(620, Math.round(saved!.height!))
+        }
+        const isVisible = screen.getAllDisplays().some(({ workArea }) => {
+            const overlapWidth = Math.min(bounds.x + bounds.width, workArea.x + workArea.width) - Math.max(bounds.x, workArea.x)
+            const overlapHeight = Math.min(bounds.y + bounds.height, workArea.y + workArea.height) - Math.max(bounds.y, workArea.y)
+            return overlapWidth >= 100 && overlapHeight >= 100
+        })
+        return isVisible ? bounds : undefined
+    } catch {
+        return undefined
+    }
+}
 
 let tray: Tray | null = null
 let allowQuit = false
@@ -38,9 +62,11 @@ async function createDetachedBookingWindow(initialState?: any): Promise<{ ok: bo
     }
 
     detachedBookingInitials.set(token, initialState || null)
+    const savedBounds = getDetachedBookingBounds()
     const win = new BrowserWindow({
         width: 1180,
         height: 780,
+        ...(savedBounds || {}),
         minWidth: 860,
         minHeight: 620,
         show: false,
@@ -61,7 +87,12 @@ async function createDetachedBookingWindow(initialState?: any): Promise<{ ok: bo
     let allowClose = false
     ;(win as any).__allowRendererClose = () => { allowClose = true }
     win.on('close', (event) => {
-        if (allowClose || win.webContents.isDestroyed()) return
+        if (allowClose || win.webContents.isDestroyed()) {
+            if (!win.isDestroyed()) {
+                try { setSetting(DETACHED_BOOKING_BOUNDS_SETTING, win.getNormalBounds()) } catch { /* ignore */ }
+            }
+            return
+        }
         event.preventDefault()
         try { win.webContents.send('window:close-requested') } catch { allowClose = true; win.close() }
     })

@@ -134,6 +134,8 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowDensity={props.setJournalRowDensity}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
+            backgroundContrast={props.backgroundContrast}
+            setBackgroundContrast={props.setBackgroundContrast}
             modalBackdropBlur={props.modalBackdropBlur}
             setModalBackdropBlur={props.setModalBackdropBlur}
             showBookingDraftTabs={props.showBookingDraftTabs}

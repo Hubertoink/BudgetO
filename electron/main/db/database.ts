@@ -47,6 +47,7 @@ type AppConfig = {
         colorTheme?: string
         backgroundImage?: string
         glassModals?: boolean
+        backgroundContrast?: boolean
     }>
 }
 function getConfigPath() {
@@ -436,14 +437,15 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
 /**
  * Get the appearance settings for a specific organization
  */
-export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const org = orgs.find(o => o.id === orgId)
     return {
         colorTheme: org?.colorTheme || null,
         backgroundImage: org?.backgroundImage || null,
-        glassModals: org?.glassModals ?? false
+        glassModals: org?.glassModals ?? false,
+        backgroundContrast: org?.backgroundContrast ?? false
     }
 }
 
@@ -452,7 +454,7 @@ export function getOrganizationAppearance(orgId: string): { colorTheme: string |
  */
 export function setOrganizationAppearance(
     orgId: string, 
-    appearance: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean }
+    appearance: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean; backgroundContrast?: boolean }
 ): { success: boolean } {
     const cfg = readAppConfig()
     let orgs = cfg.organizations || []
@@ -467,7 +469,8 @@ export function setOrganizationAppearance(
             createdAt: new Date().toISOString(),
             colorTheme: undefined,
             backgroundImage: undefined,
-            glassModals: undefined
+            glassModals: undefined,
+            backgroundContrast: undefined
         }]
     }
     
@@ -484,7 +487,8 @@ export function setOrganizationAppearance(
                 createdAt: new Date().toISOString(),
                 colorTheme: appearance.colorTheme,
                 backgroundImage: appearance.backgroundImage,
-                glassModals: appearance.glassModals
+                glassModals: appearance.glassModals,
+                backgroundContrast: appearance.backgroundContrast
             })
         } else {
             throw new Error('Organisation nicht gefunden')
@@ -494,7 +498,8 @@ export function setOrganizationAppearance(
             ...orgs[idx], 
             ...(appearance.colorTheme !== undefined && { colorTheme: appearance.colorTheme }),
             ...(appearance.backgroundImage !== undefined && { backgroundImage: appearance.backgroundImage }),
-            ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals })
+            ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals }),
+            ...(appearance.backgroundContrast !== undefined && { backgroundContrast: appearance.backgroundContrast })
         }
     }
     
@@ -505,14 +510,14 @@ export function setOrganizationAppearance(
 /**
  * Get the appearance settings (theme, background, glass) of the currently active organization
  */
-export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
     
     // If orgs array is empty, return defaults
     if (orgs.length === 0) {
-        return { colorTheme: null, backgroundImage: null, glassModals: false }
+        return { colorTheme: null, backgroundImage: null, glassModals: false, backgroundContrast: false }
     }
     
     // Find active org
@@ -520,6 +525,7 @@ export function getActiveOrganizationAppearance(): { colorTheme: string | null; 
     return {
         colorTheme: activeOrg?.colorTheme || null,
         backgroundImage: activeOrg?.backgroundImage || null,
-        glassModals: activeOrg?.glassModals ?? false
+        glassModals: activeOrg?.glassModals ?? false,
+        backgroundContrast: activeOrg?.backgroundContrast ?? false
     }
 }

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { GeneralPaneProps, BackgroundImage } from '../types'
 
 // Hintergrundbilder - Vorschau für die Auswahl
@@ -174,6 +174,8 @@ export function GeneralPane({
   openSetupWizard,
   glassModals,
   setGlassModals,
+  backgroundContrast,
+  setBackgroundContrast,
   modalBackdropBlur,
   setModalBackdropBlur,
   showBookingDraftTabs,
@@ -214,6 +216,15 @@ export function GeneralPane({
     originalDimensions: string
     finalDimensions: string
   } | null>(null)
+  const [autoUpdateCheck, setAutoUpdateCheck] = useState(true)
+
+  useEffect(() => {
+    let disposed = false
+    window.api?.settings?.get?.({ key: 'updates.autoCheck' })
+      .then((result) => { if (!disposed) setAutoUpdateCheck(result?.value !== false) })
+      .catch(() => {})
+    return () => { disposed = true }
+  }, [])
 
   // Helper: Format bytes to human readable
   const formatBytes = (bytes: number): string => {
@@ -612,6 +623,45 @@ export function GeneralPane({
             />
           </div>
           <div className="helper" style={{ marginTop: 8 }}>Wähle ein Hintergrundbild für die App oder lade ein eigenes hoch.</div>
+          <div className="settings-inline-toggle" style={{ marginTop: 12, padding: 0 }}>
+            <div>
+              <label htmlFor="toggle-background-contrast">Kontrastmodus für Bildhintergründe</label>
+              <div className="helper">Macht Karten und Buchungstabellen deckender und Texte besser lesbar.</div>
+            </div>
+            <input
+              id="toggle-background-contrast"
+              role="switch"
+              aria-checked={backgroundContrast}
+              className="toggle"
+              type="checkbox"
+              checked={backgroundContrast}
+              disabled={backgroundImage === 'none'}
+              onChange={(e) => setBackgroundContrast(e.target.checked)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="card settings-card settings-pane-card">
+        <div className="settings-title">
+          <span aria-hidden="true">⬆️</span> <strong>Updates</strong>
+        </div>
+        <div className="settings-sub">BudgetO kann beim Programmstart automatisch nach einer neuen Version suchen.</div>
+        <div className="settings-inline-toggle" style={{ marginTop: 12 }}>
+          <label htmlFor="toggle-auto-update-check">Bei jedem Start nach Updates suchen</label>
+          <input
+            id="toggle-auto-update-check"
+            role="switch"
+            aria-checked={autoUpdateCheck}
+            className="toggle"
+            type="checkbox"
+            checked={autoUpdateCheck}
+            onChange={(event) => {
+              const enabled = event.target.checked
+              setAutoUpdateCheck(enabled)
+              void window.api?.settings?.set?.({ key: 'updates.autoCheck', value: enabled })
+            }}
+          />
         </div>
       </div>
 

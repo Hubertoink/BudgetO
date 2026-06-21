@@ -38,6 +38,8 @@ export interface UIPreferencesContextValue {
   setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean
   setGlassModals: (val: boolean) => void
+  backgroundContrast: boolean
+  setBackgroundContrast: (val: boolean) => void
   modalBackdropBlur: boolean
   setModalBackdropBlur: (val: boolean) => void
   showBookingDraftTabs: boolean
