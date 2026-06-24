@@ -11,6 +11,7 @@ export type RecurringBookingTemplateData = {
   grossAmount: number
   vatRate: number
   paymentMethod: 'BAR' | 'BANK'
+  paymentAccountId?: number
   categoryId?: number | null
   budgetId?: number | null
   earmarkId?: number | null

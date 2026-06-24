@@ -14,6 +14,7 @@ import { UsersPane } from './panes/UsersPane'
 import { ServerPane } from './panes/ServerPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { UpdatePane } from './panes/UpdatePane'
+import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
 import { useAuth } from '../../context/authHooks'
 import { useModules } from '../../context/moduleHooks'
 
@@ -44,6 +45,7 @@ export function SettingsView(props: SettingsProps) {
     const all: Array<{ key: TileKey; icon: string; label: string }> = [
       { key: 'general', icon: '🖼️', label: 'Darstellung' },
       { key: 'table', icon: '📋', label: 'Tabelle' },
+      { key: 'paymentAccounts', icon: '💳', label: 'Zahlungskonten' },
       { key: 'modules', icon: '🧩', label: 'Module' },
       { key: 'cashCheck', icon: '🔎', label: 'Kassenprüfung' },
       { key: 'users', icon: '👥', label: 'Benutzer' },
@@ -167,6 +169,7 @@ export function SettingsView(props: SettingsProps) {
             labelForCol={props.labelForCol}
           />
         )}
+        {activeTile === 'paymentAccounts' && <PaymentAccountsPane notify={props.notify} bumpDataVersion={props.bumpDataVersion} />}
         
         {activeTile === 'storage' && (
           <StoragePane

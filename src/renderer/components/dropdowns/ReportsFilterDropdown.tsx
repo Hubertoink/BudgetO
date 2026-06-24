@@ -18,7 +18,9 @@ export default function ReportsFilterDropdown(props: {
   to: string
   filterType: VoucherType | null
   filterPM: PaymentMethod | null
-  onApply: (v: { from: string; to: string; filterType: VoucherType | null; filterPM: PaymentMethod | null }) => void
+  paymentAccounts?: Array<{ id: number; name: string }>
+  paymentAccountId?: number | null
+  onApply: (v: { from: string; to: string; filterType: VoucherType | null; filterPM: PaymentMethod | null; paymentAccountId: number | null }) => void
 }) {
   const { yearsAvail, from, to, filterType, filterPM, onApply } = props
 
@@ -26,6 +28,7 @@ export default function ReportsFilterDropdown(props: {
   const [t, setT] = useState<string>(to)
   const [type, setType] = useState<VoucherType | null>(filterType)
   const [pm, setPm] = useState<PaymentMethod | null>(filterPM)
+  const [accountId, setAccountId] = useState<number | null>(props.paymentAccountId ?? null)
 
   useEffect(() => {
     setF(from)
@@ -58,7 +61,7 @@ export default function ReportsFilterDropdown(props: {
   }
 
   const handleApply = () => {
-    onApply({ from: f, to: t, filterType: type, filterPM: pm })
+    onApply({ from: f, to: t, filterType: type, filterPM: null, paymentAccountId: accountId })
   }
 
   const handleReset = () => {
@@ -66,7 +69,8 @@ export default function ReportsFilterDropdown(props: {
     setT('')
     setType(null)
     setPm(null)
-    onApply({ from: '', to: '', filterType: null, filterPM: null })
+    setAccountId(null)
+    onApply({ from: '', to: '', filterType: null, filterPM: null, paymentAccountId: null })
   }
 
   return (
@@ -125,11 +129,10 @@ export default function ReportsFilterDropdown(props: {
         </div>
 
         <div className="filter-dropdown__field">
-          <label className="filter-dropdown__label">Zahlweg</label>
-          <select className="input" value={pm ?? ''} onChange={(e) => setPm(parsePaymentMethod(e.target.value))}>
+          <label className="filter-dropdown__label">Zahlungskonto</label>
+          <select className="input" value={accountId ?? ''} onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}>
             <option value="">Alle</option>
-            <option value="BAR">Bar</option>
-            <option value="BANK">Bank</option>
+            {(props.paymentAccounts || []).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
       </div>

@@ -20,6 +20,8 @@ interface MetaFilterDropdownProps {
   // Filter values
   filterType: 'IN' | 'OUT' | 'TRANSFER' | null
   filterPM: 'BAR' | 'BANK' | null
+  paymentAccounts?: Array<{ id: number; name: string }>
+  paymentAccountId?: number | null
   filterTag: string | null
   categoryId: number | null
   earmarkId: number | null
@@ -27,6 +29,7 @@ interface MetaFilterDropdownProps {
   onApply: (v: {
     filterType: 'IN' | 'OUT' | 'TRANSFER' | null
     filterPM: 'BAR' | 'BANK' | null
+    paymentAccountId: number | null
     filterTag: string | null
     categoryId: number | null
     earmarkId: number | null
@@ -41,6 +44,8 @@ export default function MetaFilterDropdown({
   tagDefs,
   filterType,
   filterPM,
+  paymentAccounts = [],
+  paymentAccountId = null,
   filterTag,
   categoryId,
   earmarkId,
@@ -49,6 +54,7 @@ export default function MetaFilterDropdown({
 }: MetaFilterDropdownProps) {
   const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(filterType)
   const [pm, setPm] = useState<'BAR' | 'BANK' | null>(filterPM)
+  const [accountId, setAccountId] = useState<number | null>(paymentAccountId)
   const [tag, setTag] = useState<string | null>(filterTag)
   const [open, setOpen] = useState(false)
   const [tagOpen, setTagOpen] = useState(false)
@@ -65,7 +71,8 @@ export default function MetaFilterDropdown({
     setC(categoryId)
     setE(earmarkId)
     setB(budgetId)
-  }, [filterType, filterPM, filterTag, categoryId, earmarkId, budgetId])
+    setAccountId(paymentAccountId)
+  }, [filterType, filterPM, filterTag, categoryId, earmarkId, budgetId, paymentAccountId])
 
   // Close tag dropdown when clicking outside
   useEffect(() => {
@@ -80,7 +87,7 @@ export default function MetaFilterDropdown({
     }
   }, [tagOpen])
 
-  const hasFilters = filterType != null || filterPM != null || filterTag != null || categoryId != null || earmarkId != null || budgetId != null
+  const hasFilters = filterType != null || paymentAccountId != null || filterTag != null || categoryId != null || earmarkId != null || budgetId != null
 
   const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
     (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
@@ -92,6 +99,7 @@ export default function MetaFilterDropdown({
     onApply({
       filterType: type,
       filterPM: pm,
+      paymentAccountId: accountId,
       filterTag: tag,
       categoryId: c,
       earmarkId: e,
@@ -103,6 +111,7 @@ export default function MetaFilterDropdown({
   const handleReset = () => {
     setType(null)
     setPm(null)
+    setAccountId(null)
     setTag(null)
     setC(null)
     setE(null)
@@ -110,6 +119,7 @@ export default function MetaFilterDropdown({
     onApply({
       filterType: null,
       filterPM: null,
+      paymentAccountId: null,
       filterTag: null,
       categoryId: null,
       earmarkId: null,
@@ -150,15 +160,14 @@ export default function MetaFilterDropdown({
         </div>
 
         <div className="filter-dropdown__field">
-          <label className="filter-dropdown__label">Zahlweg</label>
+          <label className="filter-dropdown__label">Zahlungskonto</label>
           <select
             className="input"
-            value={pm ?? ''}
-            onChange={(ev) => setPm((ev.target.value as any) || null)}
+            value={accountId ?? ''}
+            onChange={(ev) => setAccountId(ev.target.value ? Number(ev.target.value) : null)}
           >
             <option value="">Alle</option>
-            <option value="BAR">Bar</option>
-            <option value="BANK">Bank</option>
+            {paymentAccounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
         </div>
       </div>

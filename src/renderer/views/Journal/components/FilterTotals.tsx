@@ -6,6 +6,7 @@ interface FilterTotalsProps {
     from?: string
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -64,7 +65,7 @@ function TooltipList({
 }
 
 
-export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, categoryId, type, earmarkId, budgetId, q, tag, workYear, showArchived }: FilterTotalsProps) {
+export default function FilterTotals({ refreshKey, from, to, paymentMethod, paymentAccountId, sphere, categoryId, type, earmarkId, budgetId, q, tag, workYear, showArchived }: FilterTotalsProps) {
     const [loading, setLoading] = useState(false)
     const [values, setValues] = useState<null | {
         inGross: number
@@ -113,6 +114,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                         from,
                         to,
                         paymentMethod,
+                        paymentAccountId,
                         sphere,
                         categoryId,
                         earmarkId,
@@ -173,7 +175,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         }
         run()
         return () => { alive = false }
-    }, [from, to, paymentMethod, sphere, categoryId, type, earmarkId, budgetId, q, tag, workYear, showArchived, refreshKey])
+    }, [from, to, paymentMethod, paymentAccountId, sphere, categoryId, type, earmarkId, budgetId, q, tag, workYear, showArchived, refreshKey])
 
     useEffect(() => {
         let alive = true

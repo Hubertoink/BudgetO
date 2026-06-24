@@ -80,7 +80,7 @@ function Donut({ data, colors, title }: { data: Array<{ key: string; value: numb
 
 export default function SphereShareCard({ from, to }: CommonFilters) {
   const [bySphere, setBySphere] = useState<Array<{ key: string; gross: number }>>([])
-  const [byPM, setByPM] = useState<Array<{ key: string; gross: number }>>([])
+  const [byPM, setByPM] = useState<Array<{ key: string; gross: number; color?: string | null }>>([])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
         const s = await (window as any).api?.reports?.summary?.({ from, to })
         if (!alive || !s) return
         setBySphere((s.bySphere || []).map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
-        setByPM((s.byPaymentMethod || []).filter((x: any) => x.key === 'BAR' || x.key === 'BANK').map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
+        setByPM((s.byPaymentAccount || []).map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0), color: x.color })))
       } catch { if (alive) { setBySphere([]); setByPM([]) } }
     }
     load()
@@ -105,7 +105,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
     VERMOEGEN: '#9575cd',
     WGB: '#ffb74d',
   }
-  const pmColors: Record<string, string> = { BAR: '#42a5f5', BANK: '#26a69a' }
+  const pmColors: Record<string, string> = Object.fromEntries((byPM as any[]).map((p, i) => [p.key, p.color || ['#42a5f5','#26a69a','#9575cd','#ffb74d'][i % 4]]))
 
   const sphereData = bySphere.filter(x => (x.gross || 0) !== 0)
   const pmData = byPM.filter(x => (x.gross || 0) !== 0)
@@ -118,7 +118,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'center' }}>
         <Donut title="Sphären" data={sphereData.map(s => ({ key: s.key, value: Math.abs(s.gross) }))} colors={sphereColors} />
-        <Donut title="Bar vs Bank" data={pmData.map(p => ({ key: String(p.key), value: Math.abs(p.gross) }))} colors={pmColors} />
+        <Donut title="Zahlungskonten" data={pmData.map(p => ({ key: String(p.key), value: Math.abs(p.gross) }))} colors={pmColors} />
         <div>
           <div className="helper">Legende</div>
           <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>

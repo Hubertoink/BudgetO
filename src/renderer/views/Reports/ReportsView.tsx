@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { VoucherType, PaymentMethod } from '../../components/reports/types'
 import ReportsAnnualBudget from '../../components/reports/ReportsAnnualBudget'
 import ReportsSummary from '../../components/reports/ReportsSummary'
@@ -24,6 +24,9 @@ export default function ReportsView(props: {
   activateKey: number
 }) {
   const { from, to, setFrom, setTo, yearsAvail, filterType, setFilterType, filterPM, setFilterPM, onOpenExport, refreshKey, activateKey } = props
+  const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string }>>([])
+  const [paymentAccountId, setPaymentAccountId] = useState<number | null>(null)
+  useEffect(() => { window.api?.paymentAccounts.list({ activeOnly: true }).then(setPaymentAccounts).catch(() => setPaymentAccounts([])) }, [refreshKey])
 
   const rangeChipLabel = useMemo(() => {
     if (!from && !to) return null
@@ -48,9 +51,9 @@ export default function ReportsView(props: {
       })
     }
     if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
-    if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
+    if (paymentAccountId) list.push({ key: 'pm', label: `Konto: ${paymentAccounts.find(a => a.id === paymentAccountId)?.name || paymentAccountId}`, clear: () => setPaymentAccountId(null) })
     return list
-  }, [rangeChipLabel, filterType, filterPM, setFrom, setTo, setFilterType, setFilterPM])
+  }, [rangeChipLabel, filterType, paymentAccountId, paymentAccounts, setFrom, setTo, setFilterType])
 
   // Derive selected year from date filters (only when full year is selected)
   const selectedYear = useMemo(() => {
@@ -85,6 +88,7 @@ export default function ReportsView(props: {
               onClick={() => {
                 setFilterType(null)
                 setFilterPM(null)
+                setPaymentAccountId(null)
                 setFrom('')
                 setTo('')
               }}
@@ -141,11 +145,14 @@ export default function ReportsView(props: {
             to={to}
             filterType={filterType}
             filterPM={filterPM}
-            onApply={({ from: nf, to: nt, filterType: ft, filterPM: fpm }) => {
+            paymentAccounts={paymentAccounts}
+            paymentAccountId={paymentAccountId}
+            onApply={({ from: nf, to: nt, filterType: ft, filterPM: fpm, paymentAccountId: accountId }) => {
               setFrom(nf)
               setTo(nt)
               setFilterType(ft)
               setFilterPM(fpm)
+              setPaymentAccountId(accountId)
             }}
           />
         </div>
@@ -155,13 +162,13 @@ export default function ReportsView(props: {
       <ReportsAnnualBudget year={selectedYear} refreshKey={refreshKey} />
 
       {/* KPIs and charts */}
-      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
+      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentAccountId={paymentAccountId || undefined} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <ReportsCategoryDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
+        <ReportsCategoryDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentAccountId={paymentAccountId || undefined} />
         <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} />
       </div>
       <div style={{ height: 12 }} />
-      <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
+      <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentAccountId={paymentAccountId || undefined} />
     </>
   )
 }

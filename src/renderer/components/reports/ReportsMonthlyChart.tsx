@@ -21,7 +21,7 @@ function monthKeys(from?: string, to?: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod }) {
+export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; paymentAccountId?: number }) {
   const [loading, setLoading] = useState(false)
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
@@ -74,8 +74,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     let cancelled = false
     setLoading(true)
     Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'IN', paymentMethod: props.paymentMethod }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'OUT', paymentMethod: props.paymentMethod })
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'IN', paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId }),
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'OUT', paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
       setInBuckets((inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))

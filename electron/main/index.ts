@@ -71,7 +71,7 @@ async function createDetachedBookingWindow(initialState?: any): Promise<{ ok: bo
         minHeight: 620,
         show: false,
         autoHideMenuBar: true,
-        frame: true,
+        frame: false,
         title: initialState?.mode === 'edit' ? 'BudgetO – Buchung bearbeiten' : 'BudgetO – Neue Buchung',
         icon: getWindowsIconPath(),
         webPreferences: {

@@ -168,6 +168,11 @@ contextBridge.exposeInMainWorld('api', {
         status: (payload: any) => ipcRenderer.invoke('payments.status', payload),
         history: (payload: any) => ipcRenderer.invoke('payments.history', payload)
     },
+    paymentAccounts: {
+        list: (payload?: { activeOnly?: boolean }) => ipcRenderer.invoke('paymentAccounts.list', payload),
+        upsert: (payload: any) => ipcRenderer.invoke('paymentAccounts.upsert', payload),
+        delete: (payload: { id: number }) => ipcRenderer.invoke('paymentAccounts.delete', payload)
+    },
     invoiceFiles: {
         open: (payload: any) => ipcRenderer.invoke('invoiceFiles.open', payload),
         saveAs: (payload: any) => ipcRenderer.invoke('invoiceFiles.saveAs', payload),

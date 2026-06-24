@@ -65,8 +65,18 @@ interface JournalTableProps {
         categoryColor?: string | null
         description?: string | null
         paymentMethod?: 'BAR' | 'BANK' | null
+        paymentAccountId?: number | null
+        paymentAccountName?: string | null
+        paymentAccountKind?: string | null
+        paymentAccountColor?: string | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
+        transferFromAccountId?: number | null
+        transferFromAccountName?: string | null
+        transferFromAccountColor?: string | null
+        transferToAccountId?: number | null
+        transferToAccountName?: string | null
+        transferToAccountColor?: string | null
         netAmount: number
         vatRate: number
         vatAmount: number
@@ -88,6 +98,7 @@ interface JournalTableProps {
     onReorder: (o: string[]) => void
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    paymentAccounts?: Array<{ id: number; name: string; color?: string | null }>
     eurFmt: Intl.NumberFormat
     fmtDate: (s?: string) => string
     onEdit: (r: {
@@ -141,6 +152,7 @@ export default function JournalTable({
     onReorder,
     earmarks,
     tagDefs,
+    paymentAccounts = [],
     eurFmt,
     fmtDate,
     onEdit,
@@ -349,7 +361,7 @@ export default function JournalTable({
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'earmark' ? <th key={k} className="sortable" align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('earmark')}>🎯 {renderSortIcon('earmark')}</th>
                                     : k === 'budget' ? <th key={k} className="sortable" align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('budget')}>💰 {renderSortIcon('budget')}</th>
-                                        : k === 'paymentMethod' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('payment')}>Zahlweg {renderSortIcon('payment')}</th>
+                                        : k === 'paymentMethod' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('payment')}>Zahlungskonto {renderSortIcon('payment')}</th>
                                             : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>📎</th>
                                                 : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} style={{ cursor: 'pointer' }}>Netto {renderSortIcon('net')}</th>
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
@@ -406,7 +418,7 @@ export default function JournalTable({
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
                     canWrite ? (
-                        <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null, categoryColor: r.categoryColor ?? null, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                        <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferToAccountId: r.transferToAccountId ?? null, type: r.type, sphere: r.sphere, categoryId: r.categoryId ?? null, categoryName: r.categoryName ?? null, categoryColor: r.categoryColor ?? null, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                     ) : null
                 )}
             </td>
@@ -732,27 +744,28 @@ export default function JournalTable({
             <td key={k}>
                 {r.type === 'TRANSFER' ? (
                     (() => {
-                        const from = r.transferFrom
-                        const to = r.transferTo
+                        const from = r.transferFromAccountName || r.transferFrom
+                        const to = r.transferToAccountName || r.transferTo
+                        const fromAccount = paymentAccounts.find(item => item.id === r.transferFromAccountId)
+                        const toAccount = paymentAccounts.find(item => item.id === r.transferToAccountId)
+                        const fromColor = r.transferFromAccountColor || fromAccount?.color
+                        const toColor = r.transferToAccountColor || toAccount?.color
                         const title = from && to ? `${from} → ${to}` : 'Transfer'
                         return (
-                            <span className="badge pm-transfer" title={title} aria-label={title}>
-                                <span className={`pm-icon ${from === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
-                                    {from === 'BAR' ? <IconCash /> : <IconBank />}
-                                </span>
+                            <span className="badge pm-transfer" title={title} aria-label={title} style={fromColor && toColor ? { background: `linear-gradient(90deg, ${fromColor} 0%, ${toColor} 100%)`, color: contrastText(fromColor) } : undefined}>
+                                <span>{from || '—'}</span>
                                 <span className="transfer-arrow">→</span>
-                                <span className={`pm-icon ${to === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
-                                    {to === 'BAR' ? <IconCash /> : <IconBank />}
-                                </span>
+                                <span>{to || '—'}</span>
                             </span>
                         )
                     })()
                 ) : (
-                    r.paymentMethod ? (
-                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod} aria-label={`Zahlweg: ${r.paymentMethod}`} style={{ display: 'inline-grid', placeItems: 'center' }}>
-                            {r.paymentMethod === 'BAR' ? <IconCash /> : <IconBank />}
-                        </span>
-                    ) : ''
+                    (r.paymentAccountName || r.paymentMethod) ? (() => {
+                        const account = paymentAccounts.find(item => item.id === r.paymentAccountId) || paymentAccounts.find(item => item.name === r.paymentAccountName)
+                        const accountColor = r.paymentAccountColor || account?.color
+                        const label = r.paymentAccountName || account?.name || r.paymentMethod || ''
+                        return <span className={`badge payment-account-badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={label} aria-label={`Zahlungskonto: ${label}`} style={accountColor ? { backgroundColor: accountColor, borderColor: accountColor, color: contrastText(accountColor) } : undefined}>{label}</span>
+                    })() : ''
                 )}
             </td>
         ) : k === 'budget' ? (

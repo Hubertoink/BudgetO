@@ -11,6 +11,7 @@
 export type TileKey =
   | 'general'
   | 'table'
+  | 'paymentAccounts'
   | 'storage'
   | 'updates'
   | 'import'

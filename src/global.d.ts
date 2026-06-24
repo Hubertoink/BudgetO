@@ -13,6 +13,11 @@ declare global {
                 onCloseRequested: (cb: () => void) => () => void
             }
             ping: () => string
+            paymentAccounts: {
+                list: (payload?: { activeOnly?: boolean }) => Promise<Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>>
+                upsert: (payload: { id?: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder?: number; isActive?: boolean }) => Promise<{ id: number }>
+                delete: (payload: { id: number }) => Promise<{ id: number }>
+            }
             quickAdd: {
                 openDetached: (payload?: any) => Promise<{ ok: boolean; token?: string; error?: string }>
                 detachedInitial: (payload: { token: string }) => Promise<{ initial?: any }>
@@ -34,8 +39,11 @@ declare global {
                     grossAmount?: number
                     vatRate: number
                     paymentMethod?: 'BAR' | 'BANK'
+                    paymentAccountId?: number
                     transferFrom?: 'BAR' | 'BANK'
                     transferTo?: 'BAR' | 'BANK'
+                    transferFromAccountId?: number
+                    transferToAccountId?: number
                     categoryId?: number
                     projectId?: number
                     earmarkId?: number
@@ -46,7 +54,7 @@ declare global {
                     recurringDueDate?: string
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string; taxonomyTermId?: number }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; paymentAccountId?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string; taxonomyTermId?: number }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
@@ -57,8 +65,18 @@ declare global {
                         categoryName?: string | null
                         categoryColor?: string | null
                         paymentMethod?: 'BAR' | 'BANK' | null
+                        paymentAccountId?: number | null
+                        paymentAccountName?: string | null
+                        paymentAccountKind?: string | null
+                        paymentAccountColor?: string | null
                         transferFrom?: 'BAR' | 'BANK' | null
                         transferTo?: 'BAR' | 'BANK' | null
+                        transferFromAccountId?: number | null
+                        transferFromAccountName?: string | null
+                        transferFromAccountColor?: string | null
+                        transferToAccountId?: number | null
+                        transferToAccountName?: string | null
+                        transferToAccountColor?: string | null
                         description?: string | null
                         netAmount: number
                         vatRate: number
@@ -110,6 +128,7 @@ declare global {
                         grossAmount: number
                         vatRate: number
                         paymentMethod: 'BAR' | 'BANK'
+                        paymentAccountId?: number
                         categoryId?: number | null
                         budgetId?: number | null
                         earmarkId?: number | null

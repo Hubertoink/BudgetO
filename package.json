@@ -1,6 +1,6 @@
 {
   "name": "budgeto",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "description": "BudgetO - Budget- und Finanzmanagement für die Jugendförderung",
   "main": "dist-electron/main/index.cjs",

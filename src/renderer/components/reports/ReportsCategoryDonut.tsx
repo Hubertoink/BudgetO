@@ -3,7 +3,7 @@ import { PaymentMethod, VoucherType } from './types'
 
 type Row = { categoryId: number | null; categoryName: string; categoryColor: string | null; gross: number }
 
-export default function ReportsCategoryDonut(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod }) {
+export default function ReportsCategoryDonut(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; paymentAccountId?: number }) {
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -22,6 +22,7 @@ export default function ReportsCategoryDonut(props: { refreshKey?: number; from?
       to: props.to,
       type: props.type,
       paymentMethod: props.paymentMethod
+      , paymentAccountId: props.paymentAccountId
     })
     if (!p || typeof p.then !== 'function') {
       if (!cancelled) {

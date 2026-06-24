@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, categoryId, setCategoryId, filterFrom, setFilterFrom, filterTo, setFilterTo, filterCategoryId, setFilterCategoryId, filterType, setFilterType, filterPM, setFilterPM }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, categoryId, setCategoryId, filterFrom, setFilterFrom, filterTo, setFilterTo, filterCategoryId, setFilterCategoryId, filterType, setFilterType, filterPM, setFilterPM, paymentAccounts = [], paymentAccountId, setPaymentAccountId }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -37,6 +37,9 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, a
   setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
   filterPM?: 'BAR' | 'BANK' | null
   setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
+  paymentAccounts?: Array<{ id: number; name: string }>
+  paymentAccountId?: number | null
+  setPaymentAccountId?: (v: number | null) => void
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -44,7 +47,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, a
     { key: 'type', label: 'Typ' },
     { key: 'sphere', label: 'Kategorie' },
     { key: 'description', label: 'Beschreibung' },
-    { key: 'paymentMethod', label: 'Zahlweg' },
+    { key: 'paymentMethod', label: 'Zahlungskonto' },
     { key: 'netAmount', label: 'Netto' },
     { key: 'vatAmount', label: 'MwSt' },
     { key: 'grossAmount', label: 'Brutto' },
@@ -329,11 +332,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, a
                     }}
                   >
                     <strong>Wozu Filter?</strong><br/>
-                    Grenze den Export auf einen bestimmten Zeitraum, eine Kategorie, Buchungstyp oder Zahlweg ein. So erhältst du genau die Daten, die du benötigst.
+                    Grenze den Export auf einen bestimmten Zeitraum, eine Kategorie, Buchungstyp oder Zahlungskonto ein. So erhältst du genau die Daten, die du benötigst.
                   </div>
                 </div>
                 {/* Active filter indicator */}
-                {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM) && (
+                {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM || paymentAccountId) && (
                   <span 
                     style={{ 
                       marginLeft: 'auto',
@@ -389,7 +392,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, a
                         </button>
                       )
                     })}
-                    {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM) && (
+                    {(filterFrom || filterTo || filterCategoryId != null || filterType || filterPM || paymentAccountId) && (
                       <button
                         className="btn ghost"
                         onClick={() => { setFilterFrom?.(''); setFilterTo?.(''); setFilterCategoryId?.(null); setFilterType?.(null); setFilterPM?.(null) }}
@@ -458,16 +461,15 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, a
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Zahlweg</div>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 3 }}>Zahlungskonto</div>
                   <select
                     className="input"
-                    value={filterPM ?? ''}
-                    onChange={(e) => setFilterPM?.(e.target.value ? (e.target.value as any) : null)}
+                    value={paymentAccountId ?? ''}
+                    onChange={(e) => setPaymentAccountId?.(e.target.value ? Number(e.target.value) : null)}
                     style={{ width: '100%' }}
                   >
                     <option value="">Alle</option>
-                    <option value="BAR">Bar</option>
-                    <option value="BANK">Bank</option>
+                    {paymentAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
               </div>

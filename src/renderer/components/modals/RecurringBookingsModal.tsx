@@ -4,6 +4,11 @@ import TagsEditor from '../TagsEditor'
 import { IconDraft, IconPause, IconPlay, IconSkip } from '../../utils/icons'
 import { ICONS } from '../../utils/icons.constants'
 
+function paymentAccountSelectStyle(color?: string | null): React.CSSProperties | undefined {
+    if (!color) return undefined
+    return { borderColor: color, boxShadow: `inset 4px 0 0 ${color}`, fontWeight: 650 }
+}
+
 type Frequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 
 export type RecurringBooking = {
@@ -22,6 +27,7 @@ export type RecurringBooking = {
     grossAmount: number
     vatRate: number
     paymentMethod: 'BAR' | 'BANK'
+    paymentAccountId?: number
     categoryId?: number | null
     budgetId?: number | null
     earmarkId?: number | null
@@ -44,6 +50,7 @@ type FormState = {
   description: string
   grossAmount: number
   paymentMethod: 'BAR' | 'BANK'
+  paymentAccountId: number | null
   categoryId: number | null
   tags: string[]
   taxonomySelectionById: Record<string, number>
@@ -82,6 +89,7 @@ function emptyForm(): FormState {
     description: '',
     grossAmount: 0,
     paymentMethod: 'BANK',
+    paymentAccountId: null,
     categoryId: null,
     tags: [],
     taxonomySelectionById: {}
@@ -102,6 +110,7 @@ function formFromBooking(booking: RecurringBooking): FormState {
     description: booking.template.description,
     grossAmount: booking.template.grossAmount,
     paymentMethod: booking.template.paymentMethod,
+    paymentAccountId: booking.template.paymentAccountId ?? null,
     categoryId: booking.template.categoryId ?? null,
     tags: booking.template.tags || [],
     taxonomySelectionById: booking.template.taxonomySelectionById || {}
@@ -116,6 +125,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
   const [taxonomies, setTaxonomies] = useState<Array<{ id: number; name: string }>>([])
   const [taxonomyTermsById, setTaxonomyTermsById] = useState<Record<number, Array<{ id: number; name: string }>>>({})
   const [loadingTaxonomies, setLoadingTaxonomies] = useState(true)
+  const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: string; color?: string | null }>>([])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const load = useCallback(async () => {
@@ -131,6 +141,12 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
   }, [notify])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { window.api?.paymentAccounts.list({ activeOnly: true }).then(setPaymentAccounts).catch(() => setPaymentAccounts([])) }, [])
+  useEffect(() => {
+    if (!form || form.paymentAccountId || !paymentAccounts.length) return
+    const legacy = paymentAccounts.find(account => form.paymentMethod === 'BAR' ? account.kind === 'CASH' : account.kind !== 'CASH') || paymentAccounts[0]
+    if (legacy) setForm({ ...form, paymentAccountId: legacy.id })
+  }, [form, paymentAccounts])
 
   useEffect(() => {
     let cancelled = false
@@ -179,6 +195,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
       notify('error', 'Bitte Name, Fälligkeit, Buchungstext und einen Betrag größer als 0 ausfüllen.')
       return
     }
+    if (!form.paymentAccountId) { notify('error', 'Bitte ein Zahlungskonto auswählen.'); return }
     setSaving(true)
     try {
       await window.api?.recurringBookings.upsert({
@@ -196,6 +213,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
           grossAmount: Number(form.grossAmount),
           vatRate: 0,
           paymentMethod: form.paymentMethod,
+          paymentAccountId: form.paymentAccountId,
           categoryId: form.categoryId,
           tags: form.tags,
           taxonomySelectionById: form.taxonomySelectionById
@@ -267,7 +285,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
       <div className="recurring-row-main">
         <strong>{booking.name}</strong>
         <span>{booking.template.description}</span>
-        <small>{frequencyLabels[booking.frequency]}{booking.intervalCount > 1 ? ` · alle ${booking.intervalCount} Intervalle` : ''} · {booking.template.paymentMethod === 'BANK' ? 'Bank' : 'Bar'}</small>
+        <small>{frequencyLabels[booking.frequency]}{booking.intervalCount > 1 ? ` · alle ${booking.intervalCount} Intervalle` : ''} · {paymentAccounts.find(account => account.id === booking.template.paymentAccountId)?.name || (booking.template.paymentMethod === 'BANK' ? 'Bank' : 'Bar')}</small>
       </div>
       <strong className={booking.template.type === 'OUT' ? 'amount-out' : 'amount-in'}>
         {booking.template.type === 'OUT' ? '−' : '+'}{eur.format(booking.template.grossAmount)}
@@ -332,7 +350,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
               <div className={`recurring-editor-summary ${form.type === 'IN' ? 'is-in' : 'is-out'}`}>
                 <strong>{form.nextDueDate || 'Kein Datum'}</strong>
                 <span className={`badge ${form.type.toLowerCase()}`}>{form.type}</span>
-                <span>{form.paymentMethod === 'BANK' ? 'BANK' : 'BAR'}</span>
+                <span style={{ color: paymentAccounts.find(account => account.id === form.paymentAccountId)?.color || undefined }}>{paymentAccounts.find(account => account.id === form.paymentAccountId)?.name || 'Kein Konto'}</span>
                 <strong>{form.grossAmount > 0 ? eur.format(form.grossAmount) : '—'}</strong>
                 <span className="helper">{frequencyLabels[form.frequency]}</span>
               </div>
@@ -348,7 +366,7 @@ export default function RecurringBookingsModal({ onUseDue, onChanged, notify, ca
                 </div>
                 <div className="recurring-editor-two-cols">
                   <div className="field"><label>Art</label><div className="btn-group"><button type="button" className={`btn ${form.type === 'IN' ? 'active in' : ''}`} onClick={() => setForm({ ...form, type: 'IN' })}>IN</button><button type="button" className={`btn ${form.type === 'OUT' ? 'active out' : ''}`} onClick={() => setForm({ ...form, type: 'OUT' })}>OUT</button></div></div>
-                  <div className="field"><label>Zahlweg</label><div className="btn-group"><button type="button" className={`btn ${form.paymentMethod === 'BAR' ? 'active' : ''}`} onClick={() => setForm({ ...form, paymentMethod: 'BAR' })}>Bar</button><button type="button" className={`btn ${form.paymentMethod === 'BANK' ? 'active' : ''}`} onClick={() => setForm({ ...form, paymentMethod: 'BANK' })}>Bank</button></div></div>
+                  <div className="field"><label>Zahlungskonto</label><select className="input" value={form.paymentAccountId ?? ''} onChange={(event) => { const account = paymentAccounts.find(item => item.id === Number(event.target.value)); setForm({ ...form, paymentAccountId: account?.id ?? null, paymentMethod: account?.kind === 'CASH' ? 'BAR' : 'BANK' }) }} style={paymentAccountSelectStyle(paymentAccounts.find(account => account.id === form.paymentAccountId)?.color)}><option value="">— Konto wählen —</option>{paymentAccounts.map(account => <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}</select></div>
                 </div>
               </section>
 

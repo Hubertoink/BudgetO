@@ -482,6 +482,21 @@ function DetachedBookingWindow() {
         }
     }, [editFiles, editQa, notify])
 
+    const deleteEdit = useCallback(async () => {
+        if (!editQa?.id) return
+        const label = editQa.description?.trim() || `Buchung #${editQa.id}`
+        if (!window.confirm(`„${label}“ wirklich löschen?`)) return
+        try {
+            await window.api?.vouchers.delete?.({ id: Number(editQa.id) })
+            savedRef.current = true
+            notify('success', 'Buchung gelöscht')
+            await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: draftIdRef.current, mode: 'edit' })
+            void window.api?.window?.confirmClose?.()
+        } catch (error: any) {
+            notify('error', String(error?.message || error))
+        }
+    }, [editQa, notify])
+
     useEffect(() => {
         if (mode !== 'edit') return
         const onKeyDown = (event: KeyboardEvent) => {
@@ -505,6 +520,7 @@ function DetachedBookingWindow() {
             setQa={mode === 'edit' ? setEditQa : setQa}
             onSave={mode === 'edit' ? saveEdit : onQuickSave}
             onClose={requestClose}
+            onDelete={mode === 'edit' ? deleteEdit : undefined}
             windowMode
             saveLabel={mode === 'edit' ? 'Änderungen speichern' : 'Speichern'}
             files={activeFiles}
@@ -919,6 +935,9 @@ function AppInner() {
     const [exportFilterCategoryId, setExportFilterCategoryId] = useState<number | null>(null)
     const [exportFilterType, setExportFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [exportFilterPM, setExportFilterPM] = useState<'BAR' | 'BANK' | null>(null)
+    const [exportPaymentAccountId, setExportPaymentAccountId] = useState<number | null>(null)
+    const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string }>>([])
+    useEffect(() => { window.api?.paymentAccounts?.list({ activeOnly: true }).then(setPaymentAccounts).catch(() => setPaymentAccounts([])) }, [refreshKey])
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -1217,6 +1236,7 @@ function AppInner() {
                 vatRate: 0,
                 mode: 'GROSS',
                 paymentMethod: booking.template.paymentMethod,
+                paymentAccountId: booking.template.paymentAccountId,
                 categoryId: booking.template.categoryId ?? null,
                 budgetId: booking.template.budgetId ?? null,
                 earmarkId: booking.template.earmarkId ?? null,
@@ -2370,6 +2390,9 @@ function AppInner() {
                     setFilterType={setExportFilterType}
                     filterPM={exportFilterPM}
                     setFilterPM={setExportFilterPM}
+                    paymentAccounts={paymentAccounts}
+                    paymentAccountId={exportPaymentAccountId}
+                    setPaymentAccountId={setExportPaymentAccountId}
                     onExport={async (fmt) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -2397,6 +2420,7 @@ function AppInner() {
                                     to: exportFilterTo || '',
                                     filters: {
                                         paymentMethod: exportFilterPM || undefined,
+                                        paymentAccountId: exportPaymentAccountId || undefined,
                                         categoryId: typeof exportFilterCategoryId === 'number' ? exportFilterCategoryId : undefined,
                                         type: exportFilterType || undefined
                                     },

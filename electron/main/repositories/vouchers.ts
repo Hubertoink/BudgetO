@@ -7,6 +7,7 @@ import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { getTagsForVoucher, setVoucherTags } from './tags'
 import { markRecurringOccurrenceBooked } from './recurringBookings'
+import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 
 type DB = InstanceType<typeof Database>
 
@@ -23,8 +24,12 @@ export type CreateVoucherInput = {
     grossAmount?: number
     vatRate: number
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
+    paymentAccountId?: number
     transferFrom?: 'BAR' | 'BANK'
     transferTo?: 'BAR' | 'BANK'
+    transferFromAccountId?: number
+    transferToAccountId?: number
     categoryId?: number
     projectId?: number
     earmarkId?: number
@@ -42,6 +47,18 @@ export type CreateVoucherInput = {
 
 export function createVoucherTx(d: DB, input: CreateVoucherInput) {
     const warnings: string[] = []
+    const paymentAccount = input.paymentAccountId ? getPaymentAccountById(input.paymentAccountId, d) : undefined
+    const fromAccount = input.transferFromAccountId ? getPaymentAccountById(input.transferFromAccountId, d) : undefined
+    const toAccount = input.transferToAccountId ? getPaymentAccountById(input.transferToAccountId, d) : undefined
+    if (input.paymentAccountId && !paymentAccount) throw new Error('Zahlungskonto nicht gefunden')
+    if (input.transferFromAccountId && !fromAccount) throw new Error('Quellkonto nicht gefunden')
+    if (input.transferToAccountId && !toAccount) throw new Error('Zielkonto nicht gefunden')
+    const paymentMethod = paymentMethodForAccountKind(paymentAccount?.kind) ?? input.paymentMethod
+    const transferFrom = paymentMethodForAccountKind(fromAccount?.kind) ?? input.transferFrom
+    const transferTo = paymentMethodForAccountKind(toAccount?.kind) ?? input.transferTo
+    const paymentAccountId = input.paymentAccountId ?? (paymentMethod ? getDefaultPaymentAccountIdForMethod(paymentMethod, d) : null)
+    const transferFromAccountId = input.transferFromAccountId ?? (transferFrom ? getDefaultPaymentAccountIdForMethod(transferFrom, d) : null)
+    const transferToAccountId = input.transferToAccountId ?? (transferTo ? getDefaultPaymentAccountIdForMethod(transferTo, d) : null)
     ensurePeriodOpen(input.date, d)
     const date = new Date(input.date)
     const year = date.getFullYear()
@@ -113,8 +130,9 @@ export function createVoucherTx(d: DB, input: CreateVoucherInput) {
     const stmt = d.prepare(`
       INSERT INTO vouchers (
     year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
-        net_amount, vat_rate, vat_amount, gross_amount, payment_method, transfer_from, transfer_to, counterparty, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+        net_amount, vat_rate, vat_amount, gross_amount, payment_method, transfer_from, transfer_to,
+        payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
     let id: number | null = null
@@ -148,9 +166,12 @@ export function createVoucherTx(d: DB, input: CreateVoucherInput) {
                 input.vatRate,
                 vatAmount,
                 grossAmount,
-                input.paymentMethod ?? null,
-                input.transferFrom ?? null,
-                input.transferTo ?? null,
+                paymentMethod ?? null,
+                transferFrom ?? null,
+                transferTo ?? null,
+                paymentAccountId,
+                transferFromAccountId,
+                transferToAccountId,
                 input.createdBy ?? null
             )
             id = Number(info.lastInsertRowid)
@@ -480,11 +501,15 @@ export function listVouchersAdvanced(filters: {
     tag?: string
 }) {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, paymentAccountId, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag } = filters
     let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.category_id as categoryId,
                                         (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
                                         (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
-                                        v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+                                        v.payment_method as paymentMethod, v.payment_account_id as paymentAccountId,
+                                        pa.name as paymentAccountName, pa.kind as paymentAccountKind, pa.color as paymentAccountColor,
+                                        v.transfer_from as transferFrom, v.transfer_to as transferTo,
+                                        v.transfer_from_account_id as transferFromAccountId, pfa.name as transferFromAccountName, pfa.color as transferFromAccountColor,
+                                        v.transfer_to_account_id as transferToAccountId, pta.name as transferToAccountName, pta.color as transferToAccountColor, v.description, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,
@@ -506,10 +531,13 @@ export function listVouchersAdvanced(filters: {
                                             FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
                                             WHERE vt.voucher_id = v.id
                                         ) as tagsConcat
-                         FROM vouchers v`
+                         FROM vouchers v LEFT JOIN payment_accounts pa ON pa.id=v.payment_account_id
+                         LEFT JOIN payment_accounts pfa ON pfa.id=v.transfer_from_account_id
+                         LEFT JOIN payment_accounts pta ON pta.id=v.transfer_to_account_id`
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (paymentAccountId) { wh.push('(v.payment_account_id=? OR (v.type=\'TRANSFER\' AND (v.transfer_from_account_id=? OR v.transfer_to_account_id=?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
@@ -545,7 +573,7 @@ export function listVouchersAdvanced(filters: {
             case 'attachments': return 'fileCount'
             case 'budget': return 'budgetLabel COLLATE NOCASE'
             case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'payment': return 'COALESCE(pa.name, v.payment_method) COLLATE NOCASE'
             case 'sphere': return 'v.sphere'
             case 'date': default: return 'v.date'
         }
@@ -564,6 +592,7 @@ export function listVouchersAdvancedPaged(filters: {
     // Extended sort keys
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -579,10 +608,11 @@ export function listVouchersAdvancedPaged(filters: {
     showArchived?: boolean
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag, taxonomyTermId, workYear, showArchived } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, paymentAccountId, sphere, categoryId, type, from, to, earmarkId, budgetId, q, tag, taxonomyTermId, workYear, showArchived } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (paymentAccountId) { wh.push('(v.payment_account_id=? OR (v.type=\'TRANSFER\' AND (v.transfer_from_account_id=? OR v.transfer_to_account_id=?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
@@ -630,7 +660,7 @@ export function listVouchersAdvancedPaged(filters: {
             case 'attachments': return 'fileCount'
             case 'budget': return 'budgetLabel COLLATE NOCASE'
             case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'payment': return 'COALESCE(pa.name, v.payment_method) COLLATE NOCASE'
             case 'sphere': return 'v.sphere'
             case 'date': default: return 'v.date'
         }
@@ -640,7 +670,11 @@ export function listVouchersAdvancedPaged(filters: {
             v.category_id as categoryId,
             (SELECT cc.name FROM custom_categories cc WHERE cc.id = v.category_id) as categoryName,
             (SELECT cc.color FROM custom_categories cc WHERE cc.id = v.category_id) as categoryColor,
-            v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+            v.payment_method as paymentMethod, v.payment_account_id as paymentAccountId,
+            pa.name as paymentAccountName, pa.kind as paymentAccountKind, pa.color as paymentAccountColor,
+            v.transfer_from as transferFrom, v.transfer_to as transferTo,
+            v.transfer_from_account_id as transferFromAccountId, pfa.name as transferFromAccountName, pfa.color as transferFromAccountColor,
+            v.transfer_to_account_id as transferToAccountId, pta.name as transferToAccountName, pta.color as transferToAccountColor, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 CASE WHEN ca.id IS NOT NULL THEN 1 ELSE 0 END as isCashAdvancePlaceholder,
@@ -665,6 +699,9 @@ export function listVouchersAdvancedPaged(filters: {
                 ) as tagsConcat
          FROM vouchers v
          LEFT JOIN cash_advances ca ON ca.placeholder_voucher_id = v.id AND ca.status = 'OPEN'
+         LEFT JOIN payment_accounts pa ON pa.id=v.payment_account_id
+         LEFT JOIN payment_accounts pfa ON pfa.id=v.transfer_from_account_id
+         LEFT JOIN payment_accounts pta ON pta.id=v.transfer_to_account_id
          ${joinSql}${whereSql}
          ORDER BY ${orderExpr} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
          LIMIT ? OFFSET ?`
@@ -965,6 +1002,7 @@ export function batchAssignCategory(params: {
 
 export function summarizeVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -978,11 +1016,12 @@ export function summarizeVouchers(filters: {
     showArchived?: boolean
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
+    const { paymentMethod, paymentAccountId, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); paramsBase.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (paymentAccountId) { wh.push('(v.payment_account_id=? OR (v.type=\'TRANSFER\' AND (v.transfer_from_account_id=? OR v.transfer_to_account_id=?)))'); paramsBase.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
     if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); paramsBase.push(categoryId) }
     if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
@@ -1083,11 +1122,23 @@ export function summarizeVouchers(filters: {
          ORDER BY ${pmAdjustedType}
     `).all(...paramsBase) as any[]
 
-    return { totals, bySphere, byPaymentMethod, byType }
+    const byPaymentAccount = d.prepare(`
+      WITH filtered AS (SELECT v.* FROM vouchers v${joinSql}${whereSql}), entries AS (
+        SELECT payment_account_id accountId, net_amount net, vat_amount vat, gross_amount gross FROM filtered WHERE type<>'TRANSFER'
+        UNION ALL SELECT transfer_from_account_id, net_amount, vat_amount, gross_amount FROM filtered WHERE type='TRANSFER'
+        UNION ALL SELECT transfer_to_account_id, net_amount, vat_amount, gross_amount FROM filtered WHERE type='TRANSFER'
+      ) SELECT e.accountId, COALESCE(pa.name,'Ohne Konto') key, pa.color,
+        IFNULL(SUM(e.net),0) net, IFNULL(SUM(e.vat),0) vat, IFNULL(SUM(e.gross),0) gross
+      FROM entries e LEFT JOIN payment_accounts pa ON pa.id=e.accountId
+      GROUP BY e.accountId, pa.name, pa.color ORDER BY pa.sort_order, key
+    `).all(...paramsBase) as any[]
+
+    return { totals, bySphere, byPaymentMethod, byPaymentAccount, byType }
 }
 
 export function summarizeVouchersByCategory(filters: {
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -1100,11 +1151,12 @@ export function summarizeVouchersByCategory(filters: {
     showArchived?: boolean
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
+    const { paymentMethod, paymentAccountId, sphere, categoryId, type, from, to, earmarkId, q, tag, workYear, showArchived } = filters
     const params: any[] = []
     const wh: string[] = []
     let joinSql = ''
     if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
+    if (paymentAccountId) { wh.push('(v.payment_account_id=? OR (v.type=\'TRANSFER\' AND (v.transfer_from_account_id=? OR v.transfer_to_account_id=?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (typeof categoryId === 'number') { wh.push('v.category_id = ?'); params.push(categoryId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
@@ -1192,17 +1244,19 @@ export function monthlyVouchers(filters: {
     from?: string
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     categoryId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER'
 }) {
     const d = getDb()
-    const { from, to, paymentMethod, sphere, categoryId, type } = filters
+    const { from, to, paymentMethod, paymentAccountId, sphere, categoryId, type } = filters
     const params: any[] = []
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
     if (to) { wh.push('date <= ?'); params.push(to) }
     if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (paymentAccountId) { wh.push('(payment_account_id=? OR (type=\'TRANSFER\' AND (transfer_from_account_id=? OR transfer_to_account_id=?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
     if (typeof categoryId === 'number') { wh.push('category_id = ?'); params.push(categoryId) }
     if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
@@ -1290,8 +1344,11 @@ export function updateVoucher(input: {
     categoryId?: number | null
     description?: string | null
     paymentMethod?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
+    transferFromAccountId?: number | null
+    transferToAccountId?: number | null
     earmarkId?: number | null
     earmarkAmount?: number | null
     budgetId?: number | null
@@ -1387,10 +1444,18 @@ export function updateVoucher(input: {
     if (input.categoryId !== undefined) { fields.push('category_id = ?'); params.push(input.categoryId) }
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
     if (input.paymentMethod !== undefined) { fields.push('payment_method = ?'); params.push(input.paymentMethod) }
+    if (input.paymentAccountId !== undefined) {
+        const account = input.paymentAccountId ? getPaymentAccountById(input.paymentAccountId, d) : undefined
+        if (input.paymentAccountId && !account) throw new Error('Zahlungskonto nicht gefunden')
+        fields.push('payment_account_id = ?'); params.push(input.paymentAccountId)
+        fields.push('payment_method = ?'); params.push(paymentMethodForAccountKind(account?.kind))
+    }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
     if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
     if (input.transferFrom !== undefined) { fields.push('transfer_from = ?'); params.push(input.transferFrom) }
     if (input.transferTo !== undefined) { fields.push('transfer_to = ?'); params.push(input.transferTo) }
+    if (input.transferFromAccountId !== undefined) { const a = input.transferFromAccountId ? getPaymentAccountById(input.transferFromAccountId, d) : undefined; if (input.transferFromAccountId && !a) throw new Error('Quellkonto nicht gefunden'); fields.push('transfer_from_account_id = ?'); params.push(input.transferFromAccountId); fields.push('transfer_from = ?'); params.push(paymentMethodForAccountKind(a?.kind)) }
+    if (input.transferToAccountId !== undefined) { const a = input.transferToAccountId ? getPaymentAccountById(input.transferToAccountId, d) : undefined; if (input.transferToAccountId && !a) throw new Error('Zielkonto nicht gefunden'); fields.push('transfer_to_account_id = ?'); params.push(input.transferToAccountId); fields.push('transfer_to = ?'); params.push(paymentMethodForAccountKind(a?.kind)) }
     if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
     if (input.budgetAmount !== undefined) { fields.push('budget_amount = ?'); params.push(input.budgetAmount) }
     // If sphere or year changes, re-number voucher (year, seq_no, voucher_no)
@@ -1565,7 +1630,15 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
             if (r.pm === 'BANK') bank += sign * (r.gross || 0)
         }
     }
-    return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100 }
+    const accountRows = d.prepare(`SELECT pa.id, pa.name, pa.kind, pa.color,
+      IFNULL(SUM(CASE WHEN v.type='IN' AND v.payment_account_id=pa.id THEN v.gross_amount
+        WHEN v.type='OUT' AND v.payment_account_id=pa.id THEN -v.gross_amount
+        WHEN v.type='TRANSFER' AND v.transfer_from_account_id=pa.id THEN -v.gross_amount
+        WHEN v.type='TRANSFER' AND v.transfer_to_account_id=pa.id THEN v.gross_amount ELSE 0 END),0) balance
+      FROM payment_accounts pa LEFT JOIN vouchers v ON (${whereSql.replace(' WHERE ', '')})
+      GROUP BY pa.id ORDER BY pa.sort_order, pa.name`).all(...vals) as any[]
+    return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100,
+      accounts: accountRows.map(r => ({ ...r, balance: round2(Number(r.balance || 0)) })) }
 }
 
 // Distinct voucher years present in the database

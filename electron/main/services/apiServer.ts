@@ -154,6 +154,18 @@ const apiHandlers: Map<string, ApiHandler> = new Map()
 
 // Register all API routes (mirrors IPC handlers)
 function registerHandlers() {
+  apiHandlers.set('paymentAccounts.list', async (body) => {
+    const { listPaymentAccounts } = await import('../repositories/paymentAccounts')
+    return listPaymentAccounts(body || {})
+  })
+  apiHandlers.set('paymentAccounts.upsert', async (body) => {
+    const { upsertPaymentAccount } = await import('../repositories/paymentAccounts')
+    return upsertPaymentAccount(body)
+  })
+  apiHandlers.set('paymentAccounts.delete', async (body) => {
+    const { deletePaymentAccount } = await import('../repositories/paymentAccounts')
+    return deletePaymentAccount(Number(body?.id))
+  })
   // Meta
   apiHandlers.set('meta.getChangeSeq', async () => {
     return { seq: getChangeSeq() }

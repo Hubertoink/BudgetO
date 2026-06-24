@@ -26,6 +26,7 @@ export function SettingsNav({ active, onSelect, tiles }: SettingsNavProps) {
   const defaultTiles: Array<{ key: TileKey; icon: string; label: string }> = [
     { key: 'general', icon: '🖼️', label: 'Darstellung' },
     { key: 'table', icon: '📋', label: 'Tabelle' },
+    { key: 'paymentAccounts', icon: '💳', label: 'Zahlungskonten' },
     { key: 'modules', icon: '🧩', label: 'Module' },
     { key: 'users', icon: '👥', label: 'Benutzer' },
     { key: 'server', icon: '🌐', label: 'Netzwerk' },

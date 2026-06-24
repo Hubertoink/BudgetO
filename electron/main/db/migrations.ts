@@ -1135,6 +1135,42 @@ export const MIGRATIONS: Mig[] = [
         db.exec('ALTER TABLE budget_period_config ADD COLUMN carry_deficit INTEGER NOT NULL DEFAULT 0 CHECK(carry_deficit IN (0,1))')
       }
     }
+  },
+  {
+    version: 43,
+    up(db: DB) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS payment_accounts (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          kind TEXT NOT NULL CHECK(kind IN ('CASH','BANK','PAYPAL','CARD','OTHER')),
+          iban TEXT, color TEXT, sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_payment_accounts_active ON payment_accounts(is_active, sort_order, name);
+        INSERT OR IGNORE INTO payment_accounts(name,kind,sort_order,is_active) VALUES ('Bar','CASH',1,1),('Bank','BANK',2,1);
+      `)
+      const cols = new Set((db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>).map(c => c.name))
+      if (!cols.has('payment_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN payment_account_id INTEGER')
+      if (!cols.has('transfer_from_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN transfer_from_account_id INTEGER')
+      if (!cols.has('transfer_to_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN transfer_to_account_id INTEGER')
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_vouchers_payment_account ON vouchers(payment_account_id);
+        CREATE INDEX IF NOT EXISTS idx_vouchers_transfer_accounts ON vouchers(transfer_from_account_id,transfer_to_account_id);
+        UPDATE vouchers SET payment_account_id=CASE payment_method
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind='CASH' ORDER BY sort_order,id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind='BANK' ORDER BY sort_order,id LIMIT 1) END
+          WHERE payment_account_id IS NULL AND type<>'TRANSFER';
+        UPDATE vouchers SET transfer_from_account_id=CASE transfer_from
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind='CASH' ORDER BY sort_order,id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind='BANK' ORDER BY sort_order,id LIMIT 1) END
+          WHERE transfer_from_account_id IS NULL AND type='TRANSFER';
+        UPDATE vouchers SET transfer_to_account_id=CASE transfer_to
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind='CASH' ORDER BY sort_order,id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind='BANK' ORDER BY sort_order,id LIMIT 1) END
+          WHERE transfer_to_account_id IS NULL AND type='TRANSFER';
+      `)
+    }
   }
 ]
 

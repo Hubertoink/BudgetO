@@ -12,9 +12,12 @@ type QA = {
     vatRate: number
     description: string
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number
     mode?: 'NET' | 'GROSS'
     transferFrom?: 'BAR' | 'BANK'
     transferTo?: 'BAR' | 'BANK'
+    transferFromAccountId?: number
+    transferToAccountId?: number
     budgetId?: number | null
     earmarkId?: number | null
     tags?: string[]
@@ -177,8 +180,12 @@ export function useQuickAdd(
         if (!activeDraft) return
         const currentQa = activeDraft.qa
 
-        if (currentQa.type === 'TRANSFER' && (!currentQa.transferFrom || !currentQa.transferTo)) {
+        if (currentQa.type === 'TRANSFER' && (!currentQa.transferFromAccountId || !currentQa.transferToAccountId)) {
             notify?.('error', 'Bitte wähle eine Richtung für den Transfer aus.')
+            return
+        }
+        if (currentQa.type !== 'TRANSFER' && !currentQa.paymentAccountId && !currentQa.paymentMethod) {
+            notify?.('error', 'Bitte wähle ein Zahlungskonto aus.')
             return
         }
 
@@ -193,10 +200,13 @@ export function useQuickAdd(
         if (currentQa.type === 'TRANSFER') {
             payload.transferFrom = currentQa.transferFrom
             payload.transferTo = currentQa.transferTo
+            payload.transferFromAccountId = currentQa.transferFromAccountId
+            payload.transferToAccountId = currentQa.transferToAccountId
             payload.vatRate = 0
             payload.grossAmount = currentQa.grossAmount ?? 0
         } else {
             payload.paymentMethod = currentQa.paymentMethod
+            payload.paymentAccountId = currentQa.paymentAccountId
         }
 
         if (currentQa.mode === 'GROSS') {

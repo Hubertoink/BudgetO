@@ -3,6 +3,12 @@ import { z } from 'zod'
 export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
+export const PaymentAccountKind = z.enum(['CASH', 'BANK', 'PAYPAL', 'CARD', 'OTHER'])
+export const PaymentAccountInput = z.object({
+    id: z.number().int().positive().optional(), name: z.string().min(1), kind: PaymentAccountKind,
+    iban: z.string().nullable().optional(), color: z.string().nullable().optional(),
+    sortOrder: z.number().int().optional(), isActive: z.boolean().optional()
+})
 const RecurringIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 // Multi-assignments (shared between create + update)
@@ -26,9 +32,12 @@ export const VoucherCreateInput = z
         grossAmount: z.number().optional(),
         vatRate: z.number(),
         paymentMethod: PaymentMethod.optional(),
+        paymentAccountId: z.number().int().positive().optional(),
         // Transfer direction (only when type === 'TRANSFER')
         transferFrom: PaymentMethod.optional(),
         transferTo: PaymentMethod.optional(),
+        transferFromAccountId: z.number().int().positive().optional(),
+        transferToAccountId: z.number().int().positive().optional(),
         categoryId: z.number().optional(), // Custom category (alternative to sphere)
         projectId: z.number().optional(),
         earmarkId: z.number().optional(),
@@ -70,6 +79,7 @@ export const RecurringBookingTemplateData = z.object({
     grossAmount: z.number().positive(),
     vatRate: z.number(),
     paymentMethod: PaymentMethod,
+    paymentAccountId: z.number().int().positive().optional(),
     categoryId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
     earmarkId: z.number().nullable().optional(),
@@ -291,6 +301,7 @@ export const ReportsSummaryInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().int().positive().optional(),
     sphere: Sphere.optional(),
     categoryId: z.number().optional(),
     type: VoucherType.optional(),
@@ -310,6 +321,7 @@ export const ReportsSummaryOutput = z.object({
     }),
     bySphere: z.array(z.object({ key: Sphere, net: z.number(), vat: z.number(), gross: z.number() })),
     byPaymentMethod: z.array(z.object({ key: PaymentMethod.nullable(), net: z.number(), vat: z.number(), gross: z.number() })),
+    byPaymentAccount: z.array(z.object({ accountId: z.number().nullable(), key: z.string(), color: z.string().nullable().optional(), net: z.number(), vat: z.number(), gross: z.number() })).optional(),
     byType: z.array(z.object({ key: VoucherType, net: z.number(), vat: z.number(), gross: z.number() }))
 })
 
@@ -321,6 +333,7 @@ export const ReportsMonthlyInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().int().positive().optional(),
     sphere: Sphere.optional(),
     type: VoucherType.optional()
 })
@@ -341,6 +354,7 @@ export const ReportsByCategoryInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().int().positive().optional(),
     sphere: Sphere.optional(),
     categoryId: z.number().optional(),
     type: VoucherType.optional(),
@@ -389,7 +403,8 @@ export const ReportsCashBalanceInput = z.object({
 })
 export const ReportsCashBalanceOutput = z.object({
     BAR: z.number(),
-    BANK: z.number()
+    BANK: z.number(),
+    accounts: z.array(z.object({ id: z.number(), name: z.string(), kind: PaymentAccountKind, color: z.string().nullable().optional(), balance: z.number() })).optional()
 })
 export type TReportsCashBalanceInput = z.infer<typeof ReportsCashBalanceInput>
 export type TReportsCashBalanceOutput = z.infer<typeof ReportsCashBalanceOutput>
@@ -403,6 +418,7 @@ export const VouchersListInput = z
         // New sortable columns for Buchungen
         sortBy: z.enum(['date', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere']).optional(),
         paymentMethod: PaymentMethod.optional(),
+        paymentAccountId: z.number().int().positive().optional(),
         sphere: Sphere.optional(),
         categoryId: z.number().optional(),
         type: VoucherType.optional(),
@@ -430,8 +446,18 @@ export const VouchersListOutput = z.object({
             categoryName: z.string().nullable().optional(),
             categoryColor: z.string().nullable().optional(),
             paymentMethod: PaymentMethod.nullable().optional(),
+            paymentAccountId: z.number().nullable().optional(),
+            paymentAccountName: z.string().nullable().optional(),
+            paymentAccountKind: PaymentAccountKind.nullable().optional(),
+            paymentAccountColor: z.string().nullable().optional(),
             transferFrom: PaymentMethod.nullable().optional(),
             transferTo: PaymentMethod.nullable().optional(),
+            transferFromAccountId: z.number().nullable().optional(),
+            transferFromAccountName: z.string().nullable().optional(),
+            transferFromAccountColor: z.string().nullable().optional(),
+            transferToAccountId: z.number().nullable().optional(),
+            transferToAccountName: z.string().nullable().optional(),
+            transferToAccountColor: z.string().nullable().optional(),
             description: z.string().nullable().optional(),
             netAmount: z.number(),
             vatRate: z.number(),
@@ -663,8 +689,11 @@ export const VoucherUpdateInput = z.object({
     categoryId: z.number().nullable().optional(),
     description: z.string().nullable().optional(),
     paymentMethod: PaymentMethod.nullable().optional(),
+    paymentAccountId: z.number().int().positive().nullable().optional(),
     transferFrom: PaymentMethod.nullable().optional(),
     transferTo: PaymentMethod.nullable().optional(),
+    transferFromAccountId: z.number().int().positive().nullable().optional(),
+    transferToAccountId: z.number().int().positive().nullable().optional(),
     earmarkId: z.number().nullable().optional(),
     earmarkAmount: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),

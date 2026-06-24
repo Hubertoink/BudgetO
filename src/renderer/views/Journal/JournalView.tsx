@@ -7,6 +7,12 @@ import { TimeFilterDropdown, MetaFilterDropdown, BatchAssignDropdown, ColumnSele
 import { useModules } from '../../context/moduleHooks'
 import { useAuth } from '../../context/authHooks'
 import { getWorkPeriodRange } from '../../utils/workPeriod'
+import { IconTrash } from '../../utils/icons'
+
+function paymentAccountSelectStyle(color?: string | null): React.CSSProperties | undefined {
+    if (!color) return undefined
+    return { borderColor: color, boxShadow: `inset 4px 0 0 ${color}`, fontWeight: 650 }
+}
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
@@ -23,8 +29,18 @@ type VoucherRow = {
     categoryColor?: string | null
     description?: string | null
     paymentMethod?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
+    paymentAccountName?: string | null
+    paymentAccountKind?: string | null
+    paymentAccountColor?: string | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
+    transferFromAccountId?: number | null
+    transferFromAccountName?: string | null
+    transferFromAccountColor?: string | null
+    transferToAccountId?: number | null
+    transferToAccountName?: string | null
+    transferToAccountColor?: string | null
     netAmount: number
     vatRate: number
     vatAmount: number
@@ -249,6 +265,9 @@ export default function JournalView({
     const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
+    const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: string; color?: string | null }>>([])
+    const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
+    useEffect(() => { window.api?.paymentAccounts?.list({ activeOnly: true }).then(setPaymentAccounts).catch(() => setPaymentAccounts([])) }, [refreshKey])
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
@@ -316,8 +335,11 @@ export default function JournalView({
             categoryId: row.categoryId ?? null,
             description: (row.description || '').trim(),
             paymentMethod: row.paymentMethod || null,
+            paymentAccountId: row.paymentAccountId || null,
             transferFrom: row.transferFrom || null,
             transferTo: row.transferTo || null,
+            transferFromAccountId: row.transferFromAccountId || null,
+            transferToAccountId: row.transferToAccountId || null,
             mode: row.mode || 'GROSS',
             grossAmount: Number(row.grossAmount ?? 0),
             netAmount: Number(row.netAmount ?? 0),
@@ -659,7 +681,7 @@ export default function JournalView({
             list.push({ key: 'sphere', label: `Kategorie: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
         }
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
-        if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
+        if (filterPaymentAccountId) list.push({ key: 'pm', label: `Konto: ${paymentAccounts.find(a => a.id === filterPaymentAccountId)?.name || filterPaymentAccountId}`, clear: () => setFilterPaymentAccountId(null) })
         if (activeFilterEarmark != null) {
             const em = earmarks.find(e => e.id === activeFilterEarmark)
             list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}` , clear: () => activeSetFilterEarmark(null), color: em?.color })
@@ -681,7 +703,7 @@ export default function JournalView({
         }
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, activeFilterTaxonomyTerm, earmarks, budgetNames, activeQ, activeSetFilterCategoryId, activeSetFilterTag, activeSetQ, clearTimeFilter, activeSetFrom, activeSetTo, activeSetFilterSphere, activeSetFilterType, activeSetFilterPM, activeSetFilterEarmark, activeSetFilterBudgetId])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, categoryMap, activeFilterType, filterPaymentAccountId, paymentAccounts, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, activeFilterTaxonomyTerm, earmarks, budgetNames, activeQ, activeSetFilterCategoryId, activeSetFilterTag, activeSetQ, clearTimeFilter, activeSetFrom, activeSetTo, activeSetFilterSphere, activeSetFilterType, activeSetFilterEarmark, activeSetFilterBudgetId])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -697,6 +719,7 @@ export default function JournalView({
                 sort: sortDir,
                 sortBy,
                 paymentMethod: activeFilterPM || undefined,
+                paymentAccountId: filterPaymentAccountId || undefined,
                 sphere: activeFilterSphere || undefined,
                 categoryId: useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined,
                 type: activeFilterType || undefined,
@@ -751,7 +774,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [allowData, journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, dataFrom, dataTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady, budgetNames, earmarks])
+    }, [allowData, journalLimit, activePage, sortDir, sortBy, filterPaymentAccountId, activeFilterSphere, activeFilterCategoryId, useCategoriesModule, activeFilterType, dataFrom, dataTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, activeFilterTaxonomyTerm, notify, refreshKey, workYear, showArchived, archiveSettingsReady, budgetNames, earmarks])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -1033,13 +1056,16 @@ export default function JournalView({
                         tagDefs={tagDefs}
                         filterType={activeFilterType}
                         filterPM={activeFilterPM}
+                        paymentAccounts={paymentAccounts}
+                        paymentAccountId={filterPaymentAccountId}
                         filterTag={activeFilterTag}
                         categoryId={activeFilterCategoryId}
                         earmarkId={activeFilterEarmark}
                         budgetId={activeFilterBudgetId}
-                        onApply={({ filterType, filterPM, filterTag, categoryId, earmarkId, budgetId }) => {
+                        onApply={({ filterType, filterPM, paymentAccountId, filterTag, categoryId, earmarkId, budgetId }) => {
                             activeSetFilterType(filterType)
                             activeSetFilterPM(filterPM)
+                            setFilterPaymentAccountId(paymentAccountId)
                             activeSetFilterTag(filterTag)
                             activeSetFilterCategoryId(categoryId)
                             activeSetFilterEarmark(earmarkId)
@@ -1102,13 +1128,14 @@ export default function JournalView({
                             </span>
                         )
                     })}
-                    {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterCategoryId != null || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
+                    {(activeFilterType || filterPaymentAccountId || activeFilterTag || activeFilterSphere || activeFilterCategoryId != null || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
                         <button
                             className="btn ghost"
                             title="Alle Filter zurücksetzen"
                             onClick={() => { 
                                 activeSetFilterType(null);
                                 activeSetFilterPM(null);
+                                setFilterPaymentAccountId(null);
                                 activeSetFilterTag(null);
                                 activeSetFilterSphere(null);
                                 activeSetFilterCategoryId(null);
@@ -1136,6 +1163,7 @@ export default function JournalView({
                 from={dataFrom || undefined}
                 to={dataTo || undefined}
                 paymentMethod={activeFilterPM || undefined} 
+                paymentAccountId={filterPaymentAccountId || undefined}
                 sphere={activeFilterSphere || undefined} 
                 categoryId={useCategoriesModule ? (activeFilterCategoryId ?? undefined) : undefined}
                 type={activeFilterType || undefined} 
@@ -1219,6 +1247,7 @@ export default function JournalView({
                         onReorder={(o: any) => setOrder(o as any)}
                         earmarks={earmarks}
                         tagDefs={tagDefs}
+                        paymentAccounts={paymentAccounts}
                         eurFmt={eurFmt}
                         fmtDate={(s) => fmtDate(s || '')}
                         budgetUsage={budgetUsage}
@@ -1310,7 +1339,7 @@ export default function JournalView({
                                     <h2 style={{ margin: 0, flex: 1 }}>Buchung bearbeiten</h2>
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <button type="button" className="btn ghost" style={{ padding: '6px 10px', fontSize: 13 }} title="In eigenes Fenster abdocken" onClick={() => { void openDetachedEdit(editRow) }}>↗</button>
-                                        <button type="button" className="btn danger" style={{ padding: '6px 12px', fontSize: 13 }} title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑</button>
+                                        <button type="button" className="btn danger icon-btn" title="Löschen" aria-label="Buchung löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}><IconTrash /></button>
                                         <button type="button" className="btn" style={{ padding: '6px 12px', fontSize: 13 }} onClick={requestCloseEditModal}>Abbrechen</button>
                                         <button type="submit" form="edit-booking-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>Speichern</button>
                                         <button type="button" className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)" style={{ padding: 6 }}>
@@ -1343,10 +1372,10 @@ export default function JournalView({
                                     }}>
                                         {editRow.type}
                                     </span>
-                                    <span style={{ color: 'var(--text-dim)' }}>
+                                    <span style={{ color: editRow.type === 'TRANSFER' ? paymentAccounts.find(a => a.id === editRow.transferFromAccountId)?.color || 'var(--text-dim)' : paymentAccounts.find(a => a.id === editRow.paymentAccountId)?.color || 'var(--text-dim)', fontWeight: 600 }}>
                                         {editRow.type === 'TRANSFER' 
-                                            ? `${(editRow as any).transferFrom || '—'} → ${(editRow as any).transferTo || '—'}`
-                                            : (editRow as any).paymentMethod || '—'}
+                                            ? `${paymentAccounts.find(a => a.id === editRow.transferFromAccountId)?.name || '—'} → ${paymentAccounts.find(a => a.id === editRow.transferToAccountId)?.name || '—'}`
+                                            : paymentAccounts.find(a => a.id === editRow.paymentAccountId)?.name || (editRow as any).paymentMethod || '—'}
                                     </span>
                                     <span style={{ 
                                         color: editRow.type === 'IN' ? 'var(--success)' : editRow.type === 'OUT' ? 'var(--danger)' : 'inherit',
@@ -1459,10 +1488,13 @@ export default function JournalView({
                                     }
                                     if (editRow.type === 'TRANSFER') {
                                         delete payload.paymentMethod
+                                        payload.transferFromAccountId = editRow.transferFromAccountId ?? null
+                                        payload.transferToAccountId = editRow.transferToAccountId ?? null
                                         payload.transferFrom = editRow.transferFrom ?? null
                                         payload.transferTo = editRow.transferTo ?? null
                                     } else {
                                         payload.paymentMethod = editRow.paymentMethod ?? null
+                                        payload.paymentAccountId = editRow.paymentAccountId ?? null
                                         payload.transferFrom = null
                                         payload.transferTo = null
                                     }
@@ -1523,9 +1555,9 @@ export default function JournalView({
                                                     {(['IN','OUT','TRANSFER'] as const).map(t => (
                                                         <button key={t} type="button" className={`btn ${editRow.type === t ? 'btn-toggle-active' : ''} ${t==='IN' ? 'btn-type-in' : t==='OUT' ? 'btn-type-out' : ''}`} onClick={() => {
                                                             const newRow = { ...editRow, type: t }
-                                                            if (t === 'TRANSFER' && (!newRow.transferFrom || !newRow.transferTo)) {
-                                                                newRow.transferFrom = 'BAR'
-                                                                newRow.transferTo = 'BANK'
+                                                            if (t === 'TRANSFER' && (!newRow.transferFromAccountId || !newRow.transferToAccountId)) {
+                                                                newRow.transferFromAccountId = paymentAccounts[0]?.id || null
+                                                                newRow.transferToAccountId = paymentAccounts[1]?.id || null
                                                             }
                                                             setEditRow(newRow)
                                                         }}>{t}</button>
@@ -1558,23 +1590,13 @@ export default function JournalView({
                                             {editRow.type === 'TRANSFER' ? (
                                                 <div className="field">
                                                     <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                    <select value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
-                                                        onChange={(e) => {
-                                                            const v = e.target.value
-                                                            if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
-                                                            else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
-                                                        }}>
-                                                        <option value="BAR->BANK">BAR → BANK</option>
-                                                        <option value="BANK->BAR">BANK → BAR</option>
-                                                    </select>
+                                                    <div className="row"><select value={editRow.transferFromAccountId ?? ''} onChange={e => setEditRow({ ...editRow, transferFromAccountId: Number(e.target.value) || null })} style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === editRow.transferFromAccountId)?.color)}><option value="">Von …</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select><select value={editRow.transferToAccountId ?? ''} onChange={e => setEditRow({ ...editRow, transferToAccountId: Number(e.target.value) || null })} style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === editRow.transferToAccountId)?.color)}><option value="">Nach …</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select></div>
                                                 </div>
                                             ) : (
                                                 <div className="field">
-                                                    <label>Zahlweg</label>
-                                                    <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                                        {(['BAR','BANK'] as const).map(pm => (
-                                                            <button key={pm} type="button" className={`btn ${(editRow as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`} onClick={() => setEditRow({ ...editRow, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
-                                                        ))}
+                                                    <label>Zahlungskonto</label>
+                                                    <div className="btn-group" role="group" aria-label="Zahlungskonto wählen">
+                                                        <select value={editRow.paymentAccountId ?? ''} onChange={e => setEditRow({ ...editRow, paymentAccountId: Number(e.target.value) || null })} style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === editRow.paymentAccountId)?.color)}><option value="">— Konto wählen —</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select>
                                                     </div>
                                                 </div>
                                             )}

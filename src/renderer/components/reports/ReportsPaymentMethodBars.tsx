@@ -1,32 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { PaymentMethod } from './types'
 
 export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string }) {
   const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<Array<{ key: PaymentMethod; inGross: number; outGross: number }>>([])
+  const [data, setData] = useState<Array<{ key: string; accountId: number; inGross: number; outGross: number }>>([])
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    const keys: Array<PaymentMethod> = ['BAR', 'BANK']
-    Promise.all(
-      keys.map(pm =>
+    window.api?.paymentAccounts.list({ activeOnly: true }).then(accounts => Promise.all(
+      accounts.map(account =>
         (window as any).api?.reports.summary?.({
           from: props.from,
           to: props.to,
-          paymentMethod: pm
+          paymentAccountId: account.id
         })
       )
-    ).then((results) => {
+    ).then(results => ({ accounts, results }))).then(({ accounts, results }) => {
       if (cancelled) return
-      const mapped = keys.map((pm, i) => {
+      const mapped = accounts.map((account, i) => {
         const res = results[i]
         const byType = (res?.byType || []) as Array<{ key: string; gross: number }>
         const inGross = byType.find(t => t.key === 'IN')?.gross || 0
         const outGross = byType.find(t => t.key === 'OUT')?.gross || 0
-        return { key: pm, inGross, outGross }
+        return { key: account.name, accountId: account.id, inGross, outGross }
       })
       setData(mapped)
     }).finally(() => { if (!cancelled) setLoading(false) })
@@ -63,7 +61,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
   return (
     <div className="card report-chart-card">
       <div className="report-chart-header">
-        <strong>Nach Zahlweg (IN/OUT)</strong>
+        <strong>Nach Zahlungskonto (IN/OUT)</strong>
         <div className="legend">
           <span className="legend-item"><span className="legend-swatch legend-swatch-in"></span>IN</span>
           <span className="legend-item"><span className="legend-swatch legend-swatch-out"></span>OUT</span>
@@ -85,7 +83,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
               </div>
             )
           })()}
-          <svg ref={svgRef} width={width} height={height} role="img" aria-label="Nach Zahlweg">
+          <svg ref={svgRef} width={width} height={height} role="img" aria-label="Nach Zahlungskonto">
             {/* X-Achse Grid + Labels */}
             {xTicks.map((v, i) => (
               <g key={i}>

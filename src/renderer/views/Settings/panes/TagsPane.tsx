@@ -2,6 +2,7 @@ import React from 'react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
 import { useAuth } from '../../../context/authHooks'
+import { IconEdit, IconTrash } from '../../../utils/icons'
 
 /**
  * TagsPane - Tag Management
@@ -157,19 +158,19 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                   {canWrite ? (
                     <>
                       <button 
-                        className="btn btn-edit" 
+                        className="btn ghost icon-btn"
                         onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} 
                         title="Bearbeiten"
                       >
-                        ✎
+                        <IconEdit />
                       </button>
                       <button 
-                        className="btn ghost" 
+                        className="btn danger icon-btn"
                         onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
                         title="Löschen"
-                        style={{ padding: '6px 8px' }}
+                        aria-label={`${t.name} löschen`}
                       >
-                        🗑️
+                        <IconTrash />
                       </button>
                     </>
                   ) : null}

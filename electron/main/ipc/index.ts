@@ -27,6 +27,8 @@ import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 import { checkForAppUpdates, downloadAppUpdate, getUpdateStatus, initializeUpdater, installAppUpdate } from '../services/updater'
 import { BudgetPeriodConfigOutput, BudgetPeriodConfigSetInput, BudgetPeriodDeleteInput, BudgetPeriodFillYearInput, BudgetPeriodGetInput, BudgetPeriodListInput, BudgetPeriodUpsertInput, BudgetYearUsageInput } from './schemas'
+import { PaymentAccountInput } from './schemas'
+import { deletePaymentAccount, listPaymentAccounts, upsertPaymentAccount } from '../repositories/paymentAccounts'
 
 function isMissingTableError(error: unknown, tableNames: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -66,6 +68,25 @@ type RegisterIpcHandlersOptions = {
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     initializeUpdater()
+    ipcMain.handle('paymentAccounts.list', async (_e, payload) => {
+        const { getServerConfig, remoteCall } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        return cfg.mode === 'client' && cfg.serverAddress ? remoteCall(cfg.serverAddress, 'paymentAccounts.list', payload || {}) : listPaymentAccounts(payload || {})
+    })
+    ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
+        const parsed = PaymentAccountInput.parse(payload)
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        const result = cfg.mode === 'client' && cfg.serverAddress ? await remoteCall(cfg.serverAddress, 'paymentAccounts.upsert', parsed) : upsertPaymentAccount(parsed)
+        bumpChangeSeq(); return result
+    })
+    ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
+        const body = { id: Number(payload?.id) }
+        const { getServerConfig, remoteCall, bumpChangeSeq } = await import('../services/apiServer')
+        const cfg = getServerConfig()
+        const result = cfg.mode === 'client' && cfg.serverAddress ? await remoteCall(cfg.serverAddress, 'paymentAccounts.delete', body) : deletePaymentAccount(body.id)
+        bumpChangeSeq(); return result
+    })
     const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
     // App info
     ipcMain.handle('app.version', async () => {
@@ -186,6 +207,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             if (!cfg.serverAddress) throw new Error('Kein Server konfiguriert (Netzwerk: Client)')
             return ReportsSummaryOutput.parse(await remoteCall(cfg.serverAddress, 'reports.summary', {
                 paymentMethod: parsed.paymentMethod,
+                paymentAccountId: parsed.paymentAccountId,
                 sphere: parsed.sphere,
                 categoryId: (parsed as any).categoryId,
                 type: parsed.type,
@@ -201,6 +223,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
         const summary = summarizeVouchers({
             paymentMethod: parsed.paymentMethod as any,
+            paymentAccountId: parsed.paymentAccountId,
             sphere: parsed.sphere as any,
             categoryId: (parsed as any).categoryId,
             type: parsed.type as any,
@@ -227,6 +250,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 from: parsed.from,
                 to: parsed.to,
                 paymentMethod: parsed.paymentMethod,
+                paymentAccountId: parsed.paymentAccountId,
                 sphere: parsed.sphere,
                 type: parsed.type
             }))
@@ -236,6 +260,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             from: parsed.from,
             to: parsed.to,
             paymentMethod: parsed.paymentMethod as any,
+            paymentAccountId: parsed.paymentAccountId,
             sphere: parsed.sphere as any,
             type: parsed.type as any
         })
@@ -253,6 +278,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 from: parsed.from,
                 to: parsed.to,
                 paymentMethod: parsed.paymentMethod,
+                paymentAccountId: parsed.paymentAccountId,
                 sphere: parsed.sphere,
                 categoryId: parsed.categoryId,
                 type: parsed.type,
@@ -269,6 +295,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             from: parsed.from,
             to: parsed.to,
             paymentMethod: parsed.paymentMethod as any,
+            paymentAccountId: parsed.paymentAccountId,
             sphere: parsed.sphere as any,
             categoryId: parsed.categoryId,
             type: parsed.type as any,
@@ -449,6 +476,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const rows = listVouchersAdvanced({
             limit: 100000,
             paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+            paymentAccountId: Number(parsed.filters?.paymentAccountId) || undefined,
             sphere: (parsed.filters?.sphere as any) || undefined,
             categoryId: (parsed.filters as any)?.categoryId,
             type: (parsed.filters?.type as any) || undefined,
@@ -485,13 +513,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             // Gather summary data for the report
             const summary = summarizeVouchers({
                 paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                paymentAccountId: Number(parsed.filters?.paymentAccountId) || undefined,
                 sphere: (parsed.filters?.sphere as any) || undefined,
                 categoryId: (parsed.filters as any)?.categoryId,
                 type: (parsed.filters?.type as any) || undefined,
                 from: parsed.from,
                 to: parsed.to
             } as any)
-            const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, categoryId: (parsed.filters as any)?.categoryId, type: (parsed.filters?.type as any) || undefined } as any)
+            const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, paymentAccountId: Number(parsed.filters?.paymentAccountId) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, categoryId: (parsed.filters as any)?.categoryId, type: (parsed.filters?.type as any) || undefined } as any)
             // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
             const d2 = getDb()
             const p2: any[] = []
@@ -499,6 +528,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             if (parsed.from) { wh2.push('date >= ?'); p2.push(parsed.from) }
             if (parsed.to) { wh2.push('date <= ?'); p2.push(parsed.to) }
             if (parsed.filters?.paymentMethod) { wh2.push('payment_method = ?'); p2.push(parsed.filters.paymentMethod) }
+            if (Number(parsed.filters?.paymentAccountId)) { wh2.push('(payment_account_id=? OR (type=\'TRANSFER\' AND (transfer_from_account_id=? OR transfer_to_account_id=?)))'); p2.push(Number(parsed.filters?.paymentAccountId), Number(parsed.filters?.paymentAccountId), Number(parsed.filters?.paymentAccountId)) }
             if (parsed.filters?.sphere) { wh2.push('sphere = ?'); p2.push(parsed.filters.sphere) }
             if (typeof (parsed.filters as any)?.categoryId === 'number') { wh2.push('category_id = ?'); p2.push((parsed.filters as any).categoryId) }
             const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
@@ -540,6 +570,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                         from: parsed.from,
                         to: parsed.to,
                         paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                        paymentAccountId: Number(parsed.filters?.paymentAccountId) || undefined,
                         type: (parsed.filters?.type as any) || undefined
                     } as any)
                     categoryAgg = rows.map((r: any) => ({
@@ -614,6 +645,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                         const yearEnd = `${budgetYear}-12-31`
                         const budgetSummary = summarizeVouchers({
                             paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                            paymentAccountId: Number(parsed.filters?.paymentAccountId) || undefined,
                             sphere: (parsed.filters?.sphere as any) || undefined,
                             categoryId: (parsed.filters as any)?.categoryId,
                             // NOTE: Intentionally no type filter; budget should consider full year movement.
@@ -693,11 +725,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             </div>
         </div>
         <div class="card">
-            <div class="title">Nach Zahlweg</div>
+            <div class="title">Nach Zahlungskonto</div>
             <table class="small">
-                <thead><tr><th>Zahlweg</th><th class="right">Brutto</th></tr></thead>
+                <thead><tr><th>Zahlungskonto</th><th class="right">Brutto</th></tr></thead>
                 <tbody>
-                    ${(summary.byPaymentMethod as any[]).map(p => `<tr><td>${p.key === null ? 'TRANSFER' : (p.key ?? 'TRANSFER')}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
+                    ${((summary as any).byPaymentAccount || []).map((p: any) => `<tr><td>${esc(p.key || 'Ohne Konto')}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
                 </tbody>
             </table>
         </div>
@@ -910,7 +942,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                         <td class="nowrap">${esc(r.type)}</td>
                         <td class="nowrap">${esc(r.sphere)}</td>
                         <td>${esc(r.description ?? '')}</td>
-                        <td class="nowrap">${esc(r.paymentMethod ?? '')}</td>
+                        <td class="nowrap">${esc(r.paymentAccountName ?? r.paymentMethod ?? '')}</td>
                         <td class="right nowrap">${euro(Number(g))}</td>
                     </tr>`
                 }).join('')}
@@ -945,7 +977,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                     if (c === 'netAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2))
                     if (c === 'vatAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.vatAmount : r.vatAmount).toFixed(2))
                     if (c === 'description') return r.description ?? ''
-                    if (c === 'paymentMethod') return r.paymentMethod ?? ''
+                    if (c === 'paymentMethod') return r.paymentAccountName ?? r.paymentMethod ?? ''
                     if (c === 'tags') return (r.tags || []).join(', ')
                     return (r as any)[c]
                 })
@@ -975,7 +1007,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             for (const r of rows) {
                 const vals = colsSel.map((c) => {
                     if (c === 'description') return (r.description ?? '').replace(/\n|\r|;/g, ' ')
-                    if (c === 'paymentMethod') return r.paymentMethod ?? ''
+                    if (c === 'paymentMethod') return r.paymentAccountName ?? r.paymentMethod ?? ''
                     if (c === 'tags') return (r.tags || []).join(', ')
                     if (c === 'grossAmount') return ((r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount).toFixed(2)
                     if (c === 'netAmount') return ((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2)

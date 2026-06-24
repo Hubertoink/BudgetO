@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA, BudgetAssignment, EarmarkAssignment } from '../../hooks/useQuickAdd'
+import { IconTrash } from '../../utils/icons'
+
+function paymentAccountSelectStyle(color?: string | null): React.CSSProperties | undefined {
+    if (!color) return undefined
+    return { borderColor: color, boxShadow: `inset 4px 0 0 ${color}`, fontWeight: 650 }
+}
 
 interface QuickAddModalProps {
     title?: string
@@ -9,6 +15,7 @@ interface QuickAddModalProps {
     setQa: (qa: QA) => void
     onSave: () => void
     onClose: () => void
+    onDelete?: () => void
     onDetach?: () => void
     windowMode?: boolean
     saveLabel?: string
@@ -45,6 +52,7 @@ export default function QuickAddModal({
     setQa,
     onSave,
     onClose,
+    onDelete,
     onDetach,
     windowMode = false,
     saveLabel = 'Speichern',
@@ -67,9 +75,17 @@ export default function QuickAddModal({
     customCategories = [],
     useCategoriesModule = false
 }: QuickAddModalProps) {
+    const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: string; color?: string | null }>>([])
     const [taxonomiesForCreate, setTaxonomiesForCreate] = useState<Array<{ id: number; name: string }>>([])
     const [taxonomyTermsById, setTaxonomyTermsById] = useState<Record<number, Array<{ id: number; name: string }>>>({})
     const [loadingTaxonomiesForCreate, setLoadingTaxonomiesForCreate] = useState(false)
+    useEffect(() => { window.api?.paymentAccounts?.list({ activeOnly: true }).then(setPaymentAccounts).catch(() => setPaymentAccounts([])) }, [])
+    useEffect(() => {
+        if (paymentAccounts.length && qa.type !== 'TRANSFER' && !(qa as any).paymentAccountId) {
+            const legacy = paymentAccounts.find(a => qa.paymentMethod === 'BAR' ? a.kind === 'CASH' : a.kind !== 'CASH')
+            if (legacy) setQa({ ...qa, paymentAccountId: legacy.id })
+        }
+    }, [paymentAccounts])
 
     // Load active taxonomies + active terms on open; only show taxonomies that have at least one term.
     useEffect(() => {
@@ -125,16 +141,19 @@ export default function QuickAddModal({
         <div className={`modal-overlay${windowMode ? ' detached-booking-overlay' : ''}`}>
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 {/* Sticky Header with Summary + Actions */}
-                <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                <header className="modal-header-flex" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, ...(windowMode ? { WebkitAppRegion: 'drag' } as React.CSSProperties : {}) }}>
                     {/* Title row with action buttons */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                         <h2 style={{ margin: 0, flex: 1 }}>{title}</h2>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', ...(windowMode ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : {}) }}>
                             <span className="helper" style={{ fontSize: 11, opacity: 0.7 }}>Ctrl+S</span>
                             {onDetach && !windowMode && (
                                 <button type="button" className="btn ghost" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
                                     ↗
                                 </button>
+                            )}
+                            {onDelete && (
+                                <button type="button" className="btn danger icon-btn" onClick={onDelete} title="Buchung löschen" aria-label="Buchung löschen"><IconTrash /></button>
                             )}
                             <button type="submit" form="quick-add-form" className="btn primary" style={{ padding: '6px 12px', fontSize: 13 }}>{saveLabel}</button>
                             <button type="button" className="btn ghost" onClick={onClose} title="Schließen (ESC)" style={{ padding: 6 }}>
@@ -173,10 +192,10 @@ export default function QuickAddModal({
                         }}>
                             {qa.type}
                         </span>
-                        <span style={{ color: 'var(--text-dim)' }}>
+                        <span style={{ color: qa.type === 'TRANSFER' ? paymentAccounts.find(a => a.id === (qa as any).transferFromAccountId)?.color || 'var(--text-dim)' : paymentAccounts.find(a => a.id === (qa as any).paymentAccountId)?.color || 'var(--text-dim)', fontWeight: 600 }}>
                             {qa.type === 'TRANSFER' 
-                                ? `${(qa as any).transferFrom || '—'} → ${(qa as any).transferTo || '—'}`
-                                : (qa as any).paymentMethod || '—'}
+                                ? `${paymentAccounts.find(a => a.id === (qa as any).transferFromAccountId)?.name || '—'} → ${paymentAccounts.find(a => a.id === (qa as any).transferToAccountId)?.name || '—'}`
+                                : paymentAccounts.find(a => a.id === (qa as any).paymentAccountId)?.name || (qa as any).paymentMethod || '—'}
                         </span>
                         <span style={{ 
                             color: qa.type === 'IN' ? 'var(--success)' : qa.type === 'OUT' ? 'var(--danger)' : 'inherit',
@@ -248,9 +267,9 @@ export default function QuickAddModal({
                                                 className={`btn ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
                                                 onClick={() => {
                                                     const newQa = { ...qa, type: t }
-                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
-                                                        (newQa as any).transferFrom = 'BAR';
-                                                        (newQa as any).transferTo = 'BANK'
+                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFromAccountId || !(newQa as any).transferToAccountId)) {
+                                                        (newQa as any).transferFromAccountId = paymentAccounts[0]?.id
+                                                        ;(newQa as any).transferToAccountId = paymentAccounts[1]?.id
                                                     }
                                                     setQa(newQa)
                                                 }}>{t}</button>
@@ -277,27 +296,17 @@ export default function QuickAddModal({
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field">
                                         <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                        <select value={`${(qa as any).transferFrom ?? ''}->${(qa as any).transferTo ?? ''}`}
+                                        <div className="row"><select value={(qa as any).transferFromAccountId ?? ''}
                                             onChange={(e) => {
-                                                const v = e.target.value
-                                                if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
-                                                else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
+                                                setQa({ ...(qa as any), transferFromAccountId: Number(e.target.value) || undefined, paymentMethod: undefined } as any)
                                             }}
-                                            aria-label="Transfer-Richtung">
-                                            <option value="BAR->BANK">BAR → BANK</option>
-                                            <option value="BANK->BAR">BANK → BAR</option>
-                                        </select>
+                                            aria-label="Quellkonto" style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === (qa as any).transferFromAccountId)?.color)}><option value="">Von …</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select>
+                                            <select value={(qa as any).transferToAccountId ?? ''} onChange={e => setQa({ ...(qa as any), transferToAccountId: Number(e.target.value) || undefined, paymentMethod: undefined } as any)} aria-label="Zielkonto" style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === (qa as any).transferToAccountId)?.color)}><option value="">Nach …</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select></div>
                                     </div>
                                 ) : (
                                     <div className="field">
-                                        <label>Zahlweg</label>
-                                        <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                            {(['BAR','BANK'] as const).map(pm => (
-                                                <button key={pm} type="button" 
-                                                    className={`btn ${(qa as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`}
-                                                    onClick={() => setQa({ ...qa, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
-                                            ))}
-                                        </div>
+                                        <label>Zahlungskonto</label>
+                                        <select value={(qa as any).paymentAccountId ?? ''} onChange={e => setQa({ ...qa, paymentAccountId: Number(e.target.value) || undefined })} aria-label="Zahlungskonto wählen" style={paymentAccountSelectStyle(paymentAccounts.find(a => a.id === (qa as any).paymentAccountId)?.color)}><option value="">— Konto wählen —</option>{paymentAccounts.map(a => <option key={a.id} value={a.id} style={{ color: a.color || undefined }}>{a.name}</option>)}</select>
                                     </div>
                                 )}
                             </div>

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod }) {
+export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; paymentAccountId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<null | {
     totals: { net: number; vat: number; gross: number }
     byPaymentMethod: Array<{ key: PaymentMethod | null; net: number; vat: number; gross: number }>
+    byPaymentAccount?: Array<{ accountId: number | null; key: string; color?: string | null; net: number; vat: number; gross: number }>
     byType: Array<{ key: VoucherType; net: number; vat: number; gross: number }>
   }>(null)
   const [byCategory, setByCategory] = useState<Array<{ categoryId: number | null; categoryName: string; categoryColor: string | null; gross: number }>>([])
@@ -15,7 +16,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod })
+    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId })
       .then((res: any) => { if (!cancelled) setData(res) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -24,7 +25,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   useEffect(() => {
     let cancelled = false
     setByCategoryError(null)
-    const p = (window as any).api?.reports?.byCategory?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod })
+    const p = (window as any).api?.reports?.byCategory?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId })
     if (!p || typeof p.then !== 'function') {
       if (!cancelled) {
         setByCategory([])
@@ -47,8 +48,8 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'IN', paymentMethod: props.paymentMethod }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'OUT', paymentMethod: props.paymentMethod })
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'IN', paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId }),
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, type: 'OUT', paymentMethod: props.paymentMethod, paymentAccountId: props.paymentAccountId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
       const months = new Set<string>()
@@ -124,19 +125,18 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
               </div>
             </div>
 
-            {/* Nach Zahlweg */}
+            {/* Nach Zahlungskonto */}
             <div className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 16 }}>💳</span>
-                <strong>Nach Zahlweg</strong>
+                <strong>Nach Zahlungskonto</strong>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r, i) => {
-                  const icons: Record<string, string> = { BANK: '🏦', BAR: '💵' }
+                {(data.byPaymentAccount || []).map((r, i) => {
                   return (
                     <div key={(r.key ?? 'NULL') + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, fontSize: 13 }}>
-                        <span>{icons[r.key ?? ''] || '📄'}</span>
+                        <span style={{ width: 10, height: 10, borderRadius: 99, background: r.color || 'var(--accent)' }} />
                         {r.key}
                       </span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
